@@ -286,7 +286,7 @@ void processInput(GLFWwindow* window, AppState& appState)
     float aspect = 0.0f;
     updateCameraBasis(camera, gWidth, gHeight, forward, right, up, scale, aspect);
 
-    float3 cameraRight = make_float3(-right.x, 0.0f, -right.z);
+    float3 cameraRight = make_float3(right.x, 0.0f, right.z);
     float3 cameraForward = make_float3(forward.x, 0.0f, forward.z);
     cameraRight = normalize3(cameraRight);
     cameraForward = normalize3(cameraForward);
