@@ -5,30 +5,7 @@ namespace gpu
 static const char* kOptixDeviceProgram = R"(
 #include <optix.h>
 #include <cuda_runtime.h>
-
-struct SphereMaterial
-{
-    float3 color;
-    int materialType;
-};
-
-struct LaunchParams
-{
-    uchar4* image;
-    unsigned int imageWidth;
-    unsigned int imageHeight;
-    OptixTraversableHandle handle;
-    float3 cameraPosition;
-    float3 cameraForward;
-    float3 cameraRight;
-    float3 cameraUp;
-    float cameraScale;
-    float cameraAspect;
-    float3 lightPosition;
-    SphereMaterial* materials;
-    int sphereCount;
-    int maxDepth;
-};
+#include <common/rtx_shared.h>
 
 extern "C" __constant__ LaunchParams params;
 
@@ -37,12 +14,6 @@ enum RayType
     RAY_TYPE_RADIANCE = 0,
     RAY_TYPE_SHADOW = 1,
     RAY_TYPE_COUNT = 2
-};
-
-enum MaterialType
-{
-    MATERIAL_DIFFUSE = 0,
-    MATERIAL_MIRROR = 1
 };
 
 static __forceinline__ __device__ float3 make_vec(const float x, const float y, const float z)
@@ -259,7 +230,7 @@ extern "C" __global__ void __closesthit__radiance()
         mul3(material.color, ambient + diffuse),
         mul3(make_vec(1.0f, 1.0f, 1.0f), 0.35f * specular));
 
-    if (material.materialType == MATERIAL_MIRROR && depth < static_cast<unsigned int>(params.maxDepth))
+    if (material.materialType == MaterialMirror && depth < static_cast<unsigned int>(params.maxDepth))
     {
         const float3 reflectedDir = normalize3(reflect3(rayDirection, normal));
         const float3 reflectedColor = traceRadiance(

@@ -1,6 +1,9 @@
 #include "optix_renderer.h"
 
 #include "optix_device_programs.h"
+#include "../app/material.h"
+#include "../app/camera.h"
+#include "../app/scene.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -40,90 +43,6 @@ namespace
 {
 int gWidth = 800;
 int gHeight = 600;
-constexpr float kPi = 3.14159265358979323846f;
-
-enum MaterialType
-{
-    MaterialDiffuse = 0,
-    MaterialMirror = 1
-};
-
-enum RayType
-{
-    RayTypeRadiance = 0,
-    RayTypeShadow = 1,
-    RayTypeCount = 2
-};
-
-struct SphereGeometry
-{
-    float3 center;
-    float radius;
-};
-
-struct SphereMaterial
-{
-    float3 color;
-    int materialType;
-};
-
-struct SceneState
-{
-    std::vector<SphereGeometry> spheres;
-    std::vector<SphereMaterial> materials;
-    float3 lightPosition;
-    int selectedSphere = 0;
-};
-
-SceneState makeDefaultScene();
-
-struct LaunchParams
-{
-    uchar4* image;
-    unsigned int imageWidth;
-    unsigned int imageHeight;
-    OptixTraversableHandle handle;
-    float3 cameraPosition;
-    float3 cameraForward;
-    float3 cameraRight;
-    float3 cameraUp;
-    float cameraScale;
-    float cameraAspect;
-    float3 lightPosition;
-    SphereMaterial* materials;
-    int sphereCount;
-    int maxDepth;
-};
-
-template <typename T>
-struct SbtRecord
-{
-    __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
-    T data;
-};
-
-struct EmptyData
-{
-};
-
-using RaygenRecord = SbtRecord<EmptyData>;
-using MissRecord = SbtRecord<EmptyData>;
-using HitgroupRecord = SbtRecord<EmptyData>;
-
-struct CameraState
-{
-    float3 position = make_float3(0.0f, 1.3f, -6.0f);
-    float yaw = 90.0f;
-    float pitch = -10.0f;
-    float fov = 60.0f;
-};
-
-struct InputState
-{
-    double lastX = gWidth / 2.0;
-    double lastY = gHeight / 2.0;
-    bool firstMouse = true;
-};
 
 struct AppState
 {
@@ -144,54 +63,20 @@ struct FrameStats
     std::chrono::steady_clock::time_point lastUpdate = std::chrono::steady_clock::now();
 };
 
-struct ProgramGroups
+template <typename T>
+struct SbtRecord
 {
-    OptixProgramGroup raygen = nullptr;
-    OptixProgramGroup missRadiance = nullptr;
-    OptixProgramGroup missShadow = nullptr;
-    OptixProgramGroup hitRadiance = nullptr;
-    OptixProgramGroup hitShadow = nullptr;
+    __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+    T data;
 };
 
-struct OptixRenderer
+struct EmptyData
 {
-    void initialize();
-    void renderFrame(const SceneState& scene, const CameraState& camera, std::vector<uchar4>& hostPixels, float* gpuTimeMs = nullptr);
-    void destroy();
-
-private:
-    void createContext();
-    void createScene();
-    void createModule();
-    void createProgramGroups();
-    void createPipeline();
-    void createSbt();
-    void rebuildAccelerationStructure();
-
-    OptixDeviceContext context = nullptr;
-    OptixModule module = nullptr;
-    OptixModule sphereModule = nullptr;
-    ProgramGroups programGroups;
-    OptixPipeline pipeline = nullptr;
-    OptixShaderBindingTable sbt = {};
-    OptixPipelineCompileOptions pipelineCompileOptions = {};
-
-    CUstream stream = nullptr;
-    CUdeviceptr dSphereCenters = 0;
-    CUdeviceptr dSphereRadii = 0;
-    CUdeviceptr dMaterials = 0;
-    CUdeviceptr dSphereGasBuffer = 0;
-    CUdeviceptr dLaunchParams = 0;
-    OptixTraversableHandle sphereGasHandle = 0;
-    std::vector<uint32_t> sphereFlags;
-    OptixBuildInput sphereBuildInput = {};
-    OptixAccelBuildOptions sphereAccelOptions = {};
-    OptixAccelBufferSizes sphereGasSizes = {};
-    cudaEvent_t frameStart = nullptr;
-    cudaEvent_t frameStop = nullptr;
-
-    uchar4* dFrameBuffer = nullptr;
 };
+
+using RaygenRecord = SbtRecord<EmptyData>;
+using MissRecord = SbtRecord<EmptyData>;
+using HitgroupRecord = SbtRecord<EmptyData>;
 
 inline void cudaCheck(cudaError_t result, const char* expression, const char* file, int line)
 {
@@ -264,15 +149,18 @@ std::string compileDeviceProgram()
 
     const std::string cudaInclude = getShortPath("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\include");
     const std::string optixInclude = getShortPath("C:\\ProgramData\\NVIDIA Corporation\\OptiX SDK 9.1.0\\include");
+    const std::string projectInclude = getShortPath("C:\\Users\\User\\source\\repos\\RayTracerRTX\\RayTracerRTX\\src");
     const std::string architecture = "--gpu-architecture=compute_" + std::to_string(props.major) + std::to_string(props.minor);
     const std::string includeCuda = "-I" + cudaInclude;
     const std::string includeOptix = "-I" + optixInclude;
+    const std::string includeProject = "-I" + projectInclude;
 
     const std::vector<const char*> options = {
         "--std=c++14",
         architecture.c_str(),
         includeCuda.c_str(),
         includeOptix.c_str(),
+        includeProject.c_str(),
         "--use_fast_math",
         "--relocatable-device-code=true",
         "--device-as-default-execution-space",
@@ -369,97 +257,6 @@ float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
         clampf(value.x, minValue.x, maxValue.x),
         clampf(value.y, minValue.y, maxValue.y),
         clampf(value.z, minValue.z, maxValue.z));
-}
-
-SceneState makeDefaultScene()
-{
-    SceneState scene;
-    scene.spheres = {
-        {make_float3(0.0f, 0.0f, 0.0f), 1.0f},
-        {make_float3(2.2f, -0.2f, 1.5f), 0.8f},
-        {make_float3(-2.2f, -0.2f, 1.5f), 0.8f},
-        {make_float3(0.0f, -1001.0f, 0.0f), 1000.0f}
-    };
-
-    scene.materials = {
-        {make_float3(1.0f, 1.0f, 1.0f), MaterialMirror},
-        {make_float3(0.82f, 0.70f, 0.60f), MaterialDiffuse},
-        {make_float3(0.60f, 0.80f, 0.75f), MaterialDiffuse},
-        {make_float3(0.88f, 0.88f, 0.90f), MaterialDiffuse}
-    };
-
-    scene.lightPosition = make_float3(7.0f, 10.0f, -10.0f);
-    scene.selectedSphere = 0;
-    return scene;
-}
-
-void clampScene(SceneState& scene)
-{
-    const float3 sphereMin = make_float3(-3.5f, 0.0f, -4.0f);
-    const float3 sphereMax = make_float3(3.5f, 3.0f, 3.0f);
-    const float floorY = scene.spheres.back().center.y + scene.spheres.back().radius;
-
-    for (size_t i = 0; i + 1 < scene.spheres.size(); ++i)
-    {
-        SphereGeometry& sphere = scene.spheres[i];
-        const float3 minBounds = make_float3(sphereMin.x, floorY + sphere.radius, sphereMin.z);
-        const float3 maxBounds = make_float3(sphereMax.x, sphereMax.y, sphereMax.z);
-        sphere.center = clamp3(sphere.center, minBounds, maxBounds);
-    }
-
-    scene.lightPosition = clamp3(
-        scene.lightPosition,
-        make_float3(-10.0f, 1.0f, -15.0f),
-        make_float3(10.0f, 18.0f, 15.0f));
-
-    if (scene.selectedSphere < 0)
-    {
-        scene.selectedSphere = 0;
-    }
-    if (scene.selectedSphere > static_cast<int>(scene.spheres.size()) - 2)
-    {
-        scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 2;
-    }
-}
-
-void moveSelectedSphere(SceneState& scene, const float3 delta)
-{
-    const int index = scene.selectedSphere;
-    if (index < 0 || index >= static_cast<int>(scene.spheres.size()) - 1)
-    {
-        return;
-    }
-
-    scene.spheres[index].center = add3(scene.spheres[index].center, delta);
-    clampScene(scene);
-}
-
-void toggleSelectedMaterial(SceneState& scene)
-{
-    const int index = scene.selectedSphere;
-    if (index < 0 || index >= static_cast<int>(scene.materials.size()) - 1)
-    {
-        return;
-    }
-
-    SphereMaterial& material = scene.materials[index];
-    material.materialType = (material.materialType == MaterialDiffuse) ? MaterialMirror : MaterialDiffuse;
-}
-
-void moveLight(SceneState& scene, const float3 delta)
-{
-    scene.lightPosition = add3(scene.lightPosition, delta);
-    clampScene(scene);
-}
-
-const char* materialName(int materialType)
-{
-    return materialType == MaterialMirror ? "mirror" : "diffuse";
-}
-
-const wchar_t* materialNameW(int materialType)
-{
-    return materialType == MaterialMirror ? L"\u0417\u0415\u0420\u041A\u0410\u041B\u041E" : L"\u041C\u0410\u0422\u041E\u0412\u042B\u0419";
 }
 
 std::array<uint8_t, 7> glyphFor(char input)
@@ -758,29 +555,6 @@ void drawHud(GLFWwindow* window, const SceneState& scene, const FrameStats& stat
     SelectObject(dc, oldFont);
 }
 
-void updateCameraBasis(
-    const CameraState& camera,
-    float3& forward,
-    float3& right,
-    float3& up,
-    float& scale,
-    float& aspect)
-{
-    const float yaw = camera.yaw * kPi / 180.0f;
-    const float pitch = camera.pitch * kPi / 180.0f;
-
-    forward = normalize3(make_float3(
-        std::cos(yaw) * std::cos(pitch),
-        std::sin(pitch),
-        std::sin(yaw) * std::cos(pitch)));
-
-    const float3 worldUp = make_float3(0.0f, 1.0f, 0.0f);
-    right = normalize3(cross3(forward, worldUp));
-    up = normalize3(cross3(right, forward));
-    aspect = static_cast<float>(gWidth) / static_cast<float>(gHeight);
-    scale = std::tan((camera.fov * 0.5f) * kPi / 180.0f);
-}
-
 void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
     auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
@@ -843,7 +617,7 @@ void processInput(GLFWwindow* window, AppState& appState)
     float3 up{};
     float scale = 0.0f;
     float aspect = 0.0f;
-    updateCameraBasis(camera, forward, right, up, scale, aspect);
+    updateCameraBasis(camera, gWidth, gHeight, forward, right, up, scale, aspect);
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
@@ -957,6 +731,14 @@ void processInput(GLFWwindow* window, AppState& appState)
         toggleSelectedMaterial(scene);
     }
     mWasDown = mIsDown;
+}
+
+} // namespace
+
+void OptixRenderer::setRenderSize(int width, int height)
+{
+    gWidth = width;
+    gHeight = height;
 }
 
 void OptixRenderer::initialize()
@@ -1189,7 +971,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     float3 up{};
     float scale = 0.0f;
     float aspect = 0.0f;
-    updateCameraBasis(camera, forward, right, up, scale, aspect);
+    updateCameraBasis(camera, gWidth, gHeight, forward, right, up, scale, aspect);
 
     std::vector<float3> centers;
     std::vector<float> radii;
@@ -1361,9 +1143,7 @@ void OptixRenderer::destroy()
         context = nullptr;
     }
 }
-} // namespace
-
-void run_optix_app()
+void run_optix_app_legacy()
 {
     if (!glfwInit())
     {
