@@ -47,8 +47,8 @@ SceneState makeDefaultScene()
 
 void clampScene(SceneState& scene)
 {
-    const float3 sphereMin = make_float3(-3.5f, 0.0f, -4.0f);
-    const float3 sphereMax = make_float3(3.5f, 3.0f, 3.0f);
+    const float3 sphereMin = make_float3(-8.0f, 0.0f, -8.0f);
+    const float3 sphereMax = make_float3(8.0f, 5.0f, 8.0f);
     const float floorY = scene.spheres.back().center.y + scene.spheres.back().radius;
 
     for (size_t i = 0; i + 1 < scene.spheres.size(); ++i)
@@ -61,8 +61,8 @@ void clampScene(SceneState& scene)
 
     scene.lightPosition = clamp3(
         scene.lightPosition,
-        make_float3(-10.0f, 1.0f, -15.0f),
-        make_float3(10.0f, 18.0f, 15.0f));
+        make_float3(-18.0f, 1.0f, -20.0f),
+        make_float3(18.0f, 24.0f, 20.0f));
 
     if (scene.selectedSphere < 0)
     {

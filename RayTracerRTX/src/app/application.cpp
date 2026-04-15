@@ -66,6 +66,22 @@ float3 mul3(const float3 a, const float value)
     return make_float3(a.x * value, a.y * value, a.z * value);
 }
 
+float dot3(const float3 a, const float3 b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+float3 normalize3(const float3 v)
+{
+    const float length = std::sqrt(dot3(v, v));
+    if (length <= 0.000001f)
+    {
+        return make_float3(0.0f, 0.0f, 0.0f);
+    }
+
+    return make_float3(v.x / length, v.y / length, v.z / length);
+}
+
 float clampf(const float value, const float minValue, const float maxValue)
 {
     return value < minValue ? minValue : (value > maxValue ? maxValue : value);
@@ -270,6 +286,19 @@ void processInput(GLFWwindow* window, AppState& appState)
     float aspect = 0.0f;
     updateCameraBasis(camera, gWidth, gHeight, forward, right, up, scale, aspect);
 
+    float3 cameraRight = make_float3(-right.x, 0.0f, -right.z);
+    float3 cameraForward = make_float3(forward.x, 0.0f, forward.z);
+    cameraRight = normalize3(cameraRight);
+    cameraForward = normalize3(cameraForward);
+    if (dot3(cameraRight, cameraRight) <= 0.000001f)
+    {
+        cameraRight = make_float3(1.0f, 0.0f, 0.0f);
+    }
+    if (dot3(cameraForward, cameraForward) <= 0.000001f)
+    {
+        cameraForward = make_float3(0.0f, 0.0f, 1.0f);
+    }
+
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -318,19 +347,19 @@ void processInput(GLFWwindow* window, AppState& appState)
     constexpr float verticalStep = 0.10f;
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
     {
-        moveSelectedSphere(scene, make_float3(-sphereStep, 0.0f, 0.0f));
+        moveSelectedSphere(scene, mul3(cameraRight, -sphereStep));
     }
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
     {
-        moveSelectedSphere(scene, make_float3(sphereStep, 0.0f, 0.0f));
+        moveSelectedSphere(scene, mul3(cameraRight, sphereStep));
     }
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
     {
-        moveSelectedSphere(scene, make_float3(0.0f, 0.0f, -sphereStep));
+        moveSelectedSphere(scene, mul3(cameraForward, sphereStep));
     }
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
     {
-        moveSelectedSphere(scene, make_float3(0.0f, 0.0f, sphereStep));
+        moveSelectedSphere(scene, mul3(cameraForward, -sphereStep));
     }
     if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS)
     {
