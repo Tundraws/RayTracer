@@ -242,7 +242,7 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
     state->input.lastX = xpos;
     state->input.lastY = ypos;
 
-    constexpr float sensitivity = 0.12f;
+    constexpr float sensitivity = 0.18f;
     state->camera.yaw += xoffset * sensitivity;
     state->camera.pitch += yoffset * sensitivity;
 
@@ -274,7 +274,7 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int)
     state->input.firstMouse = true;
 }
 
-void processInput(GLFWwindow* window, AppState& appState)
+void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
 {
     CameraState& camera = appState.camera;
     SceneState& scene = appState.scene;
@@ -304,30 +304,31 @@ void processInput(GLFWwindow* window, AppState& appState)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
 
-    constexpr float speed = 0.12f;
+    const float dt = clampf(deltaTimeSec, 0.0f, 0.05f);
+    const float cameraStep = 8.5f * dt;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
-        camera.position = add3(camera.position, mul3(forward, speed));
+        camera.position = add3(camera.position, mul3(forward, cameraStep));
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     {
-        camera.position = sub3(camera.position, mul3(forward, speed));
+        camera.position = sub3(camera.position, mul3(forward, cameraStep));
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     {
-        camera.position = sub3(camera.position, mul3(right, speed));
+        camera.position = sub3(camera.position, mul3(right, cameraStep));
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     {
-        camera.position = add3(camera.position, mul3(right, speed));
+        camera.position = add3(camera.position, mul3(right, cameraStep));
     }
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
     {
-        camera.position = add3(camera.position, mul3(up, speed));
+        camera.position = add3(camera.position, mul3(up, cameraStep));
     }
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
     {
-        camera.position = sub3(camera.position, mul3(up, speed));
+        camera.position = sub3(camera.position, mul3(up, cameraStep));
     }
 
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
@@ -343,8 +344,8 @@ void processInput(GLFWwindow* window, AppState& appState)
         scene.selectedSphere = 2;
     }
 
-    constexpr float sphereStep = 0.06f;
-    constexpr float verticalStep = 0.10f;
+    const float sphereStep = 5.8f * dt;
+    const float verticalStep = 4.8f * dt;
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
     {
         moveSelectedSphere(scene, mul3(cameraRight, -sphereStep));
@@ -378,7 +379,7 @@ void processInput(GLFWwindow* window, AppState& appState)
         moveSelectedSphere(scene, make_float3(0.0f, -verticalStep, 0.0f));
     }
 
-    constexpr float lightStep = 0.07f;
+    const float lightStep = 7.0f * dt;
     if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS)
     {
         moveLight(scene, make_float3(-lightStep, 0.0f, 0.0f));
@@ -454,15 +455,20 @@ void run_optix_app()
 
     std::vector<uchar4> pixels(gWidth * gHeight);
     FrameStats stats;
+    auto lastFrameTime = std::chrono::steady_clock::now();
 
     while (!glfwWindowShouldClose(window))
     {
+        const auto frameNow = std::chrono::steady_clock::now();
+        const float deltaTimeSec = static_cast<float>(std::chrono::duration<double>(frameNow - lastFrameTime).count());
+        lastFrameTime = frameNow;
+
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         {
             glfwSetWindowShouldClose(window, GLFW_TRUE);
         }
 
-        processInput(window, appState);
+        processInput(window, appState, deltaTimeSec);
 
         const auto hostFrameStart = std::chrono::steady_clock::now();
         float gpuTimeMs = 0.0f;

@@ -60,6 +60,16 @@ static __forceinline__ __device__ float3 clamp3(const float3 v, const float minV
         fminf(fmaxf(v.z, minValue), maxValue));
 }
 
+static __forceinline__ __device__ float saturate1(const float value)
+{
+    return fminf(fmaxf(value, 0.0f), 1.0f);
+}
+
+static __forceinline__ __device__ float3 lerp3(const float3 a, const float3 b, const float t)
+{
+    return add3(mul3(a, 1.0f - t), mul3(b, t));
+}
+
 static __forceinline__ __device__ void setRadiancePayload(const float3 color)
 {
     optixSetPayload_0(__float_as_uint(color.x));
@@ -164,19 +174,12 @@ extern "C" __global__ void __raygen__rg()
 extern "C" __global__ void __miss__radiance()
 {
     const float3 rayDir = normalize3(optixGetWorldRayDirection());
-    const float t = clamp3(make_vec(0.5f * (rayDir.y + 1.0f), 0.0f, 0.0f), 0.0f, 1.0f).x;
-    const float3 horizon = make_vec(0.96f, 0.84f, 0.70f);
-    const float3 zenith = make_vec(0.24f, 0.44f, 0.78f);
-    const float3 sky = add3(mul3(horizon, 1.0f - t), mul3(zenith, t));
-
-    const float3 sunDir = normalize3(make_vec(-0.35f, 0.82f, -0.45f));
-    const float sunAmount = powf(fmaxf(dot3(rayDir, sunDir), 0.0f), 96.0f);
-    const float glowAmount = powf(fmaxf(dot3(rayDir, sunDir), 0.0f), 12.0f);
-    const float3 sunGlow = add3(
-        mul3(make_vec(1.00f, 0.82f, 0.58f), 0.55f * glowAmount),
-        mul3(make_vec(1.00f, 0.96f, 0.88f), 0.85f * sunAmount));
-
-    setRadiancePayload(add3(sky, sunGlow));
+    const float t = saturate1(0.5f * (rayDir.y + 1.0f));
+    const float tt = t * t;
+    const float3 horizon = make_vec(0.74f, 0.74f, 0.75f);
+    const float3 zenith = make_vec(0.84f, 0.84f, 0.85f);
+    const float3 sky = add3(mul3(horizon, 1.0f - tt), mul3(zenith, tt));
+    setRadiancePayload(sky);
 }
 
 extern "C" __global__ void __miss__shadow()
@@ -241,6 +244,16 @@ extern "C" __global__ void __closesthit__radiance()
             1e20f,
             depth + 1u);
         localColor = add3(mul3(localColor, 0.15f), mul3(reflectedColor, 0.85f));
+    }
+    const bool isFloor = primitiveIndex + 1u == static_cast<unsigned int>(params.sphereCount);
+    if (isFloor)
+    {
+        const float3 toCamera = sub3(hitPoint, params.cameraPosition);
+        const float distanceToCamera = sqrtf(dot3(toCamera, toCamera));
+        const float fog = saturate1((distanceToCamera - 12.0f) / 58.0f);
+        const float fogCurve = fog * fog * (3.0f - 2.0f * fog);
+        const float3 fogColor = make_vec(0.91f, 0.90f, 0.89f);
+        localColor = lerp3(localColor, fogColor, 0.45f * fogCurve);
     }
 
     setRadiancePayload(localColor);
