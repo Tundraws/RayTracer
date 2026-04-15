@@ -1,0 +1,37 @@
+# Visual Studio and IDE state
+**/.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+
+# Build output directories
+**/Debug/
+**/Release/
+**/x64/
+
+# Build artifacts and intermediate files
+*.obj
+*.pdb
+*.idb
+*.ilk
+*.tlog
+*.lastbuildstate
+*.log
+*.recipe
+*.cache
+*.deps
+*.ipch
+*.vsidx
+
+# NVIDIA/Visual Studio database files
+*.sqlite
+*.db
+*.VC.db
+*.VC.opendb
+*.VC.VC.opendb
+
+# Render outputs
+*.ppm
+*.docx
