@@ -27,20 +27,18 @@ SceneState makeDefaultScene()
 {
     SceneState scene;
     scene.spheres = {
-        {make_float3(0.0f, 2.0f, 0.0f), 3.0f},
-        {make_float3(6.5f, 1.4f, 3.5f), 2.4f},
-        {make_float3(-6.5f, 1.4f, 3.5f), 2.4f},
-        {make_float3(0.0f, -1001.0f, 0.0f), 1000.0f}
+        {make_float3(0.0f, 3.0f, 0.0f), 3.0f},
+        {make_float3(6.5f, 2.4f, 3.5f), 2.4f},
+        {make_float3(-6.5f, 2.4f, 3.5f), 2.4f}
     };
 
     scene.materials = {
         {make_float3(1.0f, 1.0f, 1.0f), MaterialMirror},
         {make_float3(0.82f, 0.70f, 0.60f), MaterialDiffuse},
-        {make_float3(0.60f, 0.80f, 0.75f), MaterialDiffuse},
-        {make_float3(0.88f, 0.88f, 0.90f), MaterialDiffuse}
+        {make_float3(0.60f, 0.80f, 0.75f), MaterialDiffuse}
     };
 
-    scene.lightPosition = make_float3(7.0f, 10.0f, -10.0f);
+    scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
     scene.selectedSphere = 0;
     return scene;
 }
@@ -49,9 +47,9 @@ void clampScene(SceneState& scene)
 {
     const float3 sphereMin = make_float3(-24.0f, 0.0f, -24.0f);
     const float3 sphereMax = make_float3(24.0f, 14.0f, 24.0f);
-    const float floorY = scene.spheres.back().center.y + scene.spheres.back().radius;
+    const float floorY = 0.0f;
 
-    for (size_t i = 0; i + 1 < scene.spheres.size(); ++i)
+    for (size_t i = 0; i < scene.spheres.size(); ++i)
     {
         SphereGeometry& sphere = scene.spheres[i];
         const float3 minBounds = make_float3(sphereMin.x, floorY + sphere.radius, sphereMin.z);
@@ -61,23 +59,23 @@ void clampScene(SceneState& scene)
 
     scene.lightPosition = clamp3(
         scene.lightPosition,
-        make_float3(-40.0f, 1.0f, -40.0f),
+        make_float3(-40.0f, 6.0f, -40.0f),
         make_float3(40.0f, 40.0f, 40.0f));
 
     if (scene.selectedSphere < 0)
     {
         scene.selectedSphere = 0;
     }
-    if (scene.selectedSphere > static_cast<int>(scene.spheres.size()) - 2)
+    if (scene.selectedSphere >= static_cast<int>(scene.spheres.size()))
     {
-        scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 2;
+        scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
     }
 }
 
 void moveSelectedSphere(SceneState& scene, const float3 delta)
 {
     const int index = scene.selectedSphere;
-    if (index < 0 || index >= static_cast<int>(scene.spheres.size()) - 1)
+    if (index < 0 || index >= static_cast<int>(scene.spheres.size()))
     {
         return;
     }
@@ -89,7 +87,7 @@ void moveSelectedSphere(SceneState& scene, const float3 delta)
 void toggleSelectedMaterial(SceneState& scene)
 {
     const int index = scene.selectedSphere;
-    if (index < 0 || index >= static_cast<int>(scene.materials.size()) - 1)
+    if (index < 0 || index >= static_cast<int>(scene.materials.size()))
     {
         return;
     }

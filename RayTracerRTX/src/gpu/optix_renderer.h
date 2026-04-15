@@ -10,8 +10,10 @@ struct ProgramGroups
     OptixProgramGroup raygen = nullptr;
     OptixProgramGroup missRadiance = nullptr;
     OptixProgramGroup missShadow = nullptr;
-    OptixProgramGroup hitRadiance = nullptr;
-    OptixProgramGroup hitShadow = nullptr;
+    OptixProgramGroup hitSphereRadiance = nullptr;
+    OptixProgramGroup hitSphereShadow = nullptr;
+    OptixProgramGroup hitPlaneRadiance = nullptr;
+    OptixProgramGroup hitPlaneShadow = nullptr;
 };
 
 class OptixRenderer
@@ -43,13 +45,27 @@ private:
     CUdeviceptr dSphereCenters = 0;
     CUdeviceptr dSphereRadii = 0;
     CUdeviceptr dMaterials = 0;
+    CUdeviceptr dPlaneVertices = 0;
+    CUdeviceptr dPlaneIndices = 0;
     CUdeviceptr dSphereGasBuffer = 0;
+    CUdeviceptr dPlaneGasBuffer = 0;
+    CUdeviceptr dIasBuffer = 0;
+    CUdeviceptr dIasInstances = 0;
     CUdeviceptr dLaunchParams = 0;
     OptixTraversableHandle sphereGasHandle = 0;
+    OptixTraversableHandle planeGasHandle = 0;
+    OptixTraversableHandle iasHandle = 0;
     std::vector<uint32_t> sphereFlags;
+    std::vector<uint32_t> planeFlags;
     OptixBuildInput sphereBuildInput = {};
+    OptixBuildInput planeBuildInput = {};
+    OptixBuildInput iasBuildInput = {};
     OptixAccelBuildOptions sphereAccelOptions = {};
+    OptixAccelBuildOptions planeAccelOptions = {};
+    OptixAccelBuildOptions iasAccelOptions = {};
     OptixAccelBufferSizes sphereGasSizes = {};
+    OptixAccelBufferSizes planeGasSizes = {};
+    OptixAccelBufferSizes iasSizes = {};
     cudaEvent_t frameStart = nullptr;
     cudaEvent_t frameStop = nullptr;
 

@@ -322,13 +322,9 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     {
         camera.position = add3(camera.position, mul3(right, cameraStep));
     }
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
     {
         camera.position = add3(camera.position, mul3(up, cameraStep));
-    }
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-    {
-        camera.position = sub3(camera.position, mul3(up, cameraStep));
     }
 
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
@@ -412,6 +408,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
         toggleSelectedMaterial(scene);
     }
     mWasDown = mIsDown;
+
 }
 } // namespace
 

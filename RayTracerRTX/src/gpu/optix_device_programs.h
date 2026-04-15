@@ -223,11 +223,15 @@ extern "C" __global__ void __closesthit__radiance()
         0.001f,
         lightDistance - 0.01f);
 
-    const float ambient = 0.15f;
-    const float diffuse = visible ? fmaxf(dot3(normal, lightDir), 0.0f) : 0.0f;
+    const float ambient = 0.18f;
+    const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
+    const float shadowFactor = visible
+        ? 1.0f
+        : (material.materialType == MaterialMirror ? 0.50f : 0.32f);
+    const float diffuse = ndotl * shadowFactor;
     const float3 viewDir = mul3(rayDirection, -1.0f);
     const float3 halfDir = normalize3(add3(lightDir, viewDir));
-    const float specular = visible ? powf(fmaxf(dot3(normal, halfDir), 0.0f), 48.0f) : 0.0f;
+    const float specular = visible ? powf(fmaxf(dot3(normal, halfDir), 0.0f), 42.0f) : 0.0f;
 
     float3 localColor = add3(
         mul3(material.color, ambient + diffuse),
@@ -245,21 +249,58 @@ extern "C" __global__ void __closesthit__radiance()
             depth + 1u);
         localColor = add3(mul3(localColor, 0.15f), mul3(reflectedColor, 0.85f));
     }
-    const bool isFloor = primitiveIndex + 1u == static_cast<unsigned int>(params.sphereCount);
-    if (isFloor)
-    {
-        const float3 toCamera = sub3(hitPoint, params.cameraPosition);
-        const float distanceToCamera = sqrtf(dot3(toCamera, toCamera));
-        const float fog = saturate1((distanceToCamera - 12.0f) / 58.0f);
-        const float fogCurve = fog * fog * (3.0f - 2.0f * fog);
-        const float3 fogColor = make_vec(0.91f, 0.90f, 0.89f);
-        localColor = lerp3(localColor, fogColor, 0.45f * fogCurve);
-    }
 
     setRadiancePayload(localColor);
 }
 
 extern "C" __global__ void __closesthit__shadow()
+{
+    setShadowPayload(false);
+}
+
+extern "C" __global__ void __closesthit__radiance_plane()
+{
+    const float3 rayOrigin = optixGetWorldRayOrigin();
+    const float3 rayDirection = normalize3(optixGetWorldRayDirection());
+    const float tHit = optixGetRayTmax();
+    const float3 hitPoint = add3(rayOrigin, mul3(rayDirection, tHit));
+    const float3 normal = make_vec(0.0f, 1.0f, 0.0f);
+
+    const float3 lightVector = sub3(params.lightPosition, hitPoint);
+    const float lightDistance = sqrtf(dot3(lightVector, lightVector));
+    const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
+
+    const bool visible = traceShadow(
+        params.handle,
+        add3(hitPoint, mul3(normal, 0.002f)),
+        lightDir,
+        0.001f,
+        lightDistance - 0.01f);
+
+    const float ambient = 0.18f;
+    const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
+    const float shadowFactor = visible ? 1.0f : 0.38f;
+    const float diffuse = ndotl * shadowFactor;
+    const float3 viewDir = mul3(rayDirection, -1.0f);
+    const float3 halfDir = normalize3(add3(lightDir, viewDir));
+    const float specular = visible ? powf(fmaxf(dot3(normal, halfDir), 0.0f), 56.0f) : 0.0f;
+
+    const float3 baseColor = make_vec(0.95f, 0.95f, 0.96f);
+    float3 localColor = add3(
+        mul3(baseColor, ambient + 0.85f * diffuse),
+        mul3(make_vec(1.0f, 1.0f, 1.0f), 0.20f * specular));
+
+    const float3 toCamera = sub3(hitPoint, params.cameraPosition);
+    const float distanceToCamera = sqrtf(dot3(toCamera, toCamera));
+    const float fog = saturate1((distanceToCamera - 18.0f) / 70.0f);
+    const float fogCurve = fog * fog * (3.0f - 2.0f * fog);
+    const float3 fadeToSky = make_vec(0.88f, 0.88f, 0.89f);
+    localColor = lerp3(localColor, fadeToSky, 0.30f * fogCurve);
+
+    setRadiancePayload(localColor);
+}
+
+extern "C" __global__ void __closesthit__shadow_plane()
 {
     setShadowPayload(false);
 }
