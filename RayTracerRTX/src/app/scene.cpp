@@ -35,7 +35,7 @@ SceneState makeDefaultScene()
     scene.materials = {
         {make_float3(1.0f, 1.0f, 1.0f), MaterialMirror},
         {make_float3(0.82f, 0.70f, 0.60f), MaterialDiffuse},
-        {make_float3(0.60f, 0.80f, 0.75f), MaterialDiffuse}
+        {make_float3(0.65f, 0.80f, 0.75f), MaterialDiffuse}
     };
 
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);

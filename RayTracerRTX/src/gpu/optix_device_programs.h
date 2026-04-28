@@ -176,8 +176,8 @@ extern "C" __global__ void __miss__radiance()
     const float3 rayDir = normalize3(optixGetWorldRayDirection());
     const float t = saturate1(0.5f * (rayDir.y + 1.0f));
     const float tt = t * t;
-    const float3 horizon = make_vec(0.74f, 0.74f, 0.75f);
-    const float3 zenith = make_vec(0.84f, 0.84f, 0.85f);
+    const float3 horizon = make_vec(0.231f, 0.251f, 0.251f);
+    const float3 zenith = make_vec(0.333f, 0.341f, 0.341f);
     const float3 sky = add3(mul3(horizon, 1.0f - tt), mul3(zenith, tt));
     setRadiancePayload(sky);
 }
@@ -294,7 +294,7 @@ extern "C" __global__ void __closesthit__radiance_plane()
     const float distanceToCamera = sqrtf(dot3(toCamera, toCamera));
     const float fog = saturate1((distanceToCamera - 18.0f) / 70.0f);
     const float fogCurve = fog * fog * (3.0f - 2.0f * fog);
-    const float3 fadeToSky = make_vec(0.88f, 0.88f, 0.89f);
+    const float3 fadeToSky = make_vec(0.231f, 0.251f, 0.251f);
     localColor = lerp3(localColor, fadeToSky, 0.30f * fogCurve);
 
     setRadiancePayload(localColor);
