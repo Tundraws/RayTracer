@@ -7,7 +7,10 @@
 - Git-based development history with clear commits
 - Tests (unit + at least one GPU smoke/integration check)
 - Static analysis and quality report
-- Documentation (`README`, architecture notes, test evidence)
+- Documentation (`README`, architecture notes, API notes, test evidence)
+- Dependency/security notes
+- AI-assisted development notes
+- CI workflow for reproducible CPU/documentation checks
 
 ## Current "ideal" test package
 
@@ -33,13 +36,32 @@
 - Performance table (FPS / Frame ms / GPU ms) for 3 scenarios
 - Screenshot(s) of running renderer with HUD
 - Static analysis summary (tool + key warnings + fixes)
+- Architecture diagrams from `docs/architecture.md`
+- Internal API notes from `docs/api.md`
+- Dependency/security notes from `docs/dependency-security.md`
+- AI-assisted development notes from `docs/ai-assisted-development.md`
+- GitHub Actions workflow from `.github/workflows/coursework-check.yml`
 
-## Suggested next implementation steps
+## Current artifact map
 
-1. Add GitHub Actions workflow:
-   - build tests
-   - run tests
-   - run static analysis (`cppcheck` or `clang-tidy`)
-2. Add `docs/performance-results.md` and record measurements
-3. Add architecture diagram and module interaction notes
-4. Finalize report sections 4 and 5 using generated artifacts
+| Requirement | Artifact |
+|---|---|
+| Git / semantic commits | Git history on `main` |
+| CI/CD | `.github/workflows/coursework-check.yml` |
+| Unit tests | `tests/test_scene_camera.cpp` |
+| GPU smoke test | `tests/RayTracerRTX.Tests.vcxproj` |
+| Docker / Compose | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
+| README | `README.md`, `RayTracerRTX/README.md` |
+| Architecture diagrams | `docs/architecture.md` |
+| API documentation | `docs/api.md` |
+| SAST | `docs/static-analysis.md` |
+| Dependency/security notes | `docs/dependency-security.md` |
+| Performance analysis | `docs/performance-results.md` |
+| AI tools | `docs/ai-assisted-development.md` |
+
+## Remaining before final submission
+
+1. Confirm final mirror material appearance in the interactive application.
+2. Commit final visual shader changes after visual acceptance.
+3. Capture final application screenshots for the report.
+4. Re-run native tests and Docker check before final GitHub submission.

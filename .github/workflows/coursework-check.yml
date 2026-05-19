@@ -1,0 +1,55 @@
+name: Coursework Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  cpu-and-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check required files
+        shell: bash
+        run: |
+          test -f README.md
+          test -f RayTracerRTX/README.md
+          test -f RayTracerRTX/docs/coursework-checklist.md
+          test -f RayTracerRTX/docs/architecture.md
+          test -f RayTracerRTX/docs/api.md
+          test -f RayTracerRTX/docs/static-analysis.md
+          test -f RayTracerRTX/docs/dependency-security.md
+          test -f RayTracerRTX/docs/ai-assisted-development.md
+          test -f RayTracerRTX/docs/performance-results.md
+          test -f Dockerfile
+          test -f docker-compose.yml
+
+      - name: Check OptiX device source markers
+        shell: bash
+        run: |
+          grep -q "OptiX" RayTracerRTX/README.md
+          grep -q "__raygen__rg" RayTracerRTX/src/gpu/optix_device_programs.h
+          grep -q "__closesthit__radiance" RayTracerRTX/src/gpu/optix_device_programs.h
+          grep -q "LaunchParams" RayTracerRTX/src/common/rtx_shared.h
+
+      - name: Build CPU-only tests with stubs
+        shell: bash
+        run: |
+          g++ -std=c++20 -Wall -Wextra -pedantic \
+            -IRayTracerRTX/tests/stubs \
+            -IRayTracerRTX/src \
+            RayTracerRTX/tests/test_scene_camera.cpp \
+            RayTracerRTX/src/app/camera.cpp \
+            RayTracerRTX/src/app/material.cpp \
+            RayTracerRTX/src/app/scene.cpp \
+            -o raytracerrtx_cpu_tests
+
+      - name: Run CPU-only tests
+        shell: bash
+        run: ./raytracerrtx_cpu_tests
+
