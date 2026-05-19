@@ -169,6 +169,7 @@ extern "C" __global__ void __raygen__rg()
         0u);
 
     params.image[idx.y * params.imageWidth + idx.x] = toColor(color);
+
 }
 
 extern "C" __global__ void __miss__radiance()

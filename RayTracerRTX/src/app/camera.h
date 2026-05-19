@@ -4,10 +4,10 @@
 
 struct CameraState
 {
-    float3 position = make_float3(0.0f, 1.3f, -6.0f);
-    float yaw = 115.0f;
-    float pitch = -10.0f;
-    float fov = 60.0f;
+    float3 position = make_float3(0.0f, 8.0f, -15.0f);
+    float yaw = 90.0f;
+    float pitch = -25.0f;
+    float fov = 45.0f;
 };
 
 struct InputState
