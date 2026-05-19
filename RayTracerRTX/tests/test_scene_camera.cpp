@@ -7,8 +7,11 @@
 
 #include "test_framework.h"
 
+#include <chrono>
 #include <cmath>
+#include <iomanip>
 #include <iostream>
+#include <string>
 #include <vector>
 
 namespace
@@ -211,10 +214,82 @@ bool runGpuSmokeTest(TestContext& t)
     }
 #endif
 }
+
+int runGpuBenchmark()
+{
+#if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
+    std::cout << "GPU benchmark is not available: RAYTRACERRTX_ENABLE_GPU_TESTS is not enabled.\n";
+    return 1;
+#else
+    struct Scenario
+    {
+        const char* name;
+        int width;
+        int height;
+        int frames;
+    };
+
+    const Scenario scenarios[] = {
+        {"Low", 640, 360, 30},
+        {"HD", 1280, 720, 30},
+        {"Full HD", 1920, 1080, 20},
+    };
+
+    std::cout << "| Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |\n";
+    std::cout << "|---|---:|---:|---:|---:|\n";
+
+    for (const Scenario& scenario : scenarios)
+    {
+        OptixRenderer renderer;
+        renderer.setRenderSize(scenario.width, scenario.height);
+        renderer.initialize();
+
+        SceneState scene = makeDefaultScene();
+        CameraState camera;
+        std::vector<uchar4> pixels(static_cast<size_t>(scenario.width) * static_cast<size_t>(scenario.height));
+
+        float warmupGpuTimeMs = 0.0f;
+        renderer.renderFrame(scene, camera, pixels, &warmupGpuTimeMs);
+
+        double hostTotalMs = 0.0;
+        double gpuTotalMs = 0.0;
+        for (int frame = 0; frame < scenario.frames; ++frame)
+        {
+            float gpuTimeMs = 0.0f;
+            const auto start = std::chrono::steady_clock::now();
+            renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+            const auto stop = std::chrono::steady_clock::now();
+
+            hostTotalMs += std::chrono::duration<double, std::milli>(stop - start).count();
+            gpuTotalMs += static_cast<double>(gpuTimeMs);
+        }
+
+        renderer.destroy();
+
+        const double avgHostMs = hostTotalMs / static_cast<double>(scenario.frames);
+        const double avgGpuMs = gpuTotalMs / static_cast<double>(scenario.frames);
+        const double fps = avgHostMs > 0.0 ? 1000.0 / avgHostMs : 0.0;
+
+        std::cout << "| " << scenario.name
+                  << " | " << scenario.width << "x" << scenario.height
+                  << " | " << std::fixed << std::setprecision(2) << fps
+                  << " | " << avgHostMs
+                  << " | " << avgGpuMs
+                  << " |\n";
+    }
+
+    return 0;
+#endif
+}
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc > 1 && std::string(argv[1]) == "--benchmark")
+    {
+        return runGpuBenchmark();
+    }
+
     TestContext t;
     int testsRun = 0;
     int testsFailed = 0;

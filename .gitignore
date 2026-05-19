@@ -1,6 +1,7 @@
 # Visual Studio and IDE state
 **/.vs/
 *.suo
+CppProperties.json
 *.user
 *.userosscache
 *.sln.docstates

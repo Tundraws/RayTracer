@@ -1,0 +1,14 @@
+.git
+.vs
+.appdata
+.localappdata
+**/x64
+**/Debug
+**/Release
+**/.vs
+*.obj
+*.pdb
+*.ilk
+*.tlog
+*.lastbuildstate
+CppProperties.json

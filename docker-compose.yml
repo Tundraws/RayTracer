@@ -1,0 +1,6 @@
+services:
+  coursework-check:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: raytracerrtx-coursework-check:latest
