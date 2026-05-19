@@ -4,6 +4,13 @@ WORKDIR /workspace
 
 COPY . .
 
+RUN test -f README.md \
+    && test -f RayTracerRTX/README.md \
+    && test -f RayTracerRTX/docs/coursework-checklist.md \
+    && test -f RayTracerRTX/src/gpu/optix_device_programs.h \
+    && grep -q "OptiX" RayTracerRTX/README.md \
+    && grep -q "__raygen__rg" RayTracerRTX/src/gpu/optix_device_programs.h
+
 RUN g++ -std=c++20 -Wall -Wextra -pedantic \
     -IRayTracerRTX/tests/stubs \
     -IRayTracerRTX/src \
@@ -13,4 +20,4 @@ RUN g++ -std=c++20 -Wall -Wextra -pedantic \
     RayTracerRTX/src/app/scene.cpp \
     -o /usr/local/bin/raytracerrtx_cpu_tests
 
-CMD ["bash", "-lc", "python3 scripts/verify_coursework.py && /usr/local/bin/raytracerrtx_cpu_tests"]
+CMD ["/usr/local/bin/raytracerrtx_cpu_tests"]
