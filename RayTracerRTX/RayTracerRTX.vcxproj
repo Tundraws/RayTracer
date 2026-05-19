@@ -70,7 +70,9 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <OptixSdkDir Condition="'$(OptixSdkDir)'==''">C:\ProgramData\NVIDIA Corporation\OptiX SDK 9.1.0</OptixSdkDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -101,15 +103,17 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;GLFW_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;GLFW_STATIC;RAYTRACERRTX_CUDA_INCLUDE_DIR=&quot;$([System.String]::Copy('$(CudaToolkitIncludeDir)').Replace('\','/'))&quot;;RAYTRACERRTX_OPTIX_INCLUDE_DIR=&quot;$([System.String]::Copy('$(OptixSdkDir)\include').Replace('\','/'))&quot;;RAYTRACERRTX_SOURCE_DIR=&quot;$([System.String]::Copy('$(ProjectDir)src').Replace('\','/'))&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\include;C:\ProgramData\NVIDIA Corporation\OptiX SDK 9.1.0\include;$(ProjectDir)src;$(ProjectDir)glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);$(OptixSdkDir)\include;$(ProjectDir)src;$(ProjectDir)glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>cuda.lib;cudart.lib;nvrtc.lib;opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cuda.lib;cudart.lib;nvrtc.lib;opengl32.lib;glfw3_mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)glfw\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
@@ -121,14 +125,15 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;GLFW_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;GLFW_STATIC;RAYTRACERRTX_CUDA_INCLUDE_DIR=&quot;$([System.String]::Copy('$(CudaToolkitIncludeDir)').Replace('\','/'))&quot;;RAYTRACERRTX_OPTIX_INCLUDE_DIR=&quot;$([System.String]::Copy('$(OptixSdkDir)\include').Replace('\','/'))&quot;;RAYTRACERRTX_SOURCE_DIR=&quot;$([System.String]::Copy('$(ProjectDir)src').Replace('\','/'))&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\include;C:\ProgramData\NVIDIA Corporation\OptiX SDK 9.1.0\include;$(ProjectDir)src;$(ProjectDir)glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);$(OptixSdkDir)\include;$(ProjectDir)src;$(ProjectDir)glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>cuda.lib;cudart.lib;nvrtc.lib;opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cuda.lib;cudart.lib;nvrtc.lib;opengl32.lib;glfw3_mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)glfw\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
@@ -149,7 +154,7 @@
   <ItemGroup>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="glfw\lib\glfw3.lib" />
+    <Library Include="glfw\lib\glfw3_mt.lib" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\app\application.cpp" />

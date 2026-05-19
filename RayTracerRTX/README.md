@@ -58,3 +58,10 @@
 ## Статус
 
 Проект разрабатывается как курсовая работа по компьютерной графике (вариант 42). Реализовано рабочее RTX-ядро и интерактивная сцена; выполняется этап тестирования, оформления документации и подготовки к защите.
+
+## Build path configuration
+
+CUDA, OptiX, and source include paths are configured through Visual Studio
+project properties instead of hard-coded C++ strings. Override `OptixSdkDir`
+in a user property sheet or from MSBuild with `/p:OptixSdkDir=...` when the
+OptiX SDK is installed outside the default directory.

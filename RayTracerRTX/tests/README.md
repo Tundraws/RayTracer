@@ -44,3 +44,11 @@ Unit-тесты находятся в каталоге `tests` и собираю
    - `cuda.lib;cudart.lib;nvrtc.lib;opengl32.lib;glfw3.lib`
 5. Добавьте директорию библиотек:
    - `$(ProjectDir)..\glfw\lib`
+
+## GPU smoke test status
+
+The GPU smoke test is now enabled in `RayTracerRTX.Tests.vcxproj` by default.
+It defines `RAYTRACERRTX_ENABLE_GPU_TESTS`, links CUDA runtime libraries,
+compiles `src/gpu/optix_renderer.cpp`, initializes OptiX, renders one
+64x64 frame, checks that the framebuffer is non-empty, and validates that
+GPU frame time is non-negative.

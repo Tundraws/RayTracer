@@ -1,7 +1,6 @@
 #include "optix_renderer.h"
 
 #include "optix_device_programs.h"
-#include "../app/material.h"
 #include "../app/camera.h"
 #include "../app/scene.h"
 
@@ -9,11 +8,6 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
-
-#include <GLFW/glfw3.h>
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
-#include <GL/gl.h>
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -24,13 +18,8 @@
 #include <optix_stack_size.h>
 #include <optix_stubs.h>
 
-#include <cmath>
-#include <chrono>
-#include <algorithm>
 #include <array>
-#include <cwctype>
-#include <cstdint>
-#include <cctype>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -43,25 +32,6 @@ namespace
 {
 int gWidth = 800;
 int gHeight = 600;
-
-struct AppState
-{
-    CameraState camera;
-    InputState input;
-    SceneState scene = makeDefaultScene();
-    bool cursorCaptured = true;
-};
-
-struct FrameStats
-{
-    int frameCount = 0;
-    double hostAccumMs = 0.0;
-    double gpuAccumMs = 0.0;
-    double fps = 0.0;
-    double avgHostMs = 0.0;
-    double avgGpuMs = 0.0;
-    std::chrono::steady_clock::time_point lastUpdate = std::chrono::steady_clock::now();
-};
 
 template <typename T>
 struct SbtRecord
@@ -115,9 +85,53 @@ inline void nvrtcCheck(nvrtcResult result, const char* expression, const char* f
 #define OPTIX_CHECK(expr) optixCheck((expr), #expr, __FILE__, __LINE__)
 #define NVRTC_CHECK(expr) nvrtcCheck((expr), #expr, __FILE__, __LINE__)
 
+#ifndef RAYTRACERRTX_CUDA_INCLUDE_DIR
+#define RAYTRACERRTX_CUDA_INCLUDE_DIR ""
+#endif
+
+#ifndef RAYTRACERRTX_OPTIX_INCLUDE_DIR
+#define RAYTRACERRTX_OPTIX_INCLUDE_DIR ""
+#endif
+
+#ifndef RAYTRACERRTX_SOURCE_DIR
+#define RAYTRACERRTX_SOURCE_DIR ""
+#endif
+
 void contextLogCallback(unsigned int level, const char* tag, const char* message, void*)
 {
     std::cerr << "[" << std::setw(2) << level << "][" << tag << "] " << message << '\n';
+}
+
+std::string getEnvString(const char* name)
+{
+    char* value = nullptr;
+    size_t length = 0;
+    if (_dupenv_s(&value, &length, name) != 0 || value == nullptr)
+    {
+        return {};
+    }
+
+    std::string result(value);
+    std::free(value);
+    return result;
+}
+
+std::string getConfiguredPath(const char* macroValue, const char* envName, const char* suffix)
+{
+    if (macroValue != nullptr && macroValue[0] != '\0')
+    {
+        return macroValue;
+    }
+
+    const std::string envValue = getEnvString(envName);
+    if (envValue.empty())
+    {
+        return {};
+    }
+
+    return suffix != nullptr && suffix[0] != '\0'
+        ? envValue + suffix
+        : envValue;
 }
 
 std::string getShortPath(const std::string& path)
@@ -147,9 +161,17 @@ std::string compileDeviceProgram()
     CUDA_CHECK(cudaGetDevice(&device));
     CUDA_CHECK(cudaGetDeviceProperties(&props, device));
 
-    const std::string cudaInclude = getShortPath("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\include");
-    const std::string optixInclude = getShortPath("C:\\ProgramData\\NVIDIA Corporation\\OptiX SDK 9.1.0\\include");
-    const std::string projectInclude = getShortPath("C:\\Users\\User\\source\\repos\\RayTracerRTX\\RayTracerRTX\\src");
+    const std::string cudaIncludePath = getConfiguredPath(RAYTRACERRTX_CUDA_INCLUDE_DIR, "CUDA_PATH", "\\include");
+    const std::string optixIncludePath = getConfiguredPath(RAYTRACERRTX_OPTIX_INCLUDE_DIR, "OPTIX_SDK_DIR", "\\include");
+    const std::string projectIncludePath = getConfiguredPath(RAYTRACERRTX_SOURCE_DIR, "RAYTRACERRTX_SOURCE_DIR", "");
+    if (cudaIncludePath.empty() || optixIncludePath.empty() || projectIncludePath.empty())
+    {
+        throw std::runtime_error("CUDA, OptiX and project include paths must be configured in the Visual Studio project or environment.");
+    }
+
+    const std::string cudaInclude = getShortPath(cudaIncludePath);
+    const std::string optixInclude = getShortPath(optixIncludePath);
+    const std::string projectInclude = getShortPath(projectIncludePath);
     const std::string architecture = "--gpu-architecture=compute_" + std::to_string(props.major) + std::to_string(props.minor);
     const std::string includeCuda = "-I" + cudaInclude;
     const std::string includeOptix = "-I" + optixInclude;
@@ -204,535 +226,6 @@ std::string compileDeviceProgram()
     return optixIr;
 }
 
-float3 add3(const float3 a, const float3 b)
-{
-    return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
-}
-
-float3 sub3(const float3 a, const float3 b)
-{
-    return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
-}
-
-float3 mul3(const float3 a, const float value)
-{
-    return make_float3(a.x * value, a.y * value, a.z * value);
-}
-
-float dot3(const float3 a, const float3 b)
-{
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-float3 cross3(const float3 a, const float3 b)
-{
-    return make_float3(
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x);
-}
-
-float3 normalize3(const float3 v)
-{
-    const float length = std::sqrt(dot3(v, v));
-    if (length <= 0.0f)
-    {
-        return make_float3(0.0f, 0.0f, 0.0f);
-    }
-    return mul3(v, 1.0f / length);
-}
-
-float3 add3(const float3 a, const float3 b);
-float3 sub3(const float3 a, const float3 b);
-float3 mul3(const float3 a, const float value);
-
-float clampf(const float value, const float minValue, const float maxValue)
-{
-    return value < minValue ? minValue : (value > maxValue ? maxValue : value);
-}
-
-float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
-{
-    return make_float3(
-        clampf(value.x, minValue.x, maxValue.x),
-        clampf(value.y, minValue.y, maxValue.y),
-        clampf(value.z, minValue.z, maxValue.z));
-}
-
-std::array<uint8_t, 7> glyphFor(char input)
-{
-    const char c = static_cast<char>(std::toupper(static_cast<unsigned char>(input)));
-    switch (c)
-    {
-    case 'A': return {0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11};
-    case 'B': return {0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E};
-    case 'C': return {0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E};
-    case 'D': return {0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E};
-    case 'E': return {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F};
-    case 'F': return {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10};
-    case 'G': return {0x0E, 0x11, 0x10, 0x13, 0x11, 0x11, 0x0E};
-    case 'H': return {0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11};
-    case 'I': return {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x1F};
-    case 'J': return {0x07, 0x02, 0x02, 0x02, 0x12, 0x12, 0x0C};
-    case 'K': return {0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11};
-    case 'L': return {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F};
-    case 'M': return {0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11};
-    case 'N': return {0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11};
-    case 'O': return {0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E};
-    case 'P': return {0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10};
-    case 'Q': return {0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D};
-    case 'R': return {0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11};
-    case 'S': return {0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E};
-    case 'T': return {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04};
-    case 'U': return {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E};
-    case 'V': return {0x11, 0x11, 0x11, 0x11, 0x0A, 0x0A, 0x04};
-    case 'W': return {0x11, 0x11, 0x11, 0x15, 0x15, 0x1B, 0x11};
-    case 'X': return {0x11, 0x0A, 0x04, 0x04, 0x0A, 0x11, 0x11};
-    case 'Y': return {0x11, 0x0A, 0x04, 0x04, 0x04, 0x04, 0x04};
-    case 'Z': return {0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F};
-    case '0': return {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E};
-    case '1': return {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E};
-    case '2': return {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F};
-    case '3': return {0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E};
-    case '4': return {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02};
-    case '5': return {0x1F, 0x10, 0x10, 0x1E, 0x01, 0x01, 0x1E};
-    case '6': return {0x0E, 0x10, 0x10, 0x1E, 0x11, 0x11, 0x0E};
-    case '7': return {0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08};
-    case '8': return {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E};
-    case '9': return {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x01, 0x0E};
-    case '.': return {0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C};
-    case ':': return {0x00, 0x0C, 0x0C, 0x00, 0x0C, 0x0C, 0x00};
-    case '-': return {0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00};
-    case '/': return {0x01, 0x02, 0x04, 0x08, 0x10, 0x00, 0x00};
-    case '(': return {0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02};
-    case ')': return {0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08};
-    case ',': return {0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C, 0x08};
-    case ' ': return {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    default: return {0x1F, 0x11, 0x02, 0x04, 0x08, 0x00, 0x08};
-    }
-}
-
-std::array<uint8_t, 7> glyphFor(wchar_t input)
-{
-    switch (input)
-    {
-    case L'\u0410': return glyphFor('A');
-    case L'\u0411': return {0x1F, 0x10, 0x10, 0x1E, 0x11, 0x11, 0x1E};
-    case L'\u0412': return glyphFor('B');
-    case L'\u0413': return {0x1F, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10};
-    case L'\u0414': return {0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1F};
-    case L'\u0415': return glyphFor('E');
-    case L'\u0401': return glyphFor('E');
-    case L'\u0416': return {0x11, 0x0A, 0x04, 0x1F, 0x04, 0x0A, 0x11};
-    case L'\u0417': return {0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E};
-    case L'\u0418': return {0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11};
-    case L'\u0419': return {0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11};
-    case L'\u041A': return glyphFor('K');
-    case L'\u041B': return {0x04, 0x0A, 0x11, 0x11, 0x11, 0x11, 0x11};
-    case L'\u041C': return glyphFor('M');
-    case L'\u041D': return glyphFor('H');
-    case L'\u041E': return glyphFor('O');
-    case L'\u041F': return {0x1F, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
-    case L'\u0420': return glyphFor('P');
-    case L'\u0421': return glyphFor('C');
-    case L'\u0422': return glyphFor('T');
-    case L'\u0423': return glyphFor('Y');
-    case L'\u0424': return {0x0E, 0x15, 0x15, 0x1F, 0x05, 0x05, 0x0E};
-    case L'\u0425': return glyphFor('X');
-    case L'\u0426': return {0x11, 0x11, 0x11, 0x11, 0x11, 0x1F, 0x01};
-    case L'\u0427': return {0x11, 0x11, 0x11, 0x0F, 0x01, 0x01, 0x01};
-    case L'\u0428': return {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x1F};
-    case L'\u0429': return {0x11, 0x11, 0x11, 0x15, 0x15, 0x1F, 0x01};
-    case L'\u042A': return {0x18, 0x10, 0x10, 0x1E, 0x11, 0x11, 0x1E};
-    case L'\u042B': return {0x11, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E};
-    case L'\u042C': return {0x10, 0x10, 0x10, 0x1E, 0x11, 0x11, 0x1E};
-    case L'\u042D': return {0x1E, 0x01, 0x01, 0x0F, 0x01, 0x01, 0x1E};
-    case L'\u042E': return {0x15, 0x15, 0x15, 0x1F, 0x15, 0x15, 0x15};
-    case L'\u042F': return {0x0F, 0x11, 0x11, 0x0F, 0x05, 0x09, 0x11};
-    case L'0': return glyphFor('0');
-    case L'1': return glyphFor('1');
-    case L'2': return glyphFor('2');
-    case L'3': return glyphFor('3');
-    case L'4': return glyphFor('4');
-    case L'5': return glyphFor('5');
-    case L'6': return glyphFor('6');
-    case L'7': return glyphFor('7');
-    case L'8': return glyphFor('8');
-    case L'9': return glyphFor('9');
-    case L'.': return glyphFor('.');
-    case L':': return glyphFor(':');
-    case L'-': return glyphFor('-');
-    case L'/': return glyphFor('/');
-    case L'(': return glyphFor('(');
-    case L')': return glyphFor(')');
-    case L',': return glyphFor(',');
-    case L' ': return glyphFor(' ');
-    default: return glyphFor('?');
-    }
-}
-
-void fillRect(std::vector<uchar4>& pixels, int x, int y, int w, int h, uchar4 color)
-{
-    const int x2 = std::min(x + w, gWidth);
-    const int y2 = std::min(y + h, gHeight);
-    for (int py = std::max(0, y); py < y2; ++py)
-    {
-        for (int px = std::max(0, x); px < x2; ++px)
-        {
-            pixels[py * gWidth + px] = color;
-        }
-    }
-}
-
-struct HudTextCache
-{
-    HDC dc = nullptr;
-    HBITMAP bitmap = nullptr;
-    HGDIOBJ oldBitmap = nullptr;
-    HFONT font = nullptr;
-    void* bits = nullptr;
-    int width = 0;
-    int height = 0;
-};
-
-HudTextCache& hudTextCache()
-{
-    static HudTextCache cache;
-    return cache;
-}
-
-void releaseHudTextCache(HudTextCache& cache)
-{
-    if (cache.dc != nullptr)
-    {
-        if (cache.oldBitmap != nullptr)
-        {
-            SelectObject(cache.dc, cache.oldBitmap);
-            cache.oldBitmap = nullptr;
-        }
-        if (cache.bitmap != nullptr)
-        {
-            DeleteObject(cache.bitmap);
-            cache.bitmap = nullptr;
-        }
-        if (cache.font != nullptr)
-        {
-            DeleteObject(cache.font);
-            cache.font = nullptr;
-        }
-        DeleteDC(cache.dc);
-        cache.dc = nullptr;
-    }
-    cache.bits = nullptr;
-    cache.width = 0;
-    cache.height = 0;
-}
-
-void ensureHudTextCache(int width, int height)
-{
-    HudTextCache& cache = hudTextCache();
-    if (cache.dc != nullptr && cache.width == width && cache.height == height)
-    {
-        return;
-    }
-
-    releaseHudTextCache(cache);
-
-    HDC screenDC = GetDC(nullptr);
-    cache.dc = CreateCompatibleDC(screenDC);
-
-    BITMAPINFO bmi{};
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height;
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    cache.bitmap = CreateDIBSection(screenDC, &bmi, DIB_RGB_COLORS, &cache.bits, nullptr, 0);
-    cache.oldBitmap = SelectObject(cache.dc, cache.bitmap);
-    cache.font = CreateFontW(
-        -18,
-        0,
-        0,
-        0,
-        FW_SEMIBOLD,
-        FALSE,
-        FALSE,
-        FALSE,
-        DEFAULT_CHARSET,
-        OUT_DEFAULT_PRECIS,
-        CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY,
-        DEFAULT_PITCH | FF_SWISS,
-        L"Arial");
-    cache.width = width;
-    cache.height = height;
-
-    ReleaseDC(nullptr, screenDC);
-}
-
-void drawHud(GLFWwindow* window, const SceneState& scene, const FrameStats& stats)
-{
-    if (window == nullptr)
-    {
-        return;
-    }
-
-    HWND hwnd = glfwGetWin32Window(window);
-    if (hwnd == nullptr)
-    {
-        return;
-    }
-
-    HDC dc = GetDC(hwnd);
-    if (dc == nullptr)
-    {
-        return;
-    }
-
-    struct DcGuard
-    {
-        HWND hwnd;
-        HDC dc;
-        ~DcGuard()
-        {
-            if (dc != nullptr)
-            {
-                ReleaseDC(hwnd, dc);
-            }
-        }
-    } guard{hwnd, dc};
-
-    static HFONT font = CreateFontW(
-        -18,
-        0,
-        0,
-        0,
-        FW_NORMAL,
-        FALSE,
-        FALSE,
-        FALSE,
-        DEFAULT_CHARSET,
-        OUT_DEFAULT_PRECIS,
-        CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY,
-        DEFAULT_PITCH | FF_SWISS,
-        L"Arial");
-
-    const HGDIOBJ oldFont = SelectObject(dc, font);
-    SetBkMode(dc, TRANSPARENT);
-    SetTextAlign(dc, TA_LEFT | TA_TOP);
-    SetTextColor(dc, RGB(0, 0, 0));
-
-    const int panelX = 14;
-    const int panelY = 14;
-    std::wostringstream line1;
-    line1 << std::fixed << std::setprecision(1)
-          << L"\u041A\u0410\u0414\u0420 " << stats.fps
-          << L" FPS   \u0425\u041E\u0421\u0422 " << stats.avgHostMs << L" \u041C\u0421   \u0413\u041F\u0423 " << stats.avgGpuMs << L" \u041C\u0421";
-
-    std::wostringstream line2;
-    line2 << L"\u0421\u0424\u0415\u0420\u0410 " << (scene.selectedSphere + 1)
-          << L"   \u041C\u0410\u0422\u0415\u0420\u0418\u0410\u041B: " << materialNameW(scene.materials[scene.selectedSphere].materialType)
-          << L"   \u0421\u0412\u0415\u0422: " << std::fixed << std::setprecision(1)
-          << scene.lightPosition.x << L" " << scene.lightPosition.y << L" " << scene.lightPosition.z;
-
-    const std::wstring line3 = L"\u0421\u0424\u0415\u0420\u042B: 1-3 \u0412\u042B\u0411\u041E\u0420";
-    const std::wstring line4 = L"\u0414\u0412\u0418\u0416\u0415\u041D\u0418\u0415 \u0421\u0424\u0415\u0420\u042B: \u0421\u0422\u0420\u0415\u041B\u041A\u0418 - X/Z";
-    const std::wstring line5 = L"PGUP/PGDN \u0438\u043B\u0438 R/F - Y";
-    const std::wstring line6 = L"\u0421\u0412\u0415\u0422: J/L - X, I/K - Z, U/O - Y";
-    const std::wstring line7 = L"\u041C\u0410\u0422\u0415\u0420\u0418\u0410\u041B: M   \u041A\u0410\u041C\u0415\u0420\u0410: WASD/QE + \u041C\u042B\u0428\u042C";
-
-    TextOutW(dc, panelX, panelY, line1.str().c_str(), static_cast<int>(line1.str().size()));
-    TextOutW(dc, panelX, panelY + 22, line2.str().c_str(), static_cast<int>(line2.str().size()));
-    TextOutW(dc, panelX, panelY + 44, line3.c_str(), static_cast<int>(line3.size()));
-    TextOutW(dc, panelX, panelY + 66, line4.c_str(), static_cast<int>(line4.size()));
-    TextOutW(dc, panelX, panelY + 88, line5.c_str(), static_cast<int>(line5.size()));
-    TextOutW(dc, panelX, panelY + 110, line6.c_str(), static_cast<int>(line6.size()));
-    TextOutW(dc, panelX, panelY + 132, line7.c_str(), static_cast<int>(line7.size()));
-
-    SelectObject(dc, oldFont);
-}
-
-void mouseCallback(GLFWwindow* window, double xpos, double ypos)
-{
-    auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
-    if (state == nullptr || !state->cursorCaptured)
-    {
-        return;
-    }
-
-    if (state->input.firstMouse)
-    {
-        state->input.lastX = xpos;
-        state->input.lastY = ypos;
-        state->input.firstMouse = false;
-    }
-
-    const float xoffset = static_cast<float>(xpos - state->input.lastX);
-    const float yoffset = static_cast<float>(state->input.lastY - ypos);
-    state->input.lastX = xpos;
-    state->input.lastY = ypos;
-
-    constexpr float sensitivity = 0.12f;
-    state->camera.yaw += xoffset * sensitivity;
-    state->camera.pitch += yoffset * sensitivity;
-
-    if (state->camera.pitch > 89.0f)
-    {
-        state->camera.pitch = 89.0f;
-    }
-    if (state->camera.pitch < -89.0f)
-    {
-        state->camera.pitch = -89.0f;
-    }
-}
-
-void mouseButtonCallback(GLFWwindow* window, int button, int action, int)
-{
-    if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS)
-    {
-        return;
-    }
-
-    auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
-    if (state == nullptr)
-    {
-        return;
-    }
-
-    state->cursorCaptured = !state->cursorCaptured;
-    glfwSetInputMode(window, GLFW_CURSOR, state->cursorCaptured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
-    state->input.firstMouse = true;
-}
-
-void processInput(GLFWwindow* window, AppState& appState)
-{
-    CameraState& camera = appState.camera;
-    SceneState& scene = appState.scene;
-
-    float3 forward{};
-    float3 right{};
-    float3 up{};
-    float scale = 0.0f;
-    float aspect = 0.0f;
-    updateCameraBasis(camera, gWidth, gHeight, forward, right, up, scale, aspect);
-
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
-
-    constexpr float speed = 0.12f;
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-    {
-        camera.position = add3(camera.position, mul3(forward, speed));
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    {
-        camera.position = sub3(camera.position, mul3(forward, speed));
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-    {
-        camera.position = sub3(camera.position, mul3(right, speed));
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-    {
-        camera.position = add3(camera.position, mul3(right, speed));
-    }
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-    {
-        camera.position = add3(camera.position, mul3(up, speed));
-    }
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-    {
-        camera.position = sub3(camera.position, mul3(up, speed));
-    }
-
-    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
-    {
-        scene.selectedSphere = 0;
-    }
-    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
-    {
-        scene.selectedSphere = 1;
-    }
-    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
-    {
-        scene.selectedSphere = 2;
-    }
-
-    constexpr float sphereStep = 0.06f;
-    constexpr float verticalStep = 0.10f;
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-    {
-        moveSelectedSphere(scene, make_float3(-sphereStep, 0.0f, 0.0f));
-    }
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-    {
-        moveSelectedSphere(scene, make_float3(sphereStep, 0.0f, 0.0f));
-    }
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-    {
-        moveSelectedSphere(scene, make_float3(0.0f, 0.0f, -sphereStep));
-    }
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-    {
-        moveSelectedSphere(scene, make_float3(0.0f, 0.0f, sphereStep));
-    }
-    if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS)
-    {
-        moveSelectedSphere(scene, make_float3(0.0f, verticalStep, 0.0f));
-    }
-    if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS)
-    {
-        moveSelectedSphere(scene, make_float3(0.0f, -verticalStep, 0.0f));
-    }
-    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
-    {
-        moveSelectedSphere(scene, make_float3(0.0f, verticalStep, 0.0f));
-    }
-    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
-    {
-        moveSelectedSphere(scene, make_float3(0.0f, -verticalStep, 0.0f));
-    }
-
-    constexpr float lightStep = 0.07f;
-    if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS)
-    {
-        moveLight(scene, make_float3(-lightStep, 0.0f, 0.0f));
-    }
-    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-    {
-        moveLight(scene, make_float3(lightStep, 0.0f, 0.0f));
-    }
-    if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS)
-    {
-        moveLight(scene, make_float3(0.0f, 0.0f, -lightStep));
-    }
-    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
-    {
-        moveLight(scene, make_float3(0.0f, 0.0f, lightStep));
-    }
-    if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
-    {
-        moveLight(scene, make_float3(0.0f, lightStep, 0.0f));
-    }
-    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
-    {
-        moveLight(scene, make_float3(0.0f, -lightStep, 0.0f));
-    }
-
-    static bool mWasDown = false;
-    const bool mIsDown = glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS;
-    if (mIsDown && !mWasDown)
-    {
-        toggleSelectedMaterial(scene);
-    }
-    mWasDown = mIsDown;
-}
-
 } // namespace
 
 void OptixRenderer::setRenderSize(int width, int height)
@@ -764,7 +257,7 @@ void OptixRenderer::createContext()
     CUcontext cuContext = nullptr;
     OptixDeviceContextOptions options{};
     options.logCallbackFunction = contextLogCallback;
-    options.logCallbackLevel = 4;
+    options.logCallbackLevel = 2;
     OPTIX_CHECK(optixDeviceContextCreate(cuContext, &options, &context));
 }
 
@@ -951,7 +444,7 @@ void OptixRenderer::createModule()
     OptixModuleCompileOptions moduleOptions{};
     moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
     moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
-    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL;
+    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
 
     pipelineCompileOptions.usesMotionBlur = false;
     pipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
@@ -1306,107 +799,4 @@ void OptixRenderer::destroy()
         optixDeviceContextDestroy(context);
         context = nullptr;
     }
-}
-void run_optix_app_legacy()
-{
-    if (!glfwInit())
-    {
-        throw std::runtime_error("Не удалось инициализировать GLFW.");
-    }
-
-    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = monitor != nullptr ? glfwGetVideoMode(monitor) : nullptr;
-    const int windowWidth = 1280;
-    const int windowHeight = 720;
-    const int windowX = mode != nullptr ? std::max(0, (mode->width - windowWidth) / 2) : 100;
-    const int windowY = mode != nullptr ? std::max(0, (mode->height - windowHeight) / 2) : 100;
-
-    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
-    GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "RayTracerRTX OptiX", nullptr, nullptr);
-    if (window == nullptr)
-    {
-        glfwTerminate();
-        throw std::runtime_error("Не удалось создать окно GLFW.");
-    }
-
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
-    glfwSetWindowPos(window, windowX, windowY);
-    glfwGetFramebufferSize(window, &gWidth, &gHeight);
-    glViewport(0, 0, gWidth, gHeight);
-
-    AppState appState;
-    glfwSetWindowUserPointer(window, &appState);
-    glfwSetCursorPosCallback(window, mouseCallback);
-    glfwSetMouseButtonCallback(window, mouseButtonCallback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    OptixRenderer renderer;
-    renderer.initialize();
-
-    std::vector<uchar4> pixels(gWidth * gHeight);
-    FrameStats stats;
-
-    while (!glfwWindowShouldClose(window))
-    {
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        {
-            glfwSetWindowShouldClose(window, GLFW_TRUE);
-        }
-
-        processInput(window, appState);
-
-        const auto hostFrameStart = std::chrono::steady_clock::now();
-        float gpuTimeMs = 0.0f;
-        renderer.renderFrame(appState.scene, appState.camera, pixels, &gpuTimeMs);
-        const auto hostFrameEnd = std::chrono::steady_clock::now();
-
-        const double hostFrameMs = std::chrono::duration<double, std::milli>(hostFrameEnd - hostFrameStart).count();
-        stats.frameCount += 1;
-        stats.hostAccumMs += hostFrameMs;
-        stats.gpuAccumMs += static_cast<double>(gpuTimeMs);
-
-        const auto now = std::chrono::steady_clock::now();
-        const double elapsedSec = std::chrono::duration<double>(now - stats.lastUpdate).count();
-        if (elapsedSec > 0.0)
-        {
-            stats.fps = static_cast<double>(stats.frameCount) / elapsedSec;
-            stats.avgHostMs = stats.hostAccumMs / static_cast<double>(stats.frameCount);
-            stats.avgGpuMs = stats.gpuAccumMs / static_cast<double>(stats.frameCount);
-        }
-        if (elapsedSec >= 1.0)
-        {
-            std::ostringstream title;
-            title << std::fixed << std::setprecision(1)
-                  << "RayTracerRTX OptiX | FPS " << stats.fps
-                  << " | Frame " << stats.avgHostMs << " ms"
-                  << " | GPU " << stats.avgGpuMs << " ms"
-                  << " | Sphere " << (appState.scene.selectedSphere + 1)
-                  << " " << materialName(appState.scene.materials[appState.scene.selectedSphere].materialType)
-                  << " | Light (" << appState.scene.lightPosition.x << ", "
-                  << appState.scene.lightPosition.y << ", "
-                  << appState.scene.lightPosition.z << ")";
-
-            glfwSetWindowTitle(window, title.str().c_str());
-        }
-
-        if (elapsedSec >= 1.0)
-        {
-            stats.frameCount = 0;
-            stats.hostAccumMs = 0.0;
-            stats.gpuAccumMs = 0.0;
-            stats.lastUpdate = now;
-        }
-
-        drawHud(window, appState.scene, stats);
-
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDrawPixels(gWidth, gHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-    }
-
-    renderer.destroy();
-    glfwDestroyWindow(window);
-    glfwTerminate();
 }
