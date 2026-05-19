@@ -32,6 +32,8 @@ namespace
 {
 int gWidth = 800;
 int gHeight = 600;
+constexpr unsigned int kMaxReflectionDepth = 3;
+constexpr unsigned int kMaxTraceDepth = kMaxReflectionDepth + 2;
 
 template <typename T>
 struct SbtRecord
@@ -540,7 +542,7 @@ void OptixRenderer::createPipeline()
     };
 
     OptixPipelineLinkOptions linkOptions{};
-    linkOptions.maxTraceDepth = 2;
+    linkOptions.maxTraceDepth = kMaxTraceDepth;
     linkOptions.maxTraversableGraphDepth = 2;
 
     char log[4096]{};
@@ -556,7 +558,7 @@ void OptixRenderer::createPipeline()
     uint32_t directCallableStackSizeFromTraversal = 0;
     uint32_t directCallableStackSizeFromState = 0;
     uint32_t continuationStackSize = 0;
-    OPTIX_CHECK(optixUtilComputeStackSizes(&stackSizes, 2, 0, 0, &directCallableStackSizeFromTraversal, &directCallableStackSizeFromState, &continuationStackSize));
+    OPTIX_CHECK(optixUtilComputeStackSizes(&stackSizes, kMaxTraceDepth, 0, 0, &directCallableStackSizeFromTraversal, &directCallableStackSizeFromState, &continuationStackSize));
     OPTIX_CHECK(optixPipelineSetStackSize(pipeline, directCallableStackSizeFromTraversal, directCallableStackSizeFromState, continuationStackSize, 2));
 }
 
@@ -643,7 +645,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.lightPosition = scene.lightPosition;
     params.materials = reinterpret_cast<SphereMaterial*>(dMaterials);
     params.sphereCount = static_cast<int>(scene.spheres.size());
-    params.maxDepth = 3;
+    params.maxDepth = kMaxReflectionDepth;
 
     CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(dLaunchParams), &params, sizeof(LaunchParams), cudaMemcpyHostToDevice, stream));
     OPTIX_CHECK(optixLaunch(pipeline, stream, dLaunchParams, sizeof(LaunchParams), &sbt, gWidth, gHeight, 1));
