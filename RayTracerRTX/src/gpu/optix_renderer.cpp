@@ -643,7 +643,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.lightPosition = scene.lightPosition;
     params.materials = reinterpret_cast<SphereMaterial*>(dMaterials);
     params.sphereCount = static_cast<int>(scene.spheres.size());
-    params.maxDepth = 1;
+    params.maxDepth = 3;
 
     CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(dLaunchParams), &params, sizeof(LaunchParams), cudaMemcpyHostToDevice, stream));
     OPTIX_CHECK(optixLaunch(pipeline, stream, dLaunchParams, sizeof(LaunchParams), &sbt, gWidth, gHeight, 1));

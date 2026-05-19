@@ -33,9 +33,9 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low | 640x360 | 1229.56 | 0.81 | 0.79 |
-| HD | 1280x720 | 521.30 | 1.92 | 1.89 |
-| Full HD | 1920x1080 | 264.46 | 3.78 | 3.74 |
+| Low | 640x360 | 1325.68 | 0.75 | 0.73 |
+| HD | 1280x720 | 538.85 | 1.86 | 1.83 |
+| Full HD | 1920x1080 | 272.08 | 3.68 | 3.64 |
 
 ## Interpretation
 

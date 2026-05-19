@@ -6,16 +6,6 @@ namespace
 {
 constexpr float kPi = 3.14159265358979323846f;
 
-float3 add3(const float3 a, const float3 b)
-{
-    return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
-}
-
-float3 sub3(const float3 a, const float3 b)
-{
-    return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
-}
-
 float3 mul3(const float3 a, const float value)
 {
     return make_float3(a.x * value, a.y * value, a.z * value);
