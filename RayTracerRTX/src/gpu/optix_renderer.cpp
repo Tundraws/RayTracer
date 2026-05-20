@@ -643,8 +643,6 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.cameraScale = scale;
     params.cameraAspect = aspect;
     params.lightPosition = scene.lightPosition;
-    params.lightType = scene.lightType;
-    params.lightRadius = scene.lightRadius;
     params.materials = reinterpret_cast<SphereMaterial*>(dMaterials);
     params.sphereCount = static_cast<int>(scene.spheres.size());
     params.maxDepth = kMaxReflectionDepth;

@@ -1,6 +1,6 @@
 # Performance Results
 
-Date: 2026-05-19
+Date: 2026-05-20
 
 ## Hardware and Environment
 
@@ -33,15 +33,15 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low | 640x360 | 1325.68 | 0.75 | 0.73 |
-| HD | 1280x720 | 538.85 | 1.86 | 1.83 |
-| Full HD | 1920x1080 | 272.08 | 3.68 | 3.64 |
+| Low | 640x360 | 718.33 | 1.39 | 1.37 |
+| HD | 1280x720 | 230.78 | 4.33 | 4.30 |
+| Full HD | 1920x1080 | 106.10 | 9.43 | 9.37 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions.
-Even at 1920x1080, average GPU time remains below 4 ms in the headless benchmark,
-which is well under the 16.67 ms frame budget for 60 FPS.
+Even at 1920x1080, average GPU time remains below 10 ms in the headless
+benchmark, which is still under the 16.67 ms frame budget for 60 FPS.
 
 The close match between host frame time and GPU time indicates that the benchmark
 is dominated by GPU rendering and synchronization rather than CPU-side scene

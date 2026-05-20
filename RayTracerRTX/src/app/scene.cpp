@@ -33,14 +33,12 @@ SceneState makeDefaultScene()
     };
 
     scene.materials = {
-        {make_float3(1.0f, 1.0f, 1.0f), MaterialMirror},
-        {make_float3(0.82f, 0.70f, 0.60f), MaterialDiffuse},
-        {make_float3(0.65f, 0.80f, 0.75f), MaterialDiffuse}
+        {make_float3(0.98f, 0.98f, 0.95f), MaterialDiffuse},
+        {make_float3(0.92f, 0.78f, 0.66f), MaterialDiffuse},
+        {make_float3(0.72f, 0.92f, 0.84f), MaterialDiffuse}
     };
 
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
-    scene.lightType = LightPoint;
-    scene.lightRadius = 4.0f;
     scene.selectedSphere = 0;
     return scene;
 }
@@ -63,8 +61,6 @@ void clampScene(SceneState& scene)
         scene.lightPosition,
         make_float3(-40.0f, 6.0f, -40.0f),
         make_float3(40.0f, 40.0f, 40.0f));
-    scene.lightRadius = std::max(0.5f, std::min(scene.lightRadius, 12.0f));
-    scene.lightType = scene.lightType == LightArea ? LightArea : LightPoint;
 
     if (scene.selectedSphere < 0)
     {
@@ -103,16 +99,5 @@ void toggleSelectedMaterial(SceneState& scene)
 void moveLight(SceneState& scene, const float3 delta)
 {
     scene.lightPosition = add3(scene.lightPosition, delta);
-    clampScene(scene);
-}
-
-void toggleLightType(SceneState& scene)
-{
-    scene.lightType = scene.lightType == LightPoint ? LightArea : LightPoint;
-}
-
-void changeLightRadius(SceneState& scene, float delta)
-{
-    scene.lightRadius += delta;
     clampScene(scene);
 }

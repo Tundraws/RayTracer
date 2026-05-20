@@ -43,7 +43,7 @@
 - ЛКМ — захват/освобождение курсора
 - `1/2/3` — выбор сферы
 - `Left/Right/Up/Down` — движение выбранной сферы
-- `PageUp/PageDown` или `R/F` — движение сферы по оси Y
+- `R/F` — движение сферы по оси Y
 - `J/L`, `I/K`, `U/O` — перемещение источника света
 - `M` — переключение материала выбранной сферы
 - `Esc` — выход
@@ -57,7 +57,7 @@
 
 ## Статус
 
-Проект разрабатывается как курсовая работа по компьютерной графике (вариант 42). Реализовано рабочее RTX-ядро и интерактивная сцена; выполняется этап тестирования, оформления документации и подготовки к защите.
+Проект разрабатывается как курсовая работа по компьютерной графике (вариант 42). Реализованы рабочее RTX-ядро, интерактивная сцена, CPU/GPU-тесты, Docker Compose-проверка, CI workflow и проектная документация; выполняется финальная подготовка к защите.
 
 ## Build path configuration
 
@@ -65,12 +65,3 @@ CUDA, OptiX, and source include paths are configured through Visual Studio
 project properties instead of hard-coded C++ strings. Override `OptixSdkDir`
 in a user property sheet or from MSBuild with `/p:OptixSdkDir=...` when the
 OptiX SDK is installed outside the default directory.
-
-## Area light controls
-
-The scene can switch the single light between a point source and a square area
-source. Area mode uses multiple shadow rays and produces softer penumbra.
-
-- `P` - switch point/area light mode
-- `[` / `]` - decrease/increase area light radius
-- `J/L`, `I/K`, `U/O` - move the light

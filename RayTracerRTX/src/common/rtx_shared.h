@@ -9,12 +9,6 @@ enum MaterialType
     MaterialMirror = 1
 };
 
-enum LightType
-{
-    LightPoint = 0,
-    LightArea = 1
-};
-
 struct SphereMaterial
 {
     float3 color;
@@ -34,8 +28,6 @@ struct LaunchParams
     float cameraScale;
     float cameraAspect;
     float3 lightPosition;
-    int lightType;
-    float lightRadius;
     SphereMaterial* materials;
     int sphereCount;
     int maxDepth;
