@@ -32,6 +32,8 @@ void testDefaultScene(TestContext& t)
     t.expect(scene.spheres.size() == 3, "Default scene must contain 3 spheres.");
     t.expect(scene.materials.size() == 3, "Default scene must contain 3 materials.");
     t.expect(scene.selectedSphere == 0, "Default selected sphere should be index 0.");
+    t.expect(scene.lightType == LightPoint, "Default light should be point light.");
+    t.expect(scene.lightRadius > 0.0f, "Default area light radius should be positive.");
 }
 
 void testToggleMaterial(TestContext& t)
@@ -65,6 +67,20 @@ void testMoveLightClamp(TestContext& t)
     t.expect(scene.lightPosition.x <= 40.0f, "Light X should be clamped.");
     t.expect(scene.lightPosition.y >= 6.0f, "Light Y should be clamped.");
     t.expect(scene.lightPosition.z >= -40.0f, "Light Z should be clamped.");
+}
+
+void testLightTypeAndRadius(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    toggleLightType(scene);
+    t.expect(scene.lightType == LightArea, "Light type should switch to area.");
+    toggleLightType(scene);
+    t.expect(scene.lightType == LightPoint, "Light type should switch back to point.");
+
+    changeLightRadius(scene, 100.0f);
+    t.expect(scene.lightRadius <= 12.0f, "Area light radius should clamp to upper bound.");
+    changeLightRadius(scene, -100.0f);
+    t.expect(scene.lightRadius >= 0.5f, "Area light radius should clamp to lower bound.");
 }
 
 void testClampSceneSelectedSphereBounds(TestContext& t)
@@ -317,6 +333,7 @@ int main(int argc, char** argv)
     runTest("Toggle material", testToggleMaterial);
     runTest("Move sphere clamp", testMoveSphereClamp);
     runTest("Move light clamp", testMoveLightClamp);
+    runTest("Light type and radius", testLightTypeAndRadius);
     runTest("Clamp selected sphere index", testClampSceneSelectedSphereBounds);
     runTest("Invalid selected sphere operations", testInvalidSelectedSphereOps);
     runTest("All spheres above floor after clamp", testAllSpheresStayAboveFloorAfterClamp);

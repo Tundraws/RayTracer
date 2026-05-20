@@ -27,9 +27,9 @@ SceneState makeDefaultScene()
 {
     SceneState scene;
     scene.spheres = {
-        {make_float3(0.0f, 3.0f, 0.0f), 3.0f},
-        {make_float3(6.5f, 2.4f, 3.5f), 2.4f},
-        {make_float3(-6.5f, 2.4f, 3.5f), 2.4f}
+        {make_float3(0.0f, 2.55f, 0.0f), 2.55f},
+        {make_float3(-5.9f, 2.05f, 3.4f), 2.05f},
+        {make_float3(5.9f, 1.55f, 3.4f), 1.55f}
     };
 
     scene.materials = {
@@ -39,6 +39,8 @@ SceneState makeDefaultScene()
     };
 
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
+    scene.lightType = LightPoint;
+    scene.lightRadius = 4.0f;
     scene.selectedSphere = 0;
     return scene;
 }
@@ -61,6 +63,8 @@ void clampScene(SceneState& scene)
         scene.lightPosition,
         make_float3(-40.0f, 6.0f, -40.0f),
         make_float3(40.0f, 40.0f, 40.0f));
+    scene.lightRadius = std::max(0.5f, std::min(scene.lightRadius, 12.0f));
+    scene.lightType = scene.lightType == LightArea ? LightArea : LightPoint;
 
     if (scene.selectedSphere < 0)
     {
@@ -99,5 +103,16 @@ void toggleSelectedMaterial(SceneState& scene)
 void moveLight(SceneState& scene, const float3 delta)
 {
     scene.lightPosition = add3(scene.lightPosition, delta);
+    clampScene(scene);
+}
+
+void toggleLightType(SceneState& scene)
+{
+    scene.lightType = scene.lightType == LightPoint ? LightArea : LightPoint;
+}
+
+void changeLightRadius(SceneState& scene, float delta)
+{
+    scene.lightRadius += delta;
     clampScene(scene);
 }

@@ -54,13 +54,15 @@ flowchart TD
     Primary --> HitSphere{"Sphere hit?"}
     Primary --> HitPlane{"Plane hit?"}
     Primary --> Miss["__miss__radiance sky color"]
-    HitSphere --> Material{"Material type"}
-    Material --> Diffuse["Diffuse lighting + shadow"]
+    HitSphere --> Visibility["Point or area-light visibility"]
+    Visibility --> Material{"Material type"}
+    Material --> Diffuse["Diffuse lighting + hard/soft shadow"]
     Material --> Mirror["Reflection ray"]
     Mirror --> Depth{"depth < maxDepth"}
     Depth -->|yes| Primary
     Depth -->|no| Fallback["Neutral fallback color"]
-    HitPlane --> PlaneLight["Plane lighting + shadow + fog"]
+    HitPlane --> PlaneVisibility["Point or area-light visibility"]
+    PlaneVisibility --> PlaneLight["Plane lighting + hard/soft shadow + fog"]
     Diffuse --> Output["setRadiancePayload"]
     Mirror --> Output
     PlaneLight --> Output

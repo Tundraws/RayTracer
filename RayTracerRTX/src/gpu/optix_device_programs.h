@@ -41,6 +41,14 @@ static __forceinline__ __device__ float dot3(const float3 a, const float3 b)
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+static __forceinline__ __device__ float3 cross3(const float3 a, const float3 b)
+{
+    return make_vec(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x);
+}
+
 static __forceinline__ __device__ float3 normalize3(const float3 v)
 {
     const float len = sqrtf(dot3(v, v));
@@ -106,6 +114,98 @@ static __forceinline__ __device__ bool traceShadow(
     return visible != 0u;
 }
 
+static __forceinline__ __device__ float hashToUnit(const unsigned int seed)
+{
+    unsigned int x = seed;
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return static_cast<float>(x & 0x00ffffffu) / 16777215.0f;
+}
+
+static __forceinline__ __device__ float2 areaLightSample(const int index, const float3 hitPoint)
+{
+    const int gridSize = 8;
+    const int sx = index % gridSize;
+    const int sy = index / gridSize;
+    const unsigned int baseSeed =
+        static_cast<unsigned int>(fabsf(hitPoint.x) * 37.0f) ^
+        (static_cast<unsigned int>(fabsf(hitPoint.y) * 53.0f) << 8) ^
+        (static_cast<unsigned int>(fabsf(hitPoint.z) * 71.0f) << 16);
+    const float jx = hashToUnit(baseSeed + static_cast<unsigned int>(index * 2 + 1));
+    const float jy = hashToUnit(baseSeed + static_cast<unsigned int>(index * 2 + 2));
+    return make_float2(
+        (static_cast<float>(sx) + jx) / static_cast<float>(gridSize) - 0.5f,
+        (static_cast<float>(sy) + jy) / static_cast<float>(gridSize) - 0.5f);
+}
+
+static __forceinline__ __device__ float3 lightSamplePosition(const float3 hitPoint, const int sampleIndex)
+{
+    if (params.lightType != LightArea)
+    {
+        return params.lightPosition;
+    }
+
+    const float3 toLight = normalize3(sub3(params.lightPosition, hitPoint));
+    float3 tangent = normalize3(cross3(make_vec(0.0f, 1.0f, 0.0f), toLight));
+    if (dot3(tangent, tangent) <= 0.000001f)
+    {
+        tangent = make_vec(1.0f, 0.0f, 0.0f);
+    }
+    const float3 bitangent = normalize3(cross3(toLight, tangent));
+    const float2 sample = areaLightSample(sampleIndex, hitPoint);
+    return add3(
+        params.lightPosition,
+        add3(
+            mul3(tangent, sample.x * params.lightRadius),
+            mul3(bitangent, sample.y * params.lightRadius)));
+}
+
+static __forceinline__ __device__ float evaluateVisibility(
+    const OptixTraversableHandle handle,
+    const float3 hitPoint,
+    const float3 normal,
+    float3* outLightDir,
+    float* outNdotL)
+{
+    const int sampleCount = params.lightType == LightArea ? 64 : 1;
+    float visibility = 0.0f;
+    float3 lightDirSum = make_vec(0.0f, 0.0f, 0.0f);
+    float ndotlSum = 0.0f;
+
+    for (int i = 0; i < sampleCount; ++i)
+    {
+        const float3 samplePosition = lightSamplePosition(hitPoint, i);
+        const float3 lightVector = sub3(samplePosition, hitPoint);
+        const float lightDistance = sqrtf(dot3(lightVector, lightVector));
+        const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
+        const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
+
+        const bool visible = traceShadow(
+            handle,
+            add3(hitPoint, mul3(normal, 0.002f)),
+            lightDir,
+            0.001f,
+            lightDistance - 0.01f);
+
+        if (visible)
+        {
+            visibility += 1.0f;
+            lightDirSum = add3(lightDirSum, lightDir);
+            ndotlSum += ndotl;
+        }
+    }
+
+    const float invSamples = 1.0f / static_cast<float>(sampleCount);
+    *outLightDir = visibility > 0.0f ? normalize3(lightDirSum) : normalize3(sub3(params.lightPosition, hitPoint));
+    const float rawVisibility = visibility * invSamples;
+    const float smoothedVisibility = rawVisibility * rawVisibility * (3.0f - 2.0f * rawVisibility);
+    *outNdotL = ndotlSum * invSamples * (params.lightType == LightArea ? 1.08f : 1.0f);
+    return smoothedVisibility;
+}
+
 static __forceinline__ __device__ float3 traceRadiance(
     const OptixTraversableHandle handle,
     const float3 origin,
@@ -149,24 +249,36 @@ extern "C" __global__ void __raygen__rg()
     const uint3 idx = optixGetLaunchIndex();
     const uint3 dim = optixGetLaunchDimensions();
 
-    const float u = (static_cast<float>(idx.x) + 0.5f) / static_cast<float>(dim.x);
-    const float v = (static_cast<float>(idx.y) + 0.5f) / static_cast<float>(dim.y);
+    const float2 offsets[4] = {
+        make_float2(0.25f, 0.25f),
+        make_float2(0.75f, 0.25f),
+        make_float2(0.25f, 0.75f),
+        make_float2(0.75f, 0.75f)
+    };
 
-    const float px = (2.0f * u - 1.0f) * params.cameraAspect * params.cameraScale;
-    const float py = (2.0f * v - 1.0f) * params.cameraScale;
+    float3 color = make_vec(0.0f, 0.0f, 0.0f);
+    for (int sample = 0; sample < 4; ++sample)
+    {
+        const float u = (static_cast<float>(idx.x) + offsets[sample].x) / static_cast<float>(dim.x);
+        const float v = (static_cast<float>(idx.y) + offsets[sample].y) / static_cast<float>(dim.y);
 
-    const float3 direction = normalize3(
-        add3(
-            add3(params.cameraForward, mul3(params.cameraRight, px)),
-            mul3(params.cameraUp, py)));
+        const float px = (2.0f * u - 1.0f) * params.cameraAspect * params.cameraScale;
+        const float py = (2.0f * v - 1.0f) * params.cameraScale;
 
-    const float3 color = traceRadiance(
-        params.handle,
-        params.cameraPosition,
-        direction,
-        0.001f,
-        1e20f,
-        0u);
+        const float3 direction = normalize3(
+            add3(
+                add3(params.cameraForward, mul3(params.cameraRight, px)),
+                mul3(params.cameraUp, py)));
+
+        color = add3(color, traceRadiance(
+            params.handle,
+            params.cameraPosition,
+            direction,
+            0.001f,
+            1e20f,
+            0u));
+    }
+    color = mul3(color, 0.25f);
 
     params.image[idx.y * params.imageWidth + idx.x] = toColor(color);
 
@@ -213,42 +325,50 @@ extern "C" __global__ void __closesthit__radiance()
     }
 
     SphereMaterial material = params.materials[primitiveIndex];
-    const float3 lightVector = sub3(params.lightPosition, hitPoint);
-    const float lightDistance = sqrtf(dot3(lightVector, lightVector));
-    const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
-
-    const bool visible = traceShadow(
-        params.handle,
-        add3(hitPoint, mul3(normal, 0.002f)),
-        lightDir,
-        0.001f,
-        lightDistance - 0.01f);
+    float3 lightDir = make_vec(0.0f, 1.0f, 0.0f);
+    float ndotl = 0.0f;
+    const float visibility = evaluateVisibility(params.handle, hitPoint, normal, &lightDir, &ndotl);
 
     const float ambient = 0.18f;
-    const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
-    const float shadowFactor = visible
-        ? 1.0f
-        : (material.materialType == MaterialMirror ? 0.50f : 0.32f);
+    const float diffuseShadowFloor = params.lightType == LightArea ? 0.32f : 0.48f;
+    const float mirrorShadowFloor = params.lightType == LightArea ? 0.50f : 0.62f;
+    const float shadowFloor = material.materialType == MaterialMirror ? mirrorShadowFloor : diffuseShadowFloor;
+    const float shadowFactor = shadowFloor + (1.0f - shadowFloor) * visibility;
     const float diffuse = ndotl * shadowFactor;
     const float3 viewDir = mul3(rayDirection, -1.0f);
     const float3 halfDir = normalize3(add3(lightDir, viewDir));
-    const float specular = visible ? powf(fmaxf(dot3(normal, halfDir), 0.0f), 42.0f) : 0.0f;
+    const float specularPower = material.materialType == MaterialMirror ? 96.0f : 128.0f;
+    const float specular = visibility * powf(fmaxf(dot3(normal, halfDir), 0.0f), specularPower);
+    const float diffuseSpecularWeight = material.materialType == MaterialMirror ? 0.0f : 0.06f;
+    const float diffuseLightWeight = material.materialType == MaterialMirror ? 1.0f : 0.72f;
+    const float3 diffuseColor = material.materialType == MaterialMirror
+        ? material.color
+        : clamp3(material.color, 0.0f, 0.86f);
 
     float3 localColor = add3(
-        mul3(material.color, ambient + diffuse),
-        mul3(make_vec(1.0f, 1.0f, 1.0f), 0.35f * specular));
+        mul3(diffuseColor, ambient + diffuseLightWeight * diffuse),
+        mul3(make_vec(1.0f, 1.0f, 1.0f), diffuseSpecularWeight * specular));
 
-    if (material.materialType == MaterialMirror && depth < static_cast<unsigned int>(params.maxDepth))
+    if (material.materialType == MaterialMirror)
     {
-        const float3 reflectedDir = normalize3(reflect3(rayDirection, normal));
-        const float3 reflectedColor = traceRadiance(
-            params.handle,
-            add3(hitPoint, mul3(normal, 0.002f)),
-            reflectedDir,
-            0.001f,
-            1e20f,
-            depth + 1u);
-        localColor = add3(mul3(localColor, 0.15f), mul3(reflectedColor, 0.85f));
+        if (depth < static_cast<unsigned int>(params.maxDepth))
+        {
+            const float3 reflectedDir = normalize3(reflect3(rayDirection, normal));
+            const float3 reflectedColor = traceRadiance(
+                params.handle,
+                add3(hitPoint, mul3(normal, 0.002f)),
+                reflectedDir,
+                0.001f,
+                1e20f,
+                depth + 1u);
+            const float mirrorHighlight = params.lightType == LightArea ? 0.32f : 0.55f;
+            const float3 highlight = mul3(make_vec(1.0f, 1.0f, 1.0f), mirrorHighlight * specular);
+            localColor = add3(reflectedColor, highlight);
+        }
+        else
+        {
+            localColor = make_vec(0.231f, 0.251f, 0.251f);
+        }
     }
 
     setRadiancePayload(localColor);
@@ -267,24 +387,17 @@ extern "C" __global__ void __closesthit__radiance_plane()
     const float3 hitPoint = add3(rayOrigin, mul3(rayDirection, tHit));
     const float3 normal = make_vec(0.0f, 1.0f, 0.0f);
 
-    const float3 lightVector = sub3(params.lightPosition, hitPoint);
-    const float lightDistance = sqrtf(dot3(lightVector, lightVector));
-    const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
-
-    const bool visible = traceShadow(
-        params.handle,
-        add3(hitPoint, mul3(normal, 0.002f)),
-        lightDir,
-        0.001f,
-        lightDistance - 0.01f);
+    float3 lightDir = make_vec(0.0f, 1.0f, 0.0f);
+    float ndotl = 0.0f;
+    const float visibility = evaluateVisibility(params.handle, hitPoint, normal, &lightDir, &ndotl);
 
     const float ambient = 0.18f;
-    const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
-    const float shadowFactor = visible ? 1.0f : 0.38f;
+    const float planeShadowFloor = params.lightType == LightArea ? 0.38f : 0.55f;
+    const float shadowFactor = planeShadowFloor + (1.0f - planeShadowFloor) * visibility;
     const float diffuse = ndotl * shadowFactor;
     const float3 viewDir = mul3(rayDirection, -1.0f);
     const float3 halfDir = normalize3(add3(lightDir, viewDir));
-    const float specular = visible ? powf(fmaxf(dot3(normal, halfDir), 0.0f), 56.0f) : 0.0f;
+    const float specular = visibility * powf(fmaxf(dot3(normal, halfDir), 0.0f), 56.0f);
 
     const float3 baseColor = make_vec(0.95f, 0.95f, 0.96f);
     float3 localColor = add3(

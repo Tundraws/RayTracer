@@ -65,3 +65,12 @@ CUDA, OptiX, and source include paths are configured through Visual Studio
 project properties instead of hard-coded C++ strings. Override `OptixSdkDir`
 in a user property sheet or from MSBuild with `/p:OptixSdkDir=...` when the
 OptiX SDK is installed outside the default directory.
+
+## Area light controls
+
+The scene can switch the single light between a point source and a square area
+source. Area mode uses multiple shadow rays and produces softer penumbra.
+
+- `P` - switch point/area light mode
+- `[` / `]` - decrease/increase area light radius
+- `J/L`, `I/K`, `U/O` - move the light

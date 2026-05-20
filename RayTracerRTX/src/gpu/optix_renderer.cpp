@@ -32,7 +32,7 @@ namespace
 {
 int gWidth = 800;
 int gHeight = 600;
-constexpr unsigned int kMaxReflectionDepth = 3;
+constexpr unsigned int kMaxReflectionDepth = 6;
 constexpr unsigned int kMaxTraceDepth = kMaxReflectionDepth + 2;
 
 template <typename T>
@@ -643,6 +643,8 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.cameraScale = scale;
     params.cameraAspect = aspect;
     params.lightPosition = scene.lightPosition;
+    params.lightType = scene.lightType;
+    params.lightRadius = scene.lightRadius;
     params.materials = reinterpret_cast<SphereMaterial*>(dMaterials);
     params.sphereCount = static_cast<int>(scene.spheres.size());
     params.maxDepth = kMaxReflectionDepth;

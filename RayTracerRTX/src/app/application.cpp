@@ -198,13 +198,14 @@ void drawHud(GLFWwindow* window, const SceneState& scene, const FrameStats& stat
     std::wostringstream line2;
     line2 << L"\u0421\u0424\u0415\u0420\u0410: " << (scene.selectedSphere + 1)
           << L"   \u041c\u0410\u0422\u0415\u0420\u0418\u0410\u041b: " << materialNameW(scene.materials[scene.selectedSphere].materialType)
-          << L"   \u0421\u0412\u0415\u0422: " << std::fixed << std::setprecision(1)
-          << scene.lightPosition.x << L" " << scene.lightPosition.y << L" " << scene.lightPosition.z;
+          << L"   \u0421\u0412\u0415\u0422: " << (scene.lightType == LightArea ? L"AREA" : L"POINT")
+          << L" R=" << std::fixed << std::setprecision(1) << scene.lightRadius
+          << L" POS " << scene.lightPosition.x << L" " << scene.lightPosition.y << L" " << scene.lightPosition.z;
 
     const std::wstring line3 = L"\u0421\u0424\u0415\u0420\u042b: 1-3 \u0412\u042b\u0411\u041e\u0420";
     const std::wstring line4 = L"\u0414\u0412\u0418\u0416\u0415\u041d\u0418\u0415 \u0421\u0424\u0415\u0420\u042b: \u0421\u0422\u0420\u0415\u041b\u041a\u0418 - X/Z";
     const std::wstring line5 = L"PGUP/PGDN \u0418\u041b\u0418 R/F - Y";
-    const std::wstring line6 = L"\u0421\u0412\u0415\u0422: J/L - X, I/K - Z, U/O - Y";
+    const std::wstring line6 = L"\u0421\u0412\u0415\u0422: P POINT/AREA, [/]-R, J/L-X, I/K-Z, U/O-Y";
     const std::wstring line7 = L"\u041c\u0410\u0422\u0415\u0420\u0418\u0410\u041b: M   \u041a\u0410\u041c\u0415\u0420\u0410: WASD/QE + \u041c\u042b\u0428\u042c";
 
     const std::wstring text1 = line1.str();
@@ -400,6 +401,14 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     {
         moveLight(scene, make_float3(0.0f, -lightStep, 0.0f));
     }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS)
+    {
+        changeLightRadius(scene, -3.0f * dt);
+    }
+    if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
+    {
+        changeLightRadius(scene, 3.0f * dt);
+    }
 
     static bool mWasDown = false;
     const bool mIsDown = glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS;
@@ -408,6 +417,14 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
         toggleSelectedMaterial(scene);
     }
     mWasDown = mIsDown;
+
+    static bool pWasDown = false;
+    const bool pIsDown = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
+    if (pIsDown && !pWasDown)
+    {
+        toggleLightType(scene);
+    }
+    pWasDown = pIsDown;
 
 }
 } // namespace
@@ -494,6 +511,7 @@ void run_optix_app()
                   << " | GPU " << stats.avgGpuMs << " ms"
                   << " | Sphere " << (appState.scene.selectedSphere + 1)
                   << " " << materialName(appState.scene.materials[appState.scene.selectedSphere].materialType)
+                  << " | " << (appState.scene.lightType == LightArea ? "Area" : "Point")
                   << " | Light (" << appState.scene.lightPosition.x << ", "
                   << appState.scene.lightPosition.y << ", "
                   << appState.scene.lightPosition.z << ")";

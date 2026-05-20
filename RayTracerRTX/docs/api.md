@@ -33,6 +33,8 @@ Declared in `src/app/scene.h`.
 | `spheres` | `std::vector<SphereGeometry>` | Scene geometry controlled by the CPU |
 | `materials` | `std::vector<SphereMaterial>` | Per-sphere material data uploaded to GPU |
 | `lightPosition` | `float3` | Point-light position used by hit programs |
+| `lightType` | `int` | `LightPoint` or `LightArea` |
+| `lightRadius` | `float` | Area-light radius used for soft shadows |
 | `selectedSphere` | `int` | Index used by interactive controls |
 
 ### Scene Functions
@@ -44,6 +46,8 @@ Declared in `src/app/scene.h`.
 | `moveSelectedSphere(SceneState&, float3)` | Moves selected sphere and applies bounds |
 | `toggleSelectedMaterial(SceneState&)` | Switches selected sphere between diffuse and mirror material |
 | `moveLight(SceneState&, float3)` | Moves the light and applies bounds |
+| `toggleLightType(SceneState&)` | Switches between point and area light |
+| `changeLightRadius(SceneState&, float)` | Changes and clamps area-light radius |
 
 ## Camera API
 
@@ -79,6 +83,13 @@ Declared in `src/common/rtx_shared.h`.
 | `MaterialDiffuse` | Local diffuse shading with shadow and specular component |
 | `MaterialMirror` | Recursive mirror reflection with depth limit |
 
+### `LightType`
+
+| Value | Meaning |
+|---|---|
+| `LightPoint` | Single shadow ray to a point source, hard shadows |
+| `LightArea` | Multiple shadow rays to a square area source, soft shadows |
+
 ### `SphereMaterial`
 
 | Field | Type | Meaning |
@@ -96,7 +107,7 @@ Uploaded to the GPU before each OptiX launch.
 | `handle` | Top-level OptiX traversable handle |
 | `cameraPosition`, `cameraForward`, `cameraRight`, `cameraUp` | Camera ray generation data |
 | `cameraScale`, `cameraAspect` | Projection parameters |
-| `lightPosition` | Lighting input for hit programs |
+| `lightPosition`, `lightType`, `lightRadius` | Lighting input and point/area mode for hit programs |
 | `materials`, `sphereCount` | Per-sphere material data |
 | `maxDepth` | Recursive reflection depth limit |
 
