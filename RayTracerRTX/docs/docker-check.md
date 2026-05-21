@@ -8,7 +8,9 @@ The Docker setup provides a reproducible coursework verification environment for
 
 - repository structure checks;
 - documentation marker checks;
-- CPU-only unit tests for scene, camera, and material logic.
+- demo OBJ mesh and MTL asset checks;
+- OBJ loader source-file checks;
+- CPU-only unit tests for scene, camera, material, and OBJ loader logic.
 
 The RTX GUI application itself is not launched in Docker because it depends on a
 Windows desktop session, GLFW window creation, NVIDIA OptiX, CUDA, and RTX GPU
@@ -19,6 +21,10 @@ driver integration. GPU execution is verified separately by the native
 
 - `Dockerfile`
 - `docker-compose.yml`
+- `RayTracerRTX/assets/meshes/demo.obj`
+- `RayTracerRTX/assets/meshes/demo.mtl`
+- `RayTracerRTX/src/app/obj_loader.*`
+- `RayTracerRTX/src/app/mesh.*`
 - `RayTracerRTX/tests/stubs/cuda_runtime.h`
 - `RayTracerRTX/tests/stubs/optix.h`
 
@@ -50,9 +56,9 @@ The Dockerfile uses `gcc:13-bookworm` and does not run `apt-get`. This avoids
 failures when Debian package mirrors are unavailable from the Docker network.
 The image is larger than a minimal runtime image, but it already contains `g++`,
 so the build does not depend on package-manager access.
-Structure and documentation checks are performed with POSIX shell commands, then
-the CPU-only C++ tests are compiled with the compiler already present in the
-base image.
+Structure, documentation, and OBJ mesh asset checks are performed with POSIX
+shell commands, then the CPU-only C++ tests are compiled with the compiler
+already present in the base image.
 
 ## Local Verification Status
 
@@ -64,10 +70,11 @@ base image.
 raytracerrtx-coursework-check:latest
 ```
 
-`docker compose run --rm coursework-check` completed successfully:
+`docker compose run --rm coursework-check` should complete with all CPU tests
+passing:
 
 ```text
-All tests passed. Tests: 11, skipped: 1, checks: 31
+All tests passed. Tests: 23, skipped: 1
 ```
 
 The skipped test is the GPU smoke test. This is expected in Docker because the

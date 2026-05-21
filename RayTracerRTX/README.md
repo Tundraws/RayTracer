@@ -54,6 +54,7 @@
 - `src/gpu` — OptiX-рендерер, pipeline, SBT, device-программы
 - `src/common` — общие структуры данных host/device
 - `tests` — unit-тесты и тестовый проект
+- `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
 
 ## Статус
 

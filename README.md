@@ -51,6 +51,7 @@
 - `src/app` - приложение, ввод, камера, сцена, материалы
 - `src/gpu` - OptiX renderer, pipeline, SBT, device-программы
 - `src/common` - общие структуры данных host/device
+- `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
 
 ## Текущий статус
 
