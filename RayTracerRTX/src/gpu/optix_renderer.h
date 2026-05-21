@@ -23,12 +23,13 @@ class OptixRenderer
 public:
     void setRenderSize(int width, int height);
     void initialize();
+    void initialize(const struct SceneState& initialScene);
     void renderFrame(const struct SceneState& scene, const struct CameraState& camera, std::vector<uchar4>& hostPixels, float* gpuTimeMs = nullptr);
     void destroy();
 
 private:
     void createContext();
-    void createScene();
+    void createScene(const struct SceneState& scene);
     void createModule();
     void createProgramGroups();
     void createPipeline();

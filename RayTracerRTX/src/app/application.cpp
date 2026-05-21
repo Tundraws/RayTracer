@@ -4,6 +4,7 @@
 #include "camera.h"
 #include "material.h"
 #include "scene.h"
+#include "scene_config.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -36,7 +37,7 @@ struct AppState
 {
     CameraState camera;
     InputState input;
-    SceneState scene = makeDefaultScene();
+    SceneState scene;
     bool cursorCaptured = true;
 };
 
@@ -403,8 +404,44 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
 }
 } // namespace
 
-void run_optix_app()
+void run_optix_app(const ApplicationOptions& options)
 {
+    SceneBuildResult initial = buildDefaultSceneInput();
+    if (!options.sceneConfigPath.empty())
+    {
+        const SceneConfigResult config = loadSceneConfigFile(options.sceneConfigPath);
+        if (config.ok)
+        {
+            initial = buildSceneFromConfig(config.config, options.sceneConfigPath.parent_path());
+        }
+        else
+        {
+            std::cerr << config.error << "\nUsing default scene.\n";
+        }
+    }
+    else if (!options.meshPath.empty())
+    {
+        SceneBuildResult meshScene = buildSceneFromMeshPath(options.meshPath);
+        if (meshScene.ok)
+        {
+            initial = std::move(meshScene);
+        }
+        else
+        {
+            std::cerr << meshScene.error << "\nUsing default scene.\n";
+        }
+    }
+
+    if (!initial.ok)
+    {
+        std::cerr << initial.error << "\nUsing default scene.\n";
+        initial = buildDefaultSceneInput();
+    }
+    for (const std::string& warning : initial.warnings)
+    {
+        std::cerr << warning << '\n';
+    }
+
     if (!glfwInit())
     {
         throw std::runtime_error("Не удалось инициализировать GLFW.");
@@ -433,6 +470,8 @@ void run_optix_app()
     glViewport(0, 0, gWidth, gHeight);
 
     AppState appState;
+    appState.camera = initial.camera;
+    appState.scene = initial.scene;
     glfwSetWindowUserPointer(window, &appState);
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
@@ -440,7 +479,7 @@ void run_optix_app()
 
     OptixRenderer renderer;
     renderer.setRenderSize(gWidth, gHeight);
-    renderer.initialize();
+    renderer.initialize(appState.scene);
 
     std::vector<uchar4> pixels(gWidth * gHeight);
     FrameStats stats;

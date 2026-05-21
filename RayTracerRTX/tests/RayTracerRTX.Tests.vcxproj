@@ -91,6 +91,7 @@
     <ClCompile Include="..\src\app\mesh.cpp" />
     <ClCompile Include="..\src\app\obj_loader.cpp" />
     <ClCompile Include="..\src\app\scene.cpp" />
+    <ClCompile Include="..\src\app\scene_config.cpp" />
     <ClCompile Include="..\src\gpu\optix_renderer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

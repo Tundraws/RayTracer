@@ -238,11 +238,16 @@ void OptixRenderer::setRenderSize(int width, int height)
 
 void OptixRenderer::initialize()
 {
+    initialize(makeDefaultScene());
+}
+
+void OptixRenderer::initialize(const SceneState& initialScene)
+{
     createContext();
     CUDA_CHECK(cudaStreamCreate(&stream));
     CUDA_CHECK(cudaEventCreate(&frameStart));
     CUDA_CHECK(cudaEventCreate(&frameStop));
-    createScene();
+    createScene(initialScene);
     createModule();
     createProgramGroups();
     createPipeline();
@@ -263,10 +268,8 @@ void OptixRenderer::createContext()
     OPTIX_CHECK(optixDeviceContextCreate(cuContext, &options, &context));
 }
 
-void OptixRenderer::createScene()
+void OptixRenderer::createScene(const SceneState& scene)
 {
-    const SceneState scene = makeDefaultScene();
-
     sphereFlags.assign(scene.spheres.size(), OPTIX_GEOMETRY_FLAG_NONE);
     std::vector<float3> centers;
     std::vector<float> radii;

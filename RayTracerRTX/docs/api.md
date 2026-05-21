@@ -13,6 +13,17 @@ Declared in `src/app/application.h`.
 Starts the interactive RTX renderer. The application owns the window loop,
 input processing, scene mutation, render calls, and image presentation.
 
+The executable accepts optional scene input arguments:
+
+```powershell
+RayTracerRTX.exe --mesh RayTracerRTX/assets/meshes/demo.obj
+RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
+```
+
+`--mesh` loads one OBJ mesh into the default scene. `--scene` loads a JSON scene
+config with `meshObjects`, `camera`, `light`, and mesh transform fields.
+Invalid input prints a diagnostic message and falls back to the default scene.
+
 ## Scene API
 
 ### `SphereGeometry`
@@ -47,6 +58,22 @@ Declared in `src/app/scene.h`.
 | `moveLight(SceneState&, float3)` | Moves the light and applies bounds |
 
 ## OBJ Mesh API
+
+### Scene Config
+
+Declared in `src/app/scene_config.h`.
+
+`loadSceneConfigFile(...)` parses the documented JSON scene input. The config
+supports:
+
+- `mesh`: shorthand path for one OBJ mesh;
+- `meshObjects`: array of mesh objects with `path`, `position`, `rotation`, and
+  `scale`;
+- `camera`: `position`, `yaw`, `pitch`, `fov`;
+- `light`: `position`.
+
+For this stage, configured mesh objects are transformed on the CPU and merged
+into the single `SceneState::mesh` used by the current renderer.
 
 ### `loadObjMesh(...)`
 

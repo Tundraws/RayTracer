@@ -39,6 +39,19 @@ while other OBJ materials use diffuse shading.
 3. Убедитесь, что пути к CUDA/OptiX доступны в системе.
 4. Соберите проект и запустите `RayTracerRTX`.
 
+Программа может использовать встроенную demo-сцену или принимать входные
+данные из командной строки:
+
+```powershell
+RayTracerRTX.exe --mesh RayTracerRTX/assets/meshes/demo.obj
+RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
+```
+
+JSON scene config поддерживает `meshObjects`, `camera`, `light` и transform
+для mesh object: `position`, `rotation`, `scale`. Если входной файл отсутствует
+или некорректен, приложение выводит сообщение в консоль и возвращается к
+стандартной demo-сцене.
+
 ## Управление
 
 - `W/A/S/D` - перемещение камеры
@@ -58,6 +71,7 @@ while other OBJ materials use diffuse shading.
 - `src/gpu` - OptiX renderer, pipeline, SBT, device-программы
 - `src/common` - общие структуры данных host/device
 - `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
+- `assets/scenes/demo_scene.json` - documented JSON scene input example
 
 ## Текущий статус
 

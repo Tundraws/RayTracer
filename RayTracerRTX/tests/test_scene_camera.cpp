@@ -2,6 +2,7 @@
 #include "../src/app/material.h"
 #include "../src/app/obj_loader.h"
 #include "../src/app/scene.h"
+#include "../src/app/scene_config.h"
 #if defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
 #include "../src/gpu/optix_renderer.h"
 #endif
@@ -283,6 +284,67 @@ void testDefaultSceneMeshGeometry(TestContext& t)
     t.expect(scene.mesh.triangles.size() > 0, "Default mesh triangle count should be positive.");
     t.expect(!scene.mesh.materials.empty(), "Default mesh material count should be positive.");
     t.expect(hasValidMeshMaterialIndices(scene.mesh), "Default mesh material indices should stay in range.");
+}
+
+void testSceneConfigLoadsValidScene(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "config_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    const std::filesystem::path configPath = writeFixtureFile(
+        "valid_scene.json",
+        "{\n"
+        "  \"camera\": {\"position\": [1, 2, 3], \"yaw\": 15, \"pitch\": -10, \"fov\": 55},\n"
+        "  \"light\": {\"position\": [4, 5, 6]},\n"
+        "  \"meshObjects\": [\n"
+        "    {\"path\": \"config_mesh.obj\", \"position\": [2, 0, 0], \"rotation\": [0, 0, 0], \"scale\": [2, 2, 2]}\n"
+        "  ]\n"
+        "}\n");
+
+    (void)objPath;
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Valid scene config should load: " + config.error);
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Valid scene config should build a scene.");
+    t.expect(almostEqual(scene.camera.position.x, 1.0f), "Scene config should apply camera position.");
+    t.expect(almostEqual(scene.scene.lightPosition.y, 5.0f), "Scene config should apply light position.");
+    t.expect(scene.scene.mesh.vertices.size() == 3, "Scene config mesh path should load OBJ vertices.");
+    t.expect(almostEqual(scene.scene.mesh.vertices[1].position.x, 4.0f), "Scene config transform should affect mesh vertices.");
+}
+
+void testSceneConfigMissingFile(TestContext& t)
+{
+    const std::filesystem::path configPath = std::filesystem::temp_directory_path() / "raytracerrtx_missing_scene_config.json";
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(!config.ok, "Missing scene config should fail cleanly.");
+    t.expect(config.error.find("could not be opened") != std::string::npos, "Missing scene config should explain open failure.");
+}
+
+void testSceneConfigMeshPathApplied(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "direct_mesh.obj",
+        "v 0 0 0\n"
+        "v 0 2 0\n"
+        "v 0 0 2\n"
+        "f 1 2 3\n");
+
+    const SceneBuildResult scene = buildSceneFromMeshPath(objPath);
+    t.expect(scene.ok, "Direct mesh path should build a scene.");
+    t.expect(scene.scene.mesh.vertices.size() == 3, "Direct mesh path should replace default mesh vertices.");
+    t.expect(almostEqual(scene.scene.mesh.vertices[1].position.y, 2.0f), "Direct mesh path should use requested OBJ data.");
+}
+
+void testSceneConfigFallbackDemoScene(TestContext& t)
+{
+    const SceneBuildResult scene = buildDefaultSceneInput();
+    t.expect(scene.ok, "Default scene input should build.");
+    t.expect(!isEmptyMesh(scene.scene.mesh), "Default scene input should keep fallback/demo mesh.");
+    t.expect(hasValidMeshMaterialIndices(scene.scene.mesh), "Default scene input mesh material indices should be valid.");
 }
 
 void testToggleMaterial(TestContext& t)
@@ -586,6 +648,10 @@ int main(int argc, char** argv)
     runTest("OBJ loader single triangle boundary", testObjLoaderSingleTriangleBoundary);
     runTest("Demo OBJ asset loads", testDemoObjAssetLoads);
     runTest("Default scene mesh geometry", testDefaultSceneMeshGeometry);
+    runTest("Scene config loads valid scene", testSceneConfigLoadsValidScene);
+    runTest("Scene config missing file", testSceneConfigMissingFile);
+    runTest("Scene config mesh path applied", testSceneConfigMeshPathApplied);
+    runTest("Scene config fallback demo scene", testSceneConfigFallbackDemoScene);
 
     ++testsRun;
     if (runGpuSmokeTest(t))

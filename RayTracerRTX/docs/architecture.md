@@ -9,8 +9,11 @@ material for the coursework design section.
 ```mermaid
 flowchart LR
     Main["maingpu.cpp"] --> App["Application loop"]
+    Main --> Args["--mesh / --scene args"]
+    Args --> SceneConfig["SceneConfig JSON"]
     App --> Input["Input handling"]
     App --> Camera["CameraState / updateCameraBasis"]
+    SceneConfig --> ObjLoader
     ObjLoader["ObjLoader"] --> MeshData["MeshData"]
     MeshData --> Scene
     App --> Scene["SceneState"]
@@ -32,6 +35,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     participant User
+    participant Args as CLI / JSON scene config
     participant App as GLFW application
     participant ObjLoader as ObjLoader
     participant Scene as SceneState
@@ -40,6 +44,9 @@ sequenceDiagram
     participant OptiX as OptiX pipeline
     participant GPU as RTX GPU
 
+    User->>Args: Optional --mesh or --scene input
+    Args->>ObjLoader: Resolve mesh path(s) and transforms
+    Args->>Scene: Apply camera and light config
     User->>App: Keyboard and mouse input
     ObjLoader->>Scene: Load OBJ vertices, normals, triangles, MTL materials
     App->>Scene: Move sphere, light, or toggle material

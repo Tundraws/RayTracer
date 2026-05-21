@@ -1,0 +1,19 @@
+{
+  "camera": {
+    "position": [0.0, 8.0, -15.0],
+    "yaw": 90.0,
+    "pitch": -25.0,
+    "fov": 45.0
+  },
+  "light": {
+    "position": [10.0, 14.0, -10.0]
+  },
+  "meshObjects": [
+    {
+      "path": "../meshes/demo.obj",
+      "position": [0.0, 0.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    }
+  ]
+}

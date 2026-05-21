@@ -14,10 +14,13 @@ RUN test -f README.md \
     && test -f RayTracerRTX/docs/ai-assisted-development.md \
     && test -f RayTracerRTX/assets/meshes/demo.obj \
     && test -f RayTracerRTX/assets/meshes/demo.mtl \
+    && test -f RayTracerRTX/assets/scenes/demo_scene.json \
     && test -f RayTracerRTX/src/app/mesh.cpp \
     && test -f RayTracerRTX/src/app/mesh.h \
     && test -f RayTracerRTX/src/app/obj_loader.cpp \
     && test -f RayTracerRTX/src/app/obj_loader.h \
+    && test -f RayTracerRTX/src/app/scene_config.cpp \
+    && test -f RayTracerRTX/src/app/scene_config.h \
     && test -f RayTracerRTX/src/gpu/optix_device_programs.h \
     && grep -q "OBJ mesh" RayTracerRTX/README.md \
     && grep -q "OBJ mesh" RayTracerRTX/docs/docker-check.md \
@@ -35,6 +38,7 @@ RUN g++ -std=c++20 -Wall -Wextra -pedantic \
     RayTracerRTX/src/app/mesh.cpp \
     RayTracerRTX/src/app/obj_loader.cpp \
     RayTracerRTX/src/app/scene.cpp \
+    RayTracerRTX/src/app/scene_config.cpp \
     -o /usr/local/bin/raytracerrtx_cpu_tests
 
 CMD ["/usr/local/bin/raytracerrtx_cpu_tests"]

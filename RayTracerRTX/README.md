@@ -41,6 +41,18 @@
 3. Убедитесь, что пути к CUDA и OptiX корректны.
 4. Соберите проект и запустите приложение.
 
+Приложение принимает входные данные через аргументы командной строки:
+
+```powershell
+RayTracerRTX.exe --mesh RayTracerRTX/assets/meshes/demo.obj
+RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
+```
+
+`--mesh` заменяет встроенный demo mesh на указанный OBJ. `--scene` загружает
+JSON scene config с `meshObjects`, `camera`, `light` и transform-полями
+`position`, `rotation`, `scale`. При ошибке чтения входных данных приложение
+пишет диагностическое сообщение в консоль и запускает стандартную demo-сцену.
+
 ## Управление
 
 - `W/A/S/D` — перемещение камеры
@@ -61,6 +73,7 @@
 - `src/common` — общие структуры данных host/device
 - `tests` — unit-тесты и тестовый проект
 - `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
+- `assets/scenes/demo_scene.json` - documented JSON scene input example
 
 ## Статус
 
