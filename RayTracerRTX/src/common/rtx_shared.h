@@ -15,6 +15,26 @@ struct SphereMaterial
     int materialType;
 };
 
+struct MeshVertexGpu
+{
+    float3 position;
+    float3 normal;
+};
+
+struct MeshTriangleGpu
+{
+    unsigned int i0;
+    unsigned int i1;
+    unsigned int i2;
+    unsigned int materialIndex;
+};
+
+struct MeshMaterialGpu
+{
+    float3 color;
+    int materialType;
+};
+
 struct LaunchParams
 {
     uchar4* image;
@@ -30,5 +50,11 @@ struct LaunchParams
     float3 lightPosition;
     SphereMaterial* materials;
     int sphereCount;
+    MeshVertexGpu* meshVertices;
+    MeshTriangleGpu* meshTriangles;
+    MeshMaterialGpu* meshMaterials;
+    unsigned int meshVertexCount;
+    unsigned int meshTriangleCount;
+    unsigned int meshMaterialCount;
     int maxDepth;
 };
