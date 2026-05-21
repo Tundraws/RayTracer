@@ -16,11 +16,6 @@ struct FaceVertex
     int normalIndex = -1;
 };
 
-float3 add3(const float3 a, const float3 b)
-{
-    return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
-}
-
 float3 sub3(const float3 a, const float3 b)
 {
     return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
