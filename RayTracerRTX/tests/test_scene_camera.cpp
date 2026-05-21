@@ -1,5 +1,6 @@
 #include "../src/app/camera.h"
 #include "../src/app/material.h"
+#include "../src/app/obj_loader.h"
 #include "../src/app/scene.h"
 #if defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
 #include "../src/gpu/optix_renderer.h"
@@ -9,6 +10,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -24,6 +27,170 @@ float length3(const float3& v)
 float dot3(const float3& a, const float3& b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+std::filesystem::path writeFixtureFile(const std::string& name, const std::string& content)
+{
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / "raytracerrtx_obj_loader_tests";
+    std::filesystem::create_directories(directory);
+
+    const std::filesystem::path path = directory / name;
+    std::ofstream file(path, std::ios::binary);
+    file << content;
+    return path;
+}
+
+void testObjLoaderTriangleWithNormals(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "triangle_normals.obj",
+        "mtllib triangle_normals.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vn 0 0 1\n"
+        "usemtl white\n"
+        "f 1//1 2//1 3//1\n");
+
+    writeFixtureFile(
+        "triangle_normals.mtl",
+        "newmtl white\n"
+        "Kd 0.9 0.8 0.7\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with vertices, normals, and one material should load.");
+    t.expect(result.mesh.vertices.size() == 3, "Loaded triangle should create 3 packed vertices.");
+    t.expect(result.mesh.triangles.size() == 1, "Loaded OBJ should contain one triangle.");
+    t.expect(result.mesh.materials.size() == 2, "Default and MTL material should be available.");
+    t.expect(almostEqual(result.mesh.vertices[0].normal.z, 1.0f), "OBJ normal should be assigned to vertices.");
+    t.expect(almostEqual(result.mesh.materials[1].color.x, 0.9f), "MTL Kd color should be loaded.");
+}
+
+void testObjLoaderMultipleMaterials(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "multi_material.obj",
+        "mtllib multi_material.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "v 1 1 0\n"
+        "vn 0 0 1\n"
+        "usemtl red\n"
+        "f 1//1 2//1 3//1\n"
+        "usemtl green\n"
+        "f 2//1 4//1 3//1\n");
+
+    writeFixtureFile(
+        "multi_material.mtl",
+        "newmtl red\n"
+        "Kd 1 0 0\n"
+        "newmtl green\n"
+        "Kd 0 1 0\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with multiple usemtl commands should load.");
+    t.expect(result.mesh.triangles.size() == 2, "Multiple material OBJ should contain two triangles.");
+    t.expect(result.mesh.materials.size() == 3, "Default plus two named materials should be loaded.");
+    t.expect(result.mesh.triangles[0].materialIndex != result.mesh.triangles[1].materialIndex, "Triangles should reference different materials.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Material indices should be valid.");
+}
+
+void testObjLoaderMissingNormalsFallback(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "missing_normals.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ without normals should load with generated normals.");
+    t.expect(result.mesh.vertices.size() == 3, "Fallback-normal OBJ should create vertices.");
+    t.expect(almostEqual(result.mesh.vertices[0].normal.z, 1.0f), "Fallback normal should be computed from triangle winding.");
+}
+
+void testObjLoaderEmptyFile(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile("empty.obj", "");
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(!result.ok, "Empty OBJ should fail validation.");
+    t.expect(!result.error.empty(), "Empty OBJ failure should include an error message.");
+}
+
+void testObjLoaderInvalidFace(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "invalid_face.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "v 1 1 0\n"
+        "f 1 2 3 4\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(!result.ok, "Non-triangulated face should fail.");
+    t.expect(result.error.find("triangulated") != std::string::npos, "Invalid face error should explain triangulated requirement.");
+}
+
+void testObjLoaderMissingFile(TestContext& t)
+{
+    const std::filesystem::path objPath = std::filesystem::temp_directory_path() / "raytracerrtx_missing_mesh.obj";
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(!result.ok, "Missing OBJ file should fail.");
+    t.expect(result.error.find("could not be opened") != std::string::npos, "Missing file error should explain open failure.");
+}
+
+void testObjLoaderUnknownLinesIgnored(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "unknown_lines.obj",
+        "o DemoObject\n"
+        "s off\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "g ignored_group\n"
+        "f 1 2 3\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "Unknown OBJ lines should be ignored.");
+    t.expect(result.mesh.triangles.size() == 1, "Unknown lines should not prevent triangle loading.");
+}
+
+void testObjLoaderMaterialFallbackWhenMtlMissing(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "missing_mtl.obj",
+        "mtllib does_not_exist.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl fallback_name\n"
+        "f 1 2 3\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "Missing MTL should fall back to generated material.");
+    t.expect(result.mesh.materials.size() == 2, "Fallback named material should be created.");
+    t.expect(result.mesh.materials[1].name == "fallback_name", "Fallback material should keep usemtl name.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Fallback material index should be valid.");
+}
+
+void testObjLoaderSingleTriangleBoundary(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "single_triangle.obj",
+        "v 0 0 0\n"
+        "v 0 0 1\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "Single triangle OBJ should load.");
+    t.expect(!isEmptyMesh(result.mesh), "Single triangle mesh should not be empty.");
+    t.expect(result.mesh.triangles[0].i0 == 0, "Single triangle first index should be 0.");
+    t.expect(result.mesh.triangles[0].i2 == 2, "Single triangle third index should be 2.");
 }
 
 void testDefaultScene(TestContext& t)
@@ -327,6 +494,15 @@ int main(int argc, char** argv)
     runTest("Camera basis", testCameraBasis);
     runTest("Camera aspect fallback", testCameraAspectFallback);
     runTest("Camera scale vs FOV", testCameraScaleIncreasesWithFov);
+    runTest("OBJ loader triangle with normals", testObjLoaderTriangleWithNormals);
+    runTest("OBJ loader multiple materials", testObjLoaderMultipleMaterials);
+    runTest("OBJ loader missing normals fallback", testObjLoaderMissingNormalsFallback);
+    runTest("OBJ loader empty file", testObjLoaderEmptyFile);
+    runTest("OBJ loader invalid face", testObjLoaderInvalidFace);
+    runTest("OBJ loader missing file", testObjLoaderMissingFile);
+    runTest("OBJ loader unknown lines ignored", testObjLoaderUnknownLinesIgnored);
+    runTest("OBJ loader material fallback when MTL missing", testObjLoaderMaterialFallbackWhenMtlMissing);
+    runTest("OBJ loader single triangle boundary", testObjLoaderSingleTriangleBoundary);
 
     ++testsRun;
     if (runGpuSmokeTest(t))
