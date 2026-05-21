@@ -121,6 +121,25 @@ void testObjLoaderTriangleWithNormals(TestContext& t)
     t.expect(almostEqual(result.mesh.materials[1].color.x, 0.9f), "MTL Kd color should be loaded.");
 }
 
+void testGgxMathHelpers(TestContext& t)
+{
+    const float dSmooth = ggxDistribution(1.0f, 0.08f);
+    const float dRough = ggxDistribution(1.0f, 0.7f);
+    t.expect(std::isfinite(dSmooth), "GGX distribution should stay finite for low roughness.");
+    t.expect(std::isfinite(dRough), "GGX distribution should stay finite for rough material.");
+    t.expect(dSmooth > dRough, "GGX distribution should sharpen as roughness decreases.");
+
+    const float g = ggxGeometrySmith(0.7f, 0.6f, 0.4f);
+    t.expect(std::isfinite(g), "GGX geometry term should stay finite.");
+    t.expect(g >= 0.0f && g <= 1.0f, "GGX geometry term should stay in [0, 1].");
+
+    const float f0 = 0.04f;
+    const float fGrazing = ggxFresnelSchlick(0.0f, f0);
+    const float fFacing = ggxFresnelSchlick(1.0f, f0);
+    t.expect(almostEqual(fFacing, f0), "Schlick Fresnel should equal F0 at normal incidence.");
+    t.expect(fGrazing > fFacing, "Schlick Fresnel should increase at grazing angles.");
+}
+
 void testObjLoaderMultipleMaterials(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -1008,6 +1027,7 @@ int main(int argc, char** argv)
     runTest("Camera aspect fallback", testCameraAspectFallback);
     runTest("Camera scale vs FOV", testCameraScaleIncreasesWithFov);
     runTest("Tone mapping and gamma correction", testToneMappingAndGammaCorrection);
+    runTest("GGX math helpers", testGgxMathHelpers);
     runTest("OBJ loader triangle with normals", testObjLoaderTriangleWithNormals);
     runTest("OBJ loader multiple materials", testObjLoaderMultipleMaterials);
     runTest("OBJ loader mirror material name mapping", testObjLoaderMirrorMaterialNameMapping);

@@ -132,6 +132,64 @@ static __forceinline__ __device__ float fresnelSchlick(const float cosTheta, con
     return f0 + (1.0f - f0) * m2 * m2 * m;
 }
 
+static __forceinline__ __device__ float ggxDistributionDevice(const float nDotH, const float roughness)
+{
+    const float alpha = fmaxf(saturate1(roughness), 0.045f);
+    const float a2 = alpha * alpha * alpha * alpha;
+    const float ndh = saturate1(nDotH);
+    const float denom = ndh * ndh * (a2 - 1.0f) + 1.0f;
+    return a2 / (3.14159265f * denom * denom + 1e-5f);
+}
+
+static __forceinline__ __device__ float ggxGeometrySchlickDevice(const float nDotV, const float roughness)
+{
+    const float r = fmaxf(saturate1(roughness), 0.045f) + 1.0f;
+    const float k = (r * r) / 8.0f;
+    const float ndv = saturate1(nDotV);
+    return ndv / (ndv * (1.0f - k) + k + 1e-5f);
+}
+
+static __forceinline__ __device__ float ggxGeometrySmithDevice(const float nDotV, const float nDotL, const float roughness)
+{
+    return ggxGeometrySchlickDevice(nDotV, roughness) * ggxGeometrySchlickDevice(nDotL, roughness);
+}
+
+static __forceinline__ __device__ float3 ggxDirectLight(
+    const float3 baseColor,
+    const float3 specularColor,
+    const float3 normal,
+    const float3 viewDir,
+    const float3 lightDir,
+    const float roughness,
+    const float metallic)
+{
+    const float nDotL = saturate1(dot3(normal, lightDir));
+    const float nDotV = saturate1(dot3(normal, viewDir));
+    if (nDotL <= 0.0f || nDotV <= 0.0f)
+    {
+        return make_vec(0.0f, 0.0f, 0.0f);
+    }
+
+    const float3 halfDir = normalize3(add3(lightDir, viewDir));
+    const float nDotH = saturate1(dot3(normal, halfDir));
+    const float vDotH = saturate1(dot3(viewDir, halfDir));
+    const float D = ggxDistributionDevice(nDotH, roughness);
+    const float G = ggxGeometrySmithDevice(nDotV, nDotL, roughness);
+
+    const float3 dielectricF0 = make_vec(
+        fminf(fmaxf(specularColor.x * 0.04f, 0.02f), 0.18f),
+        fminf(fmaxf(specularColor.y * 0.04f, 0.02f), 0.18f),
+        fminf(fmaxf(specularColor.z * 0.04f, 0.02f), 0.18f));
+    const float3 f0 = lerp3(dielectricF0, baseColor, metallic);
+    const float fresnelFactor = fresnelSchlick(vDotH, 0.0f);
+    const float3 F = add3(f0, mul3(sub3(make_vec(1.0f, 1.0f, 1.0f), f0), fresnelFactor));
+    const float denominator = fmaxf(4.0f * nDotV * nDotL, 1e-4f);
+    const float3 specular = mul3(F, (D * G) / denominator);
+    const float3 kd = mul3(sub3(make_vec(1.0f, 1.0f, 1.0f), F), 1.0f - metallic);
+    const float3 diffuse = mul3(make_vec(kd.x * baseColor.x, kd.y * baseColor.y, kd.z * baseColor.z), 1.0f / 3.14159265f);
+    return mul3(add3(diffuse, specular), nDotL);
+}
+
 static __forceinline__ __device__ float3 roughReflectionDir(const float3 reflectedDir, const float3 normal, const float roughness)
 {
     const float blend = saturate1(roughness * roughness);
@@ -291,6 +349,8 @@ static __forceinline__ __device__ uchar4 toColor(const float3 color)
         255);
 }
 
+)"
+R"(
 static __forceinline__ __device__ float3 shadeMaterial(
     const float3 hitPoint,
     float3 normal,
@@ -338,9 +398,14 @@ static __forceinline__ __device__ float3 shadeMaterial(
     const float3 diffuseColor = reflectiveMaterial
         ? baseColor
         : clamp3(baseColor, 0.0f, 0.96f);
+    const float metallic = material.materialType == MaterialMetal ? 1.0f : 0.0f;
+    const float mirrorGgxBoost = material.materialType == MaterialMirror ? 1.35f : 1.0f;
+    const float3 ggxLight = mul3(
+        ggxDirectLight(diffuseColor, material.specularColor, normal, viewDir, lightDir, roughness, metallic),
+        shadowFactor * 1.35f * mirrorGgxBoost);
 
     float3 localColor = add3(
-        mul3(diffuseColor, ambient + diffuseLightWeight * diffuse),
+        add3(mul3(diffuseColor, ambient + diffuseLightWeight * diffuse * 0.32f), ggxLight),
         mul3(make_vec(1.0f, 1.0f, 1.0f), diffuseSpecularWeight * specular));
     localColor = add3(localColor, mul3(make_vec(diffuseColor.x * env.x, diffuseColor.y * env.y, diffuseColor.z * env.z), 0.10f));
 

@@ -161,6 +161,14 @@ Declared in `src/common/rtx_shared.h`.
 | `MaterialMetal` | Tinted reflective material with roughness-controlled reflection |
 | `MaterialDielectric` | Simple glass/dielectric approximation with Fresnel and refraction |
 
+Direct lighting for diffuse, mirror, and metal materials uses a physically
+motivated GGX/Trowbridge-Reitz microfacet BRDF. The shader evaluates the normal
+distribution term `D`, Smith geometry term `G`, and Schlick Fresnel `F`, with
+clamped roughness and dot products to avoid NaN/Inf values. `Kd` maps to
+baseColor, `Ks` tints the specular approximation, `Ns` maps to roughness, and
+material names containing `metal` use metallic shading. This is a physically
+motivated material model, not a claim of a full physically correct renderer.
+
 ### `SphereMaterial`
 
 | Field | Type | Meaning |

@@ -42,6 +42,48 @@ inline float3 toneMapAndGammaCorrect(const float3 color)
 {
     return gammaCorrect(reinhardToneMap(color));
 }
+
+inline float ggxClampDot(const float value)
+{
+    return clamp01(value);
+}
+
+inline float ggxClampRoughness(const float roughness)
+{
+    return roughness < 0.045f ? 0.045f : (roughness > 1.0f ? 1.0f : roughness);
+}
+
+inline float ggxDistribution(const float nDotH, const float roughness)
+{
+    const float alpha = ggxClampRoughness(roughness);
+    const float a2 = alpha * alpha * alpha * alpha;
+    const float ndh = ggxClampDot(nDotH);
+    const float denom = ndh * ndh * (a2 - 1.0f) + 1.0f;
+    constexpr float pi = 3.14159265358979323846f;
+    constexpr float epsilon = 1e-5f;
+    return a2 / (pi * denom * denom + epsilon);
+}
+
+inline float ggxGeometrySchlick(const float nDotV, const float roughness)
+{
+    const float r = ggxClampRoughness(roughness) + 1.0f;
+    const float k = (r * r) / 8.0f;
+    const float ndv = ggxClampDot(nDotV);
+    constexpr float epsilon = 1e-5f;
+    return ndv / (ndv * (1.0f - k) + k + epsilon);
+}
+
+inline float ggxGeometrySmith(const float nDotV, const float nDotL, const float roughness)
+{
+    return ggxGeometrySchlick(nDotV, roughness) * ggxGeometrySchlick(nDotL, roughness);
+}
+
+inline float ggxFresnelSchlick(const float cosTheta, const float f0)
+{
+    const float m = clamp01(1.0f - cosTheta);
+    const float m2 = m * m;
+    return f0 + (1.0f - f0) * m2 * m2 * m;
+}
 #endif
 
 struct SphereMaterial

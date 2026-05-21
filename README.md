@@ -20,7 +20,9 @@ index of refraction, and alpha values. Material names containing `mirror`,
 model; other OBJ materials use diffuse shading. Diffuse `map_Kd` and basic
 normal maps through `bump`, `map_Bump`, or `norm` are supported for PPM demo
 textures; normal mapping perturbs shading normals only and does not displace
-geometry.
+geometry. Direct lighting uses a physically motivated GGX/Trowbridge-Reitz
+microfacet BRDF for diffuse, mirror and metal materials; glass remains a
+separate simplified dielectric approximation.
 
 ## Технологии
 

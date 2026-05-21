@@ -22,7 +22,9 @@ roughness/glossiness, index of refraction и alpha. Если имя матери
 упрощенная модель материала; остальные OBJ-материалы отображаются как
 диффузные. Для demo PPM-текстур поддерживаются diffuse `map_Kd` и basic normal
 mapping через `bump`, `map_Bump` или `norm`; normal map изменяет только shading
-normal и не делает displacement геометрии.
+normal и не делает displacement геометрии. Direct lighting использует
+physically motivated GGX/Trowbridge-Reitz microfacet BRDF для diffuse, mirror и
+metal материалов; glass остается отдельной упрощенной dielectric-моделью.
 
 ## Технологии
 

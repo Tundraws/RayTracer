@@ -32,6 +32,8 @@ environment lighting, Reinhard tone mapping, gamma correction, and optional
 OBJ `map_Kd` diffuse texture sampling. Basic tangent-space normal mapping is
 available for OBJ materials that provide a valid normal map and UVs. Mesh
 objects are stored separately and placed in the IAS with per-object transforms.
+Direct lighting uses a physically motivated GGX microfacet BRDF for diffuse,
+mirror, and metal materials.
 
 The benchmark is headless and does not include GLFW window presentation, HUD
 drawing, or user input processing. Interactive FPS in the desktop app may differ
@@ -41,17 +43,17 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low | 640x360 | 658.24 | 1.52 | 1.50 |
-| HD | 1280x720 | 219.17 | 4.56 | 4.54 |
-| Full HD | 1920x1080 | 113.13 | 8.84 | 8.81 |
+| Low | 640x360 | 630.36 | 1.59 | 1.57 |
+| HD | 1280x720 | 225.60 | 4.43 | 4.41 |
+| Full HD | 1920x1080 | 103.30 | 9.68 | 9.64 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD averages about 113 FPS, so the current
+with the OBJ mesh scene enabled. Full HD averages about 103 FPS, so the current
 scene remains above the 60 FPS target. The extra material, diffuse texture,
 normal-map shading state, and per-object Triangle GAS/IAS layout remain within
-the real-time budget: average GPU time is below 9 ms at 1920x1080, under the
+the real-time budget: average GPU time is below 10 ms at 1920x1080, under the
 16.67 ms frame budget for 60 FPS.
 
 The close match between host frame time and GPU time indicates that the benchmark
