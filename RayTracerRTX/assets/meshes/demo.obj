@@ -10,11 +10,11 @@ vn 0.62 0.49 -0.62
 vn 0.62 0.49 0.62
 vn -0.62 0.49 0.62
 vn 0.0 1.0 0.0
-usemtl blue_diffuse
+usemtl mat_white_diffuse
 f 1//1 2//2 5//5
-usemtl warm_diffuse
+usemtl mat_green_diffuse
 f 2//2 3//3 5//5
-usemtl mirror_cap
+usemtl mat_mirror
 f 3//3 4//4 5//5
-usemtl blue_diffuse
+usemtl mat_white_diffuse
 f 4//4 1//1 5//5

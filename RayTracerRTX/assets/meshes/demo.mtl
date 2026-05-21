@@ -1,8 +1,8 @@
-newmtl blue_diffuse
-Kd 0.35 0.55 0.95
+newmtl mat_white_diffuse
+Kd 0.86 0.88 0.84
 
-newmtl warm_diffuse
-Kd 0.95 0.70 0.42
+newmtl mat_green_diffuse
+Kd 0.36 0.78 0.52
 
-newmtl mirror_cap
+newmtl mat_mirror
 Kd 0.92 0.92 0.92

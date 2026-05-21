@@ -96,6 +96,22 @@ void testObjLoaderMultipleMaterials(TestContext& t)
     t.expect(hasValidMeshMaterialIndices(result.mesh), "Material indices should be valid.");
 }
 
+void testObjLoaderMirrorMaterialNameMapping(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "mirror_material.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl mat_mirror\n"
+        "f 1 2 3\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with mirror material name should load.");
+    t.expect(result.mesh.materials.size() == 2, "Mirror usemtl should create a named material.");
+    t.expect(result.mesh.materials[1].materialType == MaterialMirror, "Material name containing mirror should map to MaterialMirror.");
+}
+
 void testObjLoaderMissingNormalsFallback(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -505,6 +521,7 @@ int main(int argc, char** argv)
     runTest("Camera scale vs FOV", testCameraScaleIncreasesWithFov);
     runTest("OBJ loader triangle with normals", testObjLoaderTriangleWithNormals);
     runTest("OBJ loader multiple materials", testObjLoaderMultipleMaterials);
+    runTest("OBJ loader mirror material name mapping", testObjLoaderMirrorMaterialNameMapping);
     runTest("OBJ loader missing normals fallback", testObjLoaderMissingNormalsFallback);
     runTest("OBJ loader empty file", testObjLoaderEmptyFile);
     runTest("OBJ loader invalid face", testObjLoaderInvalidFace);
