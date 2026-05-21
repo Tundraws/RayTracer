@@ -28,6 +28,15 @@ jobs:
           test -f RayTracerRTX/docs/performance-results.md
           test -f Dockerfile
           test -f docker-compose.yml
+          test -f RayTracerRTX/assets/meshes/demo.obj
+          test -f RayTracerRTX/assets/meshes/demo.mtl
+          test -f RayTracerRTX/assets/meshes/textured_demo.obj
+          test -f RayTracerRTX/assets/meshes/textured_cube.obj
+          test -f RayTracerRTX/assets/meshes/minimal_gltf.gltf
+          test -f RayTracerRTX/assets/meshes/minimal_gltf.bin
+          test -f RayTracerRTX/assets/scenes/demo_scene.json
+          test -f RayTracerRTX/assets/scenes/multi_mesh_scene.json
+          test -f RayTracerRTX/assets/scenes/gltf_scene.json
 
       - name: Check OptiX device source markers
         shell: bash
@@ -45,11 +54,14 @@ jobs:
             -IRayTracerRTX/src \
             RayTracerRTX/tests/test_scene_camera.cpp \
             RayTracerRTX/src/app/camera.cpp \
+            RayTracerRTX/src/app/gltf_loader.cpp \
             RayTracerRTX/src/app/material.cpp \
+            RayTracerRTX/src/app/mesh.cpp \
+            RayTracerRTX/src/app/obj_loader.cpp \
             RayTracerRTX/src/app/scene.cpp \
+            RayTracerRTX/src/app/scene_config.cpp \
             -o raytracerrtx_cpu_tests
 
       - name: Run CPU-only tests
         shell: bash
         run: ./raytracerrtx_cpu_tests
-
