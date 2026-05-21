@@ -48,6 +48,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;RAYTRACERRTX_ENABLE_GPU_TESTS;RAYTRACERRTX_CUDA_INCLUDE_DIR=&quot;$([System.String]::Copy('$(CudaToolkitIncludeDir)').Replace('\','/'))&quot;;RAYTRACERRTX_OPTIX_INCLUDE_DIR=&quot;$([System.String]::Copy('$(OptixSdkDir)\include').Replace('\','/'))&quot;;RAYTRACERRTX_SOURCE_DIR=&quot;$([System.String]::Copy('$(ProjectDir)..\src').Replace('\','/'))&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -64,6 +65,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>

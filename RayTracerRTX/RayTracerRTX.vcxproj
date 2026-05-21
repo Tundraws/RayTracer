@@ -49,6 +49,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;GLFW_STATIC;RAYTRACERRTX_CUDA_INCLUDE_DIR=&quot;$([System.String]::Copy('$(CudaToolkitIncludeDir)').Replace('\','/'))&quot;;RAYTRACERRTX_OPTIX_INCLUDE_DIR=&quot;$([System.String]::Copy('$(OptixSdkDir)\include').Replace('\','/'))&quot;;RAYTRACERRTX_SOURCE_DIR=&quot;$([System.String]::Copy('$(ProjectDir)src').Replace('\','/'))&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -69,6 +70,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
@@ -94,6 +96,7 @@
     <ClInclude Include="src\app\camera.h" />
     <ClInclude Include="src\app\material.h" />
     <ClInclude Include="src\app\mesh.h" />
+    <ClInclude Include="src\app\obj_loader.h" />
     <ClInclude Include="src\app\scene.h" />
     <ClInclude Include="src\common\rtx_shared.h" />
     <ClInclude Include="src\gpu\optix_device_programs.h" />
@@ -109,6 +112,7 @@
     <ClCompile Include="src\app\camera.cpp" />
     <ClCompile Include="src\app\material.cpp" />
     <ClCompile Include="src\app\mesh.cpp" />
+    <ClCompile Include="src\app\obj_loader.cpp" />
     <ClCompile Include="src\app\maingpu.cpp" />
     <ClCompile Include="src\app\scene.cpp" />
     <ClCompile Include="src\gpu\optix_renderer.cpp" />
