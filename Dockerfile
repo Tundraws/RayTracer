@@ -18,6 +18,7 @@ RUN test -f README.md \
     && test -f RayTracerRTX/assets/meshes/textured_cube.obj \
     && test -f RayTracerRTX/assets/meshes/textured_demo.mtl \
     && test -f RayTracerRTX/assets/meshes/checker.ppm \
+    && test -f RayTracerRTX/assets/meshes/checker_normal.ppm \
     && test -f RayTracerRTX/assets/scenes/demo_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_cube_scene.json \
@@ -33,6 +34,7 @@ RUN test -f README.md \
     && grep -q "usemtl mat_mirror" RayTracerRTX/assets/meshes/demo.obj \
     && grep -q "newmtl mat_green_diffuse" RayTracerRTX/assets/meshes/demo.mtl \
     && grep -q "map_Kd checker.ppm" RayTracerRTX/assets/meshes/textured_demo.mtl \
+    && grep -q "bump checker_normal.ppm" RayTracerRTX/assets/meshes/textured_demo.mtl \
     && grep -q "vt " RayTracerRTX/assets/meshes/textured_demo.obj \
     && grep -q "TexturedCourseworkCube" RayTracerRTX/assets/meshes/textured_cube.obj \
     && grep -q "OptiX" RayTracerRTX/README.md \

@@ -295,7 +295,7 @@ void OptixRenderer::createScene(const SceneState& scene)
     meshVertices.reserve(scene.mesh.vertices.size());
     for (const MeshVertex& vertex : scene.mesh.vertices)
     {
-        meshVertices.push_back(MeshVertexGpu{vertex.position, vertex.normal, vertex.texcoord});
+        meshVertices.push_back(MeshVertexGpu{vertex.position, vertex.normal, vertex.texcoord, vertex.tangent, vertex.hasTexcoord});
     }
 
     std::vector<uint3> meshIndices;
@@ -329,6 +329,18 @@ void OptixRenderer::createScene(const SceneState& scene)
                 materialGpu.textureOffset = static_cast<unsigned int>(meshTexturePixels.size());
                 materialGpu.textureWidth = texture.width;
                 materialGpu.textureHeight = texture.height;
+                meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
+            }
+        }
+        if (material.normalTextureIndex >= 0 && static_cast<size_t>(material.normalTextureIndex) < scene.mesh.textures.size())
+        {
+            const MeshTexture& texture = scene.mesh.textures[static_cast<size_t>(material.normalTextureIndex)];
+            if (!texture.pixels.empty() && texture.width > 0 && texture.height > 0)
+            {
+                materialGpu.hasNormalTexture = 1;
+                materialGpu.normalTextureOffset = static_cast<unsigned int>(meshTexturePixels.size());
+                materialGpu.normalTextureWidth = texture.width;
+                materialGpu.normalTextureHeight = texture.height;
                 meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
             }
         }

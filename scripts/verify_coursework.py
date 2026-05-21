@@ -26,6 +26,7 @@ REQUIRED_PATHS = [
     "RayTracerRTX/assets/meshes/textured_cube.obj",
     "RayTracerRTX/assets/meshes/textured_demo.mtl",
     "RayTracerRTX/assets/meshes/checker.ppm",
+    "RayTracerRTX/assets/meshes/checker_normal.ppm",
     "RayTracerRTX/assets/scenes/demo_scene.json",
     "RayTracerRTX/assets/scenes/textured_scene.json",
     "RayTracerRTX/assets/scenes/textured_cube_scene.json",
@@ -78,6 +79,8 @@ def main() -> None:
         fail("Textured demo OBJ misses texture coordinates.")
     if "map_Kd checker.ppm" not in textured_mtl:
         fail("Textured demo MTL misses map_Kd checker.ppm.")
+    if "bump checker_normal.ppm" not in textured_mtl:
+        fail("Textured demo MTL misses bump checker_normal.ppm.")
 
     textured_cube_obj = (ROOT / "RayTracerRTX/assets/meshes/textured_cube.obj").read_text(encoding="utf-8", errors="ignore")
     if "TexturedCourseworkCube" not in textured_cube_obj or "vt " not in textured_cube_obj:

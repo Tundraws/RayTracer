@@ -41,6 +41,14 @@ static __forceinline__ __device__ float dot3(const float3 a, const float3 b)
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+static __forceinline__ __device__ float3 cross3(const float3 a, const float3 b)
+{
+    return make_vec(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x);
+}
+
 static __forceinline__ __device__ float3 normalize3(const float3 v)
 {
     const float len = sqrtf(dot3(v, v));
@@ -161,6 +169,52 @@ static __forceinline__ __device__ float3 sampleDiffuseTexture(const MeshMaterial
         static_cast<float>(pixel.x) / 255.0f,
         static_cast<float>(pixel.y) / 255.0f,
         static_cast<float>(pixel.z) / 255.0f);
+}
+
+static __forceinline__ __device__ float3 sampleNormalTexture(
+    const MeshMaterialGpu material,
+    const float2 texcoord,
+    const float3 normal,
+    const float3 tangent,
+    const int hasTexcoord)
+{
+    if (hasTexcoord == 0 ||
+        material.hasNormalTexture == 0 ||
+        material.normalTextureWidth == 0u ||
+        material.normalTextureHeight == 0u ||
+        params.meshTexturePixels == nullptr ||
+        dot3(tangent, tangent) <= 1e-6f)
+    {
+        return normal;
+    }
+
+    float u = texcoord.x - floorf(texcoord.x);
+    float v = texcoord.y - floorf(texcoord.y);
+    if (u < 0.0f)
+    {
+        u += 1.0f;
+    }
+    if (v < 0.0f)
+    {
+        v += 1.0f;
+    }
+
+    const unsigned int x = static_cast<unsigned int>(fminf(u * static_cast<float>(material.normalTextureWidth), static_cast<float>(material.normalTextureWidth - 1u)));
+    const unsigned int y = static_cast<unsigned int>(fminf((1.0f - v) * static_cast<float>(material.normalTextureHeight), static_cast<float>(material.normalTextureHeight - 1u)));
+    const unsigned int offset = material.normalTextureOffset + y * material.normalTextureWidth + x;
+    if (offset >= params.meshTexturePixelCount)
+    {
+        return normal;
+    }
+
+    const uchar4 pixel = params.meshTexturePixels[offset];
+    const float3 tangentSpaceNormal = normalize3(make_vec(
+        static_cast<float>(pixel.x) / 255.0f * 2.0f - 1.0f,
+        static_cast<float>(pixel.y) / 255.0f * 2.0f - 1.0f,
+        static_cast<float>(pixel.z) / 255.0f * 2.0f - 1.0f));
+    const float3 t = normalize3(sub3(tangent, mul3(normal, dot3(normal, tangent))));
+    const float3 b = normalize3(cross3(normal, t));
+    return normalize3(add3(add3(mul3(t, tangentSpaceNormal.x), mul3(b, tangentSpaceNormal.y)), mul3(normal, tangentSpaceNormal.z)));
 }
 
 static __forceinline__ __device__ void setRadiancePayload(const float3 color)
@@ -530,6 +584,9 @@ extern "C" __global__ void __closesthit__radiance_mesh()
     const float w2 = bary.y;
     float3 normal = normalize3(add3(add3(mul3(v0.normal, w0), mul3(v1.normal, w1)), mul3(v2.normal, w2)));
     normal = normalize3(optixTransformNormalFromObjectToWorldSpace(normal));
+    float3 tangent = normalize3(add3(add3(mul3(v0.tangent, w0), mul3(v1.tangent, w1)), mul3(v2.tangent, w2)));
+    tangent = normalize3(optixTransformVectorFromObjectToWorldSpace(tangent));
+    const int hasTexcoord = v0.hasTexcoord != 0 && v1.hasTexcoord != 0 && v2.hasTexcoord != 0 ? 1 : 0;
     const float2 texcoord = make_float2(
         v0.texcoord.x * w0 + v1.texcoord.x * w1 + v2.texcoord.x * w2,
         v0.texcoord.y * w0 + v1.texcoord.y * w1 + v2.texcoord.y * w2);
@@ -544,6 +601,7 @@ extern "C" __global__ void __closesthit__radiance_mesh()
     {
         material = params.meshMaterials[triangle.materialIndex];
     }
+    normal = sampleNormalTexture(material, texcoord, normal, tangent, hasTexcoord);
 
     setRadiancePayload(shadeMaterial(hitPoint, normal, texcoord, rayDirection, depth, material));
 }

@@ -20,7 +20,9 @@
 roughness/glossiness, index of refraction и alpha. Если имя материала содержит
 `mirror`, `metal`, `glass` или `dielectric`, выбирается соответствующая
 упрощенная модель материала; остальные OBJ-материалы отображаются как
-диффузные.
+диффузные. Для demo PPM-текстур поддерживаются diffuse `map_Kd` и basic normal
+mapping через `bump`, `map_Bump` или `norm`; normal map изменяет только shading
+normal и не делает displacement геометрии.
 
 ## Технологии
 
@@ -79,7 +81,7 @@ JSON scene config с `meshObjects`, `camera`, `light` и transform-полями
 - `src/common` — общие структуры данных host/device
 - `tests` — unit-тесты и тестовый проект
 - `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
-- `assets/meshes/textured_demo.obj`, `textured_cube.obj`, `textured_demo.mtl`, and `checker.ppm` - demo OBJ meshes with `map_Kd` diffuse texture
+- `assets/meshes/textured_demo.obj`, `textured_cube.obj`, `textured_demo.mtl`, `checker.ppm`, and `checker_normal.ppm` - demo OBJ meshes with `map_Kd` diffuse texture and basic normal map
 - `assets/scenes/demo_scene.json`, `textured_scene.json`, and `textured_cube_scene.json` - documented JSON scene input examples
 
 ## Статус

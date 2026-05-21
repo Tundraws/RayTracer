@@ -59,6 +59,8 @@ struct MeshVertexGpu
     float3 position;
     float3 normal;
     float2 texcoord;
+    float3 tangent;
+    int hasTexcoord;
 };
 
 struct MeshTriangleGpu
@@ -81,6 +83,10 @@ struct MeshMaterialGpu
     unsigned int textureOffset = 0;
     unsigned int textureWidth = 0;
     unsigned int textureHeight = 0;
+    int hasNormalTexture = 0;
+    unsigned int normalTextureOffset = 0;
+    unsigned int normalTextureWidth = 0;
+    unsigned int normalTextureHeight = 0;
 };
 
 struct LaunchParams

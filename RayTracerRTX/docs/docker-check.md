@@ -9,7 +9,7 @@ The Docker setup provides a reproducible coursework verification environment for
 - repository structure checks;
 - documentation marker checks;
 - demo OBJ mesh and MTL asset checks;
-- demo textured OBJ and `map_Kd` PPM asset checks;
+- demo textured OBJ, `map_Kd` PPM, and normal-map PPM asset checks;
 - demo JSON scene config checks;
 - OBJ loader source-file checks;
 - CPU-only unit tests for scene, camera, material, extended MTL, and OBJ loader logic.
@@ -29,6 +29,7 @@ driver integration. GPU execution is verified separately by the native
 - `RayTracerRTX/assets/meshes/textured_cube.obj`
 - `RayTracerRTX/assets/meshes/textured_demo.mtl`
 - `RayTracerRTX/assets/meshes/checker.ppm`
+- `RayTracerRTX/assets/meshes/checker_normal.ppm`
 - `RayTracerRTX/assets/scenes/demo_scene.json`
 - `RayTracerRTX/assets/scenes/textured_scene.json`
 - `RayTracerRTX/assets/scenes/textured_cube_scene.json`

@@ -17,7 +17,10 @@ faces, and multiple materials through MTL files. MTL `Kd` values define diffuse
 colors; `Ks`, `Ns`, `Ni`, and `d` provide specular color, roughness/glossiness,
 index of refraction, and alpha values. Material names containing `mirror`,
 `metal`, `glass`, or `dielectric` select the corresponding simplified material
-model; other OBJ materials use diffuse shading.
+model; other OBJ materials use diffuse shading. Diffuse `map_Kd` and basic
+normal maps through `bump`, `map_Bump`, or `norm` are supported for PPM demo
+textures; normal mapping perturbs shading normals only and does not displace
+geometry.
 
 ## Технологии
 
@@ -76,7 +79,7 @@ JSON scene config поддерживает `meshObjects`, `camera`, `light` и t
 - `src/gpu` - OptiX renderer, pipeline, SBT, device-программы
 - `src/common` - общие структуры данных host/device
 - `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
-- `assets/meshes/textured_demo.obj`, `textured_cube.obj`, `textured_demo.mtl`, and `checker.ppm` - demo OBJ meshes with `map_Kd` diffuse texture
+- `assets/meshes/textured_demo.obj`, `textured_cube.obj`, `textured_demo.mtl`, `checker.ppm`, and `checker_normal.ppm` - demo OBJ meshes with `map_Kd` diffuse texture and basic normal map
 - `assets/scenes/demo_scene.json`, `textured_scene.json`, and `textured_cube_scene.json` - documented JSON scene input examples
 
 ## Текущий статус

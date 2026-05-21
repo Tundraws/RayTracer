@@ -22,6 +22,16 @@ float3 sub3(const float3 a, const float3 b)
     return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
+float3 mul3(const float3 a, const float value)
+{
+    return make_float3(a.x * value, a.y * value, a.z * value);
+}
+
+float dot3(const float3 a, const float3 b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
 float3 cross3(const float3 a, const float3 b)
 {
     return make_float3(
@@ -39,6 +49,41 @@ float3 normalize3(const float3 v)
     }
 
     return make_float3(v.x / length, v.y / length, v.z / length);
+}
+
+float3 orthonormalizeTangent(const float3 tangent, const float3 normal)
+{
+    const float3 projected = sub3(tangent, mul3(normal, dot3(normal, tangent)));
+    return normalize3(projected);
+}
+
+float3 computeTriangleTangent(
+    const float3 p0,
+    const float3 p1,
+    const float3 p2,
+    const float2 uv0,
+    const float2 uv1,
+    const float2 uv2,
+    const float3 normal)
+{
+    const float3 edge1 = sub3(p1, p0);
+    const float3 edge2 = sub3(p2, p0);
+    const float du1 = uv1.x - uv0.x;
+    const float dv1 = uv1.y - uv0.y;
+    const float du2 = uv2.x - uv0.x;
+    const float dv2 = uv2.y - uv0.y;
+    const float determinant = du1 * dv2 - dv1 * du2;
+    if (std::fabs(determinant) <= 1e-8f)
+    {
+        return make_float3(0.0f, 0.0f, 0.0f);
+    }
+
+    const float invDeterminant = 1.0f / determinant;
+    const float3 tangent = make_float3(
+        (edge1.x * dv2 - edge2.x * dv1) * invDeterminant,
+        (edge1.y * dv2 - edge2.y * dv1) * invDeterminant,
+        (edge1.z * dv2 - edge2.z * dv1) * invDeterminant);
+    return orthonormalizeTangent(tangent, normal);
 }
 
 std::string trim(const std::string& value)
@@ -371,6 +416,23 @@ void loadMtl(
                 }
             }
         }
+        else if ((command == "bump" || command == "map_Bump" || command == "norm") && currentMaterial >= 0)
+        {
+            std::string textureName;
+            input >> textureName;
+            if (!textureName.empty())
+            {
+                MeshMaterial& material = mesh.materials[static_cast<size_t>(currentMaterial)];
+                material.normalTexturePath = textureName;
+
+                MeshTexture texture;
+                if (loadPpmTexture(path.parent_path() / textureName, texture))
+                {
+                    material.normalTextureIndex = static_cast<int>(mesh.textures.size());
+                    mesh.textures.push_back(std::move(texture));
+                }
+            }
+        }
     }
 }
 
@@ -505,6 +567,22 @@ ObjLoadResult loadObjMesh(const std::filesystem::path& path)
             const float3 p2 = positions[static_cast<size_t>(faceVertices[2].positionIndex)];
             const float3 fallbackNormal = normalize3(cross3(sub3(p1, p0), sub3(p2, p0)));
             const std::uint32_t firstVertex = static_cast<std::uint32_t>(mesh.vertices.size());
+            const bool hasTriangleTexcoords =
+                faceVertices[0].texcoordIndex >= 0 &&
+                faceVertices[1].texcoordIndex >= 0 &&
+                faceVertices[2].texcoordIndex >= 0;
+            const float2 uv0 = hasTriangleTexcoords
+                ? texcoords[static_cast<size_t>(faceVertices[0].texcoordIndex)]
+                : make_float2(0.0f, 0.0f);
+            const float2 uv1 = hasTriangleTexcoords
+                ? texcoords[static_cast<size_t>(faceVertices[1].texcoordIndex)]
+                : make_float2(0.0f, 0.0f);
+            const float2 uv2 = hasTriangleTexcoords
+                ? texcoords[static_cast<size_t>(faceVertices[2].texcoordIndex)]
+                : make_float2(0.0f, 0.0f);
+            const float3 tangent = hasTriangleTexcoords
+                ? computeTriangleTangent(p0, p1, p2, uv0, uv1, uv2, fallbackNormal)
+                : make_float3(0.0f, 0.0f, 0.0f);
 
             for (const FaceVertex& faceVertex : faceVertices)
             {
@@ -515,7 +593,12 @@ ObjLoadResult loadObjMesh(const std::filesystem::path& path)
                 const float2 texcoord = faceVertex.texcoordIndex >= 0
                     ? texcoords[static_cast<size_t>(faceVertex.texcoordIndex)]
                     : make_float2(0.0f, 0.0f);
-                mesh.vertices.push_back(MeshVertex{position, normal, texcoord});
+                mesh.vertices.push_back(MeshVertex{
+                    position,
+                    normal,
+                    texcoord,
+                    hasTriangleTexcoords ? orthonormalizeTangent(tangent, normal) : make_float3(0.0f, 0.0f, 0.0f),
+                    hasTriangleTexcoords ? 1 : 0});
             }
 
             mesh.triangles.push_back(MeshTriangle{

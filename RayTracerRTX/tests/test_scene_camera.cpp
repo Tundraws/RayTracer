@@ -275,6 +275,27 @@ void testObjLoaderTexturedFaceWithNormals(TestContext& t)
     t.expect(almostEqual(result.mesh.vertices[2].normal.z, 1.0f), "OBJ v/vt/vn should preserve normals.");
 }
 
+void testObjLoaderComputesTangentsForTexturedTriangle(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "tangent_triangle.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vn 0 0 1\n"
+        "f 1/1/1 2/2/1 3/3/1\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with textured triangle should load.");
+    t.expect(result.mesh.vertices[0].hasTexcoord == 1, "Textured triangle vertex should mark texcoord availability.");
+    t.expect(almostEqual(result.mesh.vertices[0].tangent.x, 1.0f), "Textured triangle tangent should follow positive U.");
+    t.expect(almostEqual(result.mesh.vertices[0].tangent.y, 0.0f), "Textured triangle tangent should be orthogonal to Y for this fixture.");
+    t.expect(almostEqual(result.mesh.vertices[0].tangent.z, 0.0f), "Textured triangle tangent should be orthogonal to normal.");
+}
+
 void testObjLoaderMapKdTexture(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -310,6 +331,39 @@ void testObjLoaderMapKdTexture(TestContext& t)
     t.expect(hasValidMeshMaterialIndices(result.mesh), "Textured material indices should remain valid.");
 }
 
+void testObjLoaderNormalMapTexture(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "normal_map.obj",
+        "mtllib normal_map.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "usemtl normal_mapped\n"
+        "f 1/1 2/2 3/3\n");
+
+    writeFixtureFile(
+        "normal_map.mtl",
+        "newmtl normal_mapped\n"
+        "Kd 1 1 1\n"
+        "bump normal.ppm\n");
+    writeFixtureFile(
+        "normal.ppm",
+        "P3\n"
+        "1 1\n"
+        "255\n"
+        "128 128 255\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with bump normal map should load.");
+    t.expect(result.mesh.materials[1].normalTexturePath == "normal.ppm", "MTL bump normal map path should be stored.");
+    t.expect(result.mesh.materials[1].normalTextureIndex == 0, "Loaded normal map should be assigned to material.");
+    t.expect(result.mesh.textures.size() == 1, "Loaded normal map should be stored in mesh textures.");
+}
+
 void testObjLoaderMissingTextureFallback(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -333,6 +387,61 @@ void testObjLoaderMissingTextureFallback(TestContext& t)
     t.expect(result.mesh.materials[1].textureIndex < 0, "Missing map_Kd texture should fall back to Kd.");
     t.expect(result.mesh.textures.empty(), "Missing map_Kd texture should not create texture pixels.");
     t.expect(hasValidMeshMaterialIndices(result.mesh), "Missing texture fallback material indices should remain valid.");
+}
+
+void testObjLoaderMissingUvDisablesNormalMap(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "normal_without_uv.obj",
+        "mtllib normal_without_uv.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl normal_mapped\n"
+        "f 1 2 3\n");
+
+    writeFixtureFile(
+        "normal_without_uv.mtl",
+        "newmtl normal_mapped\n"
+        "norm normal.ppm\n");
+    writeFixtureFile(
+        "normal.ppm",
+        "P3\n"
+        "1 1\n"
+        "255\n"
+        "128 128 255\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ without UV but with normal map should load.");
+    t.expect(result.mesh.materials[1].normalTextureIndex == 0, "Normal texture can load even when geometry has no UV.");
+    t.expect(result.mesh.vertices[0].hasTexcoord == 0, "Missing UV should disable normal map use for vertex.");
+    t.expect(almostEqual(length3(result.mesh.vertices[0].tangent), 0.0f), "Missing UV should keep tangent empty.");
+}
+
+void testObjLoaderInvalidNormalMapFallback(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "invalid_normal_map.obj",
+        "mtllib invalid_normal_map.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "usemtl normal_mapped\n"
+        "f 1/1 2/2 3/3\n");
+
+    writeFixtureFile(
+        "invalid_normal_map.mtl",
+        "newmtl normal_mapped\n"
+        "map_Bump does_not_exist.ppm\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "Missing normal map texture should not fail OBJ loading.");
+    t.expect(result.mesh.materials[1].normalTexturePath == "does_not_exist.ppm", "Missing normal map path should still be stored.");
+    t.expect(result.mesh.materials[1].normalTextureIndex < 0, "Missing normal map should fall back to interpolated normal.");
+    t.expect(result.mesh.textures.empty(), "Missing normal map should not create texture pixels.");
 }
 
 void testObjLoaderMissingNormalsFallback(TestContext& t)
@@ -866,8 +975,12 @@ int main(int argc, char** argv)
     runTest("OBJ loader material parameter clamping", testObjLoaderMaterialParameterClamping);
     runTest("OBJ loader texture coordinates", testObjLoaderTextureCoordinates);
     runTest("OBJ loader textured face with normals", testObjLoaderTexturedFaceWithNormals);
+    runTest("OBJ loader computes tangents for textured triangle", testObjLoaderComputesTangentsForTexturedTriangle);
     runTest("OBJ loader map_Kd texture", testObjLoaderMapKdTexture);
+    runTest("OBJ loader normal map texture", testObjLoaderNormalMapTexture);
     runTest("OBJ loader missing texture fallback", testObjLoaderMissingTextureFallback);
+    runTest("OBJ loader missing UV disables normal map", testObjLoaderMissingUvDisablesNormalMap);
+    runTest("OBJ loader invalid normal map fallback", testObjLoaderInvalidNormalMapFallback);
     runTest("OBJ loader missing normals fallback", testObjLoaderMissingNormalsFallback);
     runTest("OBJ loader empty file", testObjLoaderEmptyFile);
     runTest("OBJ loader invalid face", testObjLoaderInvalidFace);

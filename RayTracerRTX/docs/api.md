@@ -88,6 +88,8 @@ Loads a simple OBJ mesh description into `MeshData`. The loader supports:
 - `mtllib` and `usemtl` material references;
 - MTL `Kd`, `Ks`, `Ns`, `Ni`, and `d` material values;
 - MTL `map_Kd` diffuse texture references for ASCII PPM (`P3`) images;
+- MTL `bump`, `map_Bump`, and `norm` normal map references for ASCII PPM
+  (`P3`) images;
 - multiple named materials.
 
 Material names containing `mirror` are mapped to `MaterialMirror`; all other
@@ -99,7 +101,11 @@ loader is intentionally limited to the listed OBJ and MTL records.
 
 If `map_Kd` points to a missing or unsupported texture file, the loader keeps
 the texture path for diagnostics and falls back to the material `Kd` color.
-Only diffuse `map_Kd` PPM textures are supported at this stage.
+If a normal map points to a missing or unsupported texture file, the loader
+keeps the path for diagnostics and the shader falls back to the interpolated
+geometric normal. Basic normal mapping requires OBJ `vt` coordinates and a
+valid computed tangent basis; it perturbs shading normals only and does not
+perform displacement mapping.
 
 ### `MeshData`
 
@@ -107,10 +113,10 @@ Declared in `src/app/mesh.h`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `vertices` | `std::vector<MeshVertex>` | Packed mesh vertices with position and normal |
+| `vertices` | `std::vector<MeshVertex>` | Packed mesh vertices with position, normal, UV, tangent and UV availability flag |
 | `triangles` | `std::vector<MeshTriangle>` | Triangle indices plus material index |
 | `materials` | `std::vector<MeshMaterial>` | OBJ/MTL materials used by mesh triangles |
-| `textures` | `std::vector<MeshTexture>` | Loaded diffuse texture pixels referenced by `map_Kd` |
+| `textures` | `std::vector<MeshTexture>` | Loaded diffuse and normal texture pixels referenced by MTL texture maps |
 
 `hasValidMeshMaterialIndices(const MeshData&)` validates that every triangle
 material index is inside the material array.
@@ -177,7 +183,7 @@ Uploaded to the GPU before each OptiX launch.
 | `meshVertices`, `meshVertexCount` | OBJ mesh vertex buffer |
 | `meshTriangles`, `meshTriangleCount` | OBJ mesh triangle buffer with material indices |
 | `meshMaterials`, `meshMaterialCount` | OBJ mesh material buffer |
-| `meshTexturePixels`, `meshTexturePixelCount` | Packed diffuse texture pixels for mesh `map_Kd` materials |
+| `meshTexturePixels`, `meshTexturePixelCount` | Packed diffuse and normal texture pixels for mesh materials |
 | `maxDepth` | Recursive reflection depth limit |
 
 ## Renderer API

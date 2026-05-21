@@ -427,6 +427,7 @@ MeshData transformMesh(const MeshData& source, const MeshTransformConfig& transf
             position.y + transform.position.y,
             position.z + transform.position.z);
         vertex.normal = normalize3(rotateEulerXyz(vertex.normal, transform.rotation));
+        vertex.tangent = normalize3(rotateEulerXyz(vertex.tangent, transform.rotation));
     }
     return mesh;
 }
@@ -444,6 +445,10 @@ void appendMesh(MeshData& target, const MeshData& source)
         if (material.textureIndex >= 0)
         {
             material.textureIndex += textureOffset;
+        }
+        if (material.normalTextureIndex >= 0)
+        {
+            material.normalTextureIndex += textureOffset;
         }
         target.materials.push_back(std::move(material));
     }

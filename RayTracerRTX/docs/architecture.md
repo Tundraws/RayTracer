@@ -15,8 +15,10 @@ flowchart LR
     App --> Camera["CameraState / updateCameraBasis"]
     SceneConfig --> ObjLoader
     ObjLoader["ObjLoader"] --> MeshData["MeshData"]
-    ObjLoader --> Textures["map_Kd PPM textures"]
+    ObjLoader --> Textures["map_Kd / normal PPM textures"]
+    ObjLoader --> Tangents["Tangent basis"]
     Textures --> MeshData
+    Tangents --> MeshData
     MeshData --> Scene
     App --> Scene["SceneState"]
     Scene --> Materials["SphereMaterial"]
@@ -52,10 +54,10 @@ sequenceDiagram
     Args->>ObjLoader: Resolve mesh path(s) and transforms
     Args->>Scene: Apply camera and light config
     User->>App: Keyboard and mouse input
-    ObjLoader->>Scene: Load OBJ vertices, normals, UVs, triangles, MTL materials and map_Kd textures
+    ObjLoader->>Scene: Load OBJ vertices, normals, UVs, tangents, triangles, MTL materials and textures
     App->>Scene: Move sphere, light, or toggle material
     App->>Renderer: renderFrame(scene, camera)
-    Renderer->>CUDA: Upload sphere materials, mesh buffers, texture pixels, and LaunchParams
+    Renderer->>CUDA: Upload sphere materials, mesh buffers, diffuse/normal texture pixels, and LaunchParams
     Renderer->>OptiX: Build sphere GAS + triangle GAS + IAS
     Renderer->>OptiX: optixLaunch
     OptiX->>GPU: Ray generation, sphere hit, mesh closest-hit, miss, shadow, reflection programs
@@ -77,6 +79,8 @@ flowchart TD
     Miss --> Environment["Gradient environment lighting"]
     HitSphere --> Shadow["Point-light shadow ray"]
     HitMesh --> MeshClosestHit["Mesh closest-hit shader"]
+    MeshClosestHit --> NormalMap["Optional tangent-space normal map"]
+    NormalMap --> MeshMaterial
     MeshClosestHit --> MeshMaterial{"Mesh material type"}
     MeshMaterial --> MeshDiffuse["MTL Kd diffuse lighting + shadow"]
     MeshMaterial --> MeshMirror["Mirror reflection ray"]

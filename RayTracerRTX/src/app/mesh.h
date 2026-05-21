@@ -11,6 +11,8 @@ struct MeshVertex
     float3 position{};
     float3 normal{};
     float2 texcoord{};
+    float3 tangent{};
+    int hasTexcoord = 0;
 };
 
 struct MeshTriangle
@@ -32,6 +34,8 @@ struct MeshMaterial
     float alpha = 1.0f;
     std::string texturePath;
     int textureIndex = -1;
+    std::string normalTexturePath;
+    int normalTextureIndex = -1;
 };
 
 struct MeshTexture

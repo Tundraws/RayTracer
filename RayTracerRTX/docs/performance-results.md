@@ -29,7 +29,8 @@ The benchmark scene includes analytic primitives and the demo OBJ mesh loaded
 from `assets/meshes/demo.obj` with multiple MTL materials. The material path
 includes diffuse, mirror, metal and dielectric shader branches, procedural
 environment lighting, Reinhard tone mapping, gamma correction, and optional
-OBJ `map_Kd` diffuse texture sampling.
+OBJ `map_Kd` diffuse texture sampling. Basic tangent-space normal mapping is
+available for OBJ materials that provide a valid normal map and UVs.
 
 The benchmark is headless and does not include GLFW window presentation, HUD
 drawing, or user input processing. Interactive FPS in the desktop app may differ
@@ -39,17 +40,17 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low | 640x360 | 685.22 | 1.46 | 1.43 |
-| HD | 1280x720 | 227.45 | 4.40 | 4.37 |
-| Full HD | 1920x1080 | 106.29 | 9.41 | 9.38 |
+| Low | 640x360 | 722.01 | 1.39 | 1.37 |
+| HD | 1280x720 | 222.91 | 4.49 | 4.46 |
+| Full HD | 1920x1080 | 110.73 | 9.03 | 8.99 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD averages about 106 FPS, so the current
-scene remains above the 60 FPS target. The extra material and texture sampling
-state has a small cost, but average GPU time remains below 10 ms at 1920x1080,
-under the 16.67 ms frame budget for 60 FPS.
+with the OBJ mesh scene enabled. Full HD averages about 111 FPS, so the current
+scene remains above the 60 FPS target. The extra material, diffuse texture, and
+normal-map shading state has a small cost, but average GPU time remains below
+10 ms at 1920x1080, under the 16.67 ms frame budget for 60 FPS.
 
 The close match between host frame time and GPU time indicates that the benchmark
 is dominated by GPU rendering and synchronization rather than CPU-side scene
