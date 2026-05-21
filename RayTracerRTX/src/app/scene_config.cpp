@@ -435,9 +435,18 @@ void appendMesh(MeshData& target, const MeshData& source)
 {
     const std::uint32_t vertexOffset = static_cast<std::uint32_t>(target.vertices.size());
     const std::uint32_t materialOffset = static_cast<std::uint32_t>(target.materials.size());
+    const int textureOffset = static_cast<int>(target.textures.size());
 
     target.vertices.insert(target.vertices.end(), source.vertices.begin(), source.vertices.end());
-    target.materials.insert(target.materials.end(), source.materials.begin(), source.materials.end());
+    target.textures.insert(target.textures.end(), source.textures.begin(), source.textures.end());
+    for (MeshMaterial material : source.materials)
+    {
+        if (material.textureIndex >= 0)
+        {
+            material.textureIndex += textureOffset;
+        }
+        target.materials.push_back(std::move(material));
+    }
     for (MeshTriangle triangle : source.triangles)
     {
         triangle.i0 += vertexOffset;

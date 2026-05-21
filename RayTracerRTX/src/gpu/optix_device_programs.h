@@ -130,6 +130,39 @@ static __forceinline__ __device__ float3 roughReflectionDir(const float3 reflect
     return normalize3(lerp3(reflectedDir, normal, 0.45f * blend));
 }
 
+static __forceinline__ __device__ float3 sampleDiffuseTexture(const MeshMaterialGpu material, const float2 texcoord)
+{
+    if (material.hasTexture == 0 || material.textureWidth == 0u || material.textureHeight == 0u || params.meshTexturePixels == nullptr)
+    {
+        return material.color;
+    }
+
+    float u = texcoord.x - floorf(texcoord.x);
+    float v = texcoord.y - floorf(texcoord.y);
+    if (u < 0.0f)
+    {
+        u += 1.0f;
+    }
+    if (v < 0.0f)
+    {
+        v += 1.0f;
+    }
+
+    const unsigned int x = static_cast<unsigned int>(fminf(u * static_cast<float>(material.textureWidth), static_cast<float>(material.textureWidth - 1u)));
+    const unsigned int y = static_cast<unsigned int>(fminf((1.0f - v) * static_cast<float>(material.textureHeight), static_cast<float>(material.textureHeight - 1u)));
+    const unsigned int offset = material.textureOffset + y * material.textureWidth + x;
+    if (offset >= params.meshTexturePixelCount)
+    {
+        return material.color;
+    }
+
+    const uchar4 pixel = params.meshTexturePixels[offset];
+    return make_vec(
+        static_cast<float>(pixel.x) / 255.0f,
+        static_cast<float>(pixel.y) / 255.0f,
+        static_cast<float>(pixel.z) / 255.0f);
+}
+
 static __forceinline__ __device__ void setRadiancePayload(const float3 color)
 {
     optixSetPayload_0(__float_as_uint(color.x));
@@ -207,6 +240,7 @@ static __forceinline__ __device__ uchar4 toColor(const float3 color)
 static __forceinline__ __device__ float3 shadeMaterial(
     const float3 hitPoint,
     float3 normal,
+    const float2 texcoord,
     const float3 rayDirection,
     const unsigned int depth,
     const MeshMaterialGpu material)
@@ -246,9 +280,10 @@ static __forceinline__ __device__ float3 shadeMaterial(
     const bool reflectiveMaterial = material.materialType == MaterialMirror || material.materialType == MaterialMetal || material.materialType == MaterialDielectric;
     const float diffuseSpecularWeight = reflectiveMaterial ? 0.0f : 0.06f;
     const float diffuseLightWeight = reflectiveMaterial ? 1.0f : 0.88f;
+    const float3 baseColor = sampleDiffuseTexture(material, texcoord);
     const float3 diffuseColor = reflectiveMaterial
-        ? material.color
-        : clamp3(material.color, 0.0f, 0.96f);
+        ? baseColor
+        : clamp3(baseColor, 0.0f, 0.96f);
 
     float3 localColor = add3(
         mul3(diffuseColor, ambient + diffuseLightWeight * diffuse),
@@ -422,7 +457,7 @@ extern "C" __global__ void __closesthit__radiance()
     materialGpu.roughness = material.roughness;
     materialGpu.ior = material.ior;
     materialGpu.alpha = material.alpha;
-    setRadiancePayload(shadeMaterial(hitPoint, normal, rayDirection, depth, materialGpu));
+    setRadiancePayload(shadeMaterial(hitPoint, normal, make_float2(0.0f, 0.0f), rayDirection, depth, materialGpu));
 }
 
 extern "C" __global__ void __closesthit__shadow()
@@ -495,6 +530,9 @@ extern "C" __global__ void __closesthit__radiance_mesh()
     const float w2 = bary.y;
     float3 normal = normalize3(add3(add3(mul3(v0.normal, w0), mul3(v1.normal, w1)), mul3(v2.normal, w2)));
     normal = normalize3(optixTransformNormalFromObjectToWorldSpace(normal));
+    const float2 texcoord = make_float2(
+        v0.texcoord.x * w0 + v1.texcoord.x * w1 + v2.texcoord.x * w2,
+        v0.texcoord.y * w0 + v1.texcoord.y * w1 + v2.texcoord.y * w2);
 
     const float3 rayOrigin = optixGetWorldRayOrigin();
     const float3 rayDirection = normalize3(optixGetWorldRayDirection());
@@ -507,7 +545,7 @@ extern "C" __global__ void __closesthit__radiance_mesh()
         material = params.meshMaterials[triangle.materialIndex];
     }
 
-    setRadiancePayload(shadeMaterial(hitPoint, normal, rayDirection, depth, material));
+    setRadiancePayload(shadeMaterial(hitPoint, normal, texcoord, rayDirection, depth, material));
 }
 
 extern "C" __global__ void __closesthit__shadow_mesh()

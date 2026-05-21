@@ -33,6 +33,8 @@
   - extended MTL `Kd`/`Ks`/`Ns`/`Ni`/`d` parsing
   - metal and dielectric material-name mapping
   - roughness, IOR and alpha clamping
+  - OBJ `vt` texture coordinates
+  - MTL `map_Kd` diffuse texture loading and missing-texture fallback
   - default scene mesh presence
   - mesh material index validation
 - GPU smoke test:
@@ -63,6 +65,7 @@
 | Unit tests | `tests/test_scene_camera.cpp` |
 | GPU smoke test | `tests/RayTracerRTX.Tests.vcxproj` |
 | Demo OBJ mesh | `assets/meshes/demo.obj`, `assets/meshes/demo.mtl` |
+| Demo textured OBJ mesh | `assets/meshes/textured_demo.obj`, `assets/meshes/textured_demo.mtl`, `assets/meshes/checker.ppm` |
 | Docker / Compose | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
 | README | `README.md`, `RayTracerRTX/README.md` |
 | Architecture diagrams | `docs/architecture.md` |

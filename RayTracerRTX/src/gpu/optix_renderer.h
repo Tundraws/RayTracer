@@ -54,6 +54,7 @@ private:
     CUdeviceptr dMeshIndices = 0;
     CUdeviceptr dMeshTriangles = 0;
     CUdeviceptr dMeshMaterials = 0;
+    CUdeviceptr dMeshTexturePixels = 0;
     CUdeviceptr dSphereGasBuffer = 0;
     CUdeviceptr dPlaneGasBuffer = 0;
     CUdeviceptr dMeshGasBuffer = 0;
@@ -67,6 +68,7 @@ private:
     std::vector<uint32_t> sphereFlags;
     std::vector<uint32_t> planeFlags;
     std::vector<uint32_t> meshFlags;
+    unsigned int meshTexturePixelCount = 0;
     OptixBuildInput sphereBuildInput = {};
     OptixBuildInput planeBuildInput = {};
     OptixBuildInput meshBuildInput = {};

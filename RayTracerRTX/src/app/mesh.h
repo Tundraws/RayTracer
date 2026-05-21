@@ -10,6 +10,7 @@ struct MeshVertex
 {
     float3 position{};
     float3 normal{};
+    float2 texcoord{};
 };
 
 struct MeshTriangle
@@ -29,6 +30,16 @@ struct MeshMaterial
     float roughness = 0.35f;
     float ior = 1.5f;
     float alpha = 1.0f;
+    std::string texturePath;
+    int textureIndex = -1;
+};
+
+struct MeshTexture
+{
+    std::string path;
+    unsigned int width = 0;
+    unsigned int height = 0;
+    std::vector<uchar4> pixels;
 };
 
 struct MeshData
@@ -36,6 +47,7 @@ struct MeshData
     std::vector<MeshVertex> vertices;
     std::vector<MeshTriangle> triangles;
     std::vector<MeshMaterial> materials;
+    std::vector<MeshTexture> textures;
 };
 
 bool isEmptyMesh(const MeshData& mesh);

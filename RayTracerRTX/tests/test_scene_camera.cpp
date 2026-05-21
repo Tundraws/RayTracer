@@ -213,6 +213,103 @@ void testObjLoaderMaterialParameterClamping(TestContext& t)
     t.expect(hasValidMeshMaterialIndices(result.mesh), "Material indices should remain valid after extended MTL parsing.");
 }
 
+void testObjLoaderTextureCoordinates(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "textured_coords.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0.25 0.75\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "f 1/1 2/2 3/3\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with v/vt face format should load.");
+    t.expect(almostEqual(result.mesh.vertices[0].texcoord.x, 0.25f), "OBJ vt U coordinate should be assigned.");
+    t.expect(almostEqual(result.mesh.vertices[0].texcoord.y, 0.75f), "OBJ vt V coordinate should be assigned.");
+}
+
+void testObjLoaderTexturedFaceWithNormals(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "textured_normals.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vn 0 0 1\n"
+        "f 1/1/1 2/2/1 3/3/1\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with v/vt/vn face format should load.");
+    t.expect(almostEqual(result.mesh.vertices[2].texcoord.y, 1.0f), "OBJ v/vt/vn should preserve texcoords.");
+    t.expect(almostEqual(result.mesh.vertices[2].normal.z, 1.0f), "OBJ v/vt/vn should preserve normals.");
+}
+
+void testObjLoaderMapKdTexture(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "map_kd.obj",
+        "mtllib map_kd.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "usemtl textured\n"
+        "f 1/1 2/2 3/3\n");
+
+    writeFixtureFile(
+        "map_kd.mtl",
+        "newmtl textured\n"
+        "Kd 1 1 1\n"
+        "map_Kd tiny.ppm\n");
+    writeFixtureFile(
+        "tiny.ppm",
+        "P3\n"
+        "2 1\n"
+        "255\n"
+        "255 0 0  0 255 0\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with map_Kd texture should load.");
+    t.expect(result.mesh.materials[1].texturePath == "tiny.ppm", "MTL map_Kd path should be stored.");
+    t.expect(result.mesh.materials[1].textureIndex == 0, "Loaded map_Kd texture should be assigned to material.");
+    t.expect(result.mesh.textures.size() == 1, "Loaded map_Kd texture should be stored in mesh textures.");
+    t.expect(result.mesh.textures[0].pixels.size() == 2, "PPM texture pixels should be loaded.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Textured material indices should remain valid.");
+}
+
+void testObjLoaderMissingTextureFallback(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "missing_texture.obj",
+        "mtllib missing_texture.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl missing_tex\n"
+        "f 1 2 3\n");
+
+    writeFixtureFile(
+        "missing_texture.mtl",
+        "newmtl missing_tex\n"
+        "Kd 0.4 0.5 0.6\n"
+        "map_Kd does_not_exist.ppm\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "Missing map_Kd texture should not fail OBJ loading.");
+    t.expect(result.mesh.materials[1].texturePath == "does_not_exist.ppm", "Missing map_Kd path should still be stored.");
+    t.expect(result.mesh.materials[1].textureIndex < 0, "Missing map_Kd texture should fall back to Kd.");
+    t.expect(result.mesh.textures.empty(), "Missing map_Kd texture should not create texture pixels.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Missing texture fallback material indices should remain valid.");
+}
+
 void testObjLoaderMissingNormalsFallback(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -725,6 +822,10 @@ int main(int argc, char** argv)
     runTest("OBJ loader extended MTL parameters", testObjLoaderExtendedMtlParameters);
     runTest("OBJ loader dielectric material name mapping", testObjLoaderDielectricMaterialNameMapping);
     runTest("OBJ loader material parameter clamping", testObjLoaderMaterialParameterClamping);
+    runTest("OBJ loader texture coordinates", testObjLoaderTextureCoordinates);
+    runTest("OBJ loader textured face with normals", testObjLoaderTexturedFaceWithNormals);
+    runTest("OBJ loader map_Kd texture", testObjLoaderMapKdTexture);
+    runTest("OBJ loader missing texture fallback", testObjLoaderMissingTextureFallback);
     runTest("OBJ loader missing normals fallback", testObjLoaderMissingNormalsFallback);
     runTest("OBJ loader empty file", testObjLoaderEmptyFile);
     runTest("OBJ loader invalid face", testObjLoaderInvalidFace);

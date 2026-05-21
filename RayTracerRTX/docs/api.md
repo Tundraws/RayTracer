@@ -83,9 +83,11 @@ Loads a simple OBJ mesh description into `MeshData`. The loader supports:
 
 - `v` positions;
 - `vn` normals;
+- `vt` texture coordinates;
 - triangular `f` faces;
 - `mtllib` and `usemtl` material references;
 - MTL `Kd`, `Ks`, `Ns`, `Ni`, and `d` material values;
+- MTL `map_Kd` diffuse texture references for ASCII PPM (`P3`) images;
 - multiple named materials.
 
 Material names containing `mirror` are mapped to `MaterialMirror`; all other
@@ -94,6 +96,10 @@ OBJ materials are mapped by name: `metal` to `MaterialMetal`, `glass` or
 `MaterialDiffuse`. `Ns` is converted to a clamped roughness value, `Ni` stores
 index of refraction, `d` stores alpha, and `Ks` stores specular color. The
 loader is intentionally limited to the listed OBJ and MTL records.
+
+If `map_Kd` points to a missing or unsupported texture file, the loader keeps
+the texture path for diagnostics and falls back to the material `Kd` color.
+Only diffuse `map_Kd` PPM textures are supported at this stage.
 
 ### `MeshData`
 
@@ -104,6 +110,7 @@ Declared in `src/app/mesh.h`.
 | `vertices` | `std::vector<MeshVertex>` | Packed mesh vertices with position and normal |
 | `triangles` | `std::vector<MeshTriangle>` | Triangle indices plus material index |
 | `materials` | `std::vector<MeshMaterial>` | OBJ/MTL materials used by mesh triangles |
+| `textures` | `std::vector<MeshTexture>` | Loaded diffuse texture pixels referenced by `map_Kd` |
 
 `hasValidMeshMaterialIndices(const MeshData&)` validates that every triangle
 material index is inside the material array.
@@ -170,6 +177,7 @@ Uploaded to the GPU before each OptiX launch.
 | `meshVertices`, `meshVertexCount` | OBJ mesh vertex buffer |
 | `meshTriangles`, `meshTriangleCount` | OBJ mesh triangle buffer with material indices |
 | `meshMaterials`, `meshMaterialCount` | OBJ mesh material buffer |
+| `meshTexturePixels`, `meshTexturePixelCount` | Packed diffuse texture pixels for mesh `map_Kd` materials |
 | `maxDepth` | Recursive reflection depth limit |
 
 ## Renderer API

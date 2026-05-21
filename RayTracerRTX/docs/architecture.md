@@ -15,6 +15,8 @@ flowchart LR
     App --> Camera["CameraState / updateCameraBasis"]
     SceneConfig --> ObjLoader
     ObjLoader["ObjLoader"] --> MeshData["MeshData"]
+    ObjLoader --> Textures["map_Kd PPM textures"]
+    Textures --> MeshData
     MeshData --> Scene
     App --> Scene["SceneState"]
     Scene --> Materials["SphereMaterial"]
@@ -50,10 +52,10 @@ sequenceDiagram
     Args->>ObjLoader: Resolve mesh path(s) and transforms
     Args->>Scene: Apply camera and light config
     User->>App: Keyboard and mouse input
-    ObjLoader->>Scene: Load OBJ vertices, normals, triangles, MTL materials
+    ObjLoader->>Scene: Load OBJ vertices, normals, UVs, triangles, MTL materials and map_Kd textures
     App->>Scene: Move sphere, light, or toggle material
     App->>Renderer: renderFrame(scene, camera)
-    Renderer->>CUDA: Upload sphere materials, mesh buffers, and LaunchParams
+    Renderer->>CUDA: Upload sphere materials, mesh buffers, texture pixels, and LaunchParams
     Renderer->>OptiX: Build sphere GAS + triangle GAS + IAS
     Renderer->>OptiX: optixLaunch
     OptiX->>GPU: Ray generation, sphere hit, mesh closest-hit, miss, shadow, reflection programs

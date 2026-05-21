@@ -33,17 +33,17 @@ MeshData makeFallbackMesh()
 {
     MeshData mesh;
     mesh.materials = {
-        {make_float3(0.72f, 0.86f, 0.95f), MaterialDiffuse, "fallback_blue"},
-        {make_float3(0.95f, 0.78f, 0.55f), MaterialDiffuse, "fallback_warm"},
-        {make_float3(0.92f, 0.92f, 0.92f), MaterialMirror, "fallback_mirror"}
+        {make_float3(0.72f, 0.86f, 0.95f), MaterialDiffuse, "fallback_blue", make_float3(1.0f, 1.0f, 1.0f), 0.35f, 1.5f, 1.0f, "", -1},
+        {make_float3(0.95f, 0.78f, 0.55f), MaterialDiffuse, "fallback_warm", make_float3(1.0f, 1.0f, 1.0f), 0.35f, 1.5f, 1.0f, "", -1},
+        {make_float3(0.92f, 0.92f, 0.92f), MaterialMirror, "fallback_mirror", make_float3(1.0f, 1.0f, 1.0f), 0.02f, 1.5f, 1.0f, "", -1}
     };
 
     mesh.vertices = {
-        {make_float3(-1.8f, 0.0f, -7.6f), make_float3(0.0f, -1.0f, 0.0f)},
-        {make_float3(1.8f, 0.0f, -7.6f), make_float3(0.0f, -1.0f, 0.0f)},
-        {make_float3(1.8f, 0.0f, -4.0f), make_float3(0.0f, -1.0f, 0.0f)},
-        {make_float3(-1.8f, 0.0f, -4.0f), make_float3(0.0f, -1.0f, 0.0f)},
-        {make_float3(0.0f, 3.2f, -5.8f), make_float3(0.0f, 1.0f, 0.0f)}
+        {make_float3(-1.8f, 0.0f, -7.6f), make_float3(0.0f, -1.0f, 0.0f), make_float2(0.0f, 0.0f)},
+        {make_float3(1.8f, 0.0f, -7.6f), make_float3(0.0f, -1.0f, 0.0f), make_float2(1.0f, 0.0f)},
+        {make_float3(1.8f, 0.0f, -4.0f), make_float3(0.0f, -1.0f, 0.0f), make_float2(1.0f, 1.0f)},
+        {make_float3(-1.8f, 0.0f, -4.0f), make_float3(0.0f, -1.0f, 0.0f), make_float2(0.0f, 1.0f)},
+        {make_float3(0.0f, 3.2f, -5.8f), make_float3(0.0f, 1.0f, 0.0f), make_float2(0.5f, 0.5f)}
     };
 
     mesh.triangles = {

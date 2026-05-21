@@ -1,5 +1,11 @@
 #pragma once
 
+struct float2
+{
+    float x;
+    float y;
+};
+
 struct float3
 {
     float x;
@@ -14,6 +20,11 @@ struct uchar4
     unsigned char z;
     unsigned char w;
 };
+
+inline float2 make_float2(float x, float y)
+{
+    return float2{x, y};
+}
 
 inline float3 make_float3(float x, float y, float z)
 {

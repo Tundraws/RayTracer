@@ -22,7 +22,11 @@ REQUIRED_PATHS = [
     "RayTracerRTX/src/common/rtx_shared.h",
     "RayTracerRTX/assets/meshes/demo.obj",
     "RayTracerRTX/assets/meshes/demo.mtl",
+    "RayTracerRTX/assets/meshes/textured_demo.obj",
+    "RayTracerRTX/assets/meshes/textured_demo.mtl",
+    "RayTracerRTX/assets/meshes/checker.ppm",
     "RayTracerRTX/assets/scenes/demo_scene.json",
+    "RayTracerRTX/assets/scenes/textured_scene.json",
     "RayTracerRTX/tests/test_scene_camera.cpp",
     "RayTracerRTX/docs/coursework-checklist.md",
     "RayTracerRTX/docs/docker-check.md",
@@ -65,6 +69,13 @@ def main() -> None:
     for marker in ["newmtl mat_white_diffuse", "newmtl mat_green_diffuse", "newmtl mat_mirror", "Kd", "Ks", "Ns", "Ni", "d"]:
         if marker not in demo_mtl:
             fail(f"Demo MTL misses marker: {marker}")
+
+    textured_obj = (ROOT / "RayTracerRTX/assets/meshes/textured_demo.obj").read_text(encoding="utf-8", errors="ignore")
+    textured_mtl = (ROOT / "RayTracerRTX/assets/meshes/textured_demo.mtl").read_text(encoding="utf-8", errors="ignore")
+    if "vt " not in textured_obj:
+        fail("Textured demo OBJ misses texture coordinates.")
+    if "map_Kd checker.ppm" not in textured_mtl:
+        fail("Textured demo MTL misses map_Kd checker.ppm.")
 
     docker_doc = (ROOT / "RayTracerRTX/docs/docker-check.md").read_text(encoding="utf-8", errors="ignore")
     if "OBJ mesh" not in docker_doc:

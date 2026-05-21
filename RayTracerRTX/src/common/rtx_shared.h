@@ -58,6 +58,7 @@ struct MeshVertexGpu
 {
     float3 position;
     float3 normal;
+    float2 texcoord;
 };
 
 struct MeshTriangleGpu
@@ -76,6 +77,10 @@ struct MeshMaterialGpu
     float roughness = 0.35f;
     float ior = 1.5f;
     float alpha = 1.0f;
+    int hasTexture = 0;
+    unsigned int textureOffset = 0;
+    unsigned int textureWidth = 0;
+    unsigned int textureHeight = 0;
 };
 
 struct LaunchParams
@@ -96,8 +101,10 @@ struct LaunchParams
     MeshVertexGpu* meshVertices;
     MeshTriangleGpu* meshTriangles;
     MeshMaterialGpu* meshMaterials;
+    uchar4* meshTexturePixels;
     unsigned int meshVertexCount;
     unsigned int meshTriangleCount;
     unsigned int meshMaterialCount;
+    unsigned int meshTexturePixelCount;
     int maxDepth;
 };

@@ -50,6 +50,7 @@ roughness/glossiness, index of refraction и alpha. Если имя матери
 ```powershell
 RayTracerRTX.exe --mesh RayTracerRTX/assets/meshes/demo.obj
 RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
+RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/textured_scene.json
 ```
 
 `--mesh` заменяет встроенный demo mesh на указанный OBJ. `--scene` загружает
@@ -77,6 +78,7 @@ JSON scene config с `meshObjects`, `camera`, `light` и transform-полями
 - `src/common` — общие структуры данных host/device
 - `tests` — unit-тесты и тестовый проект
 - `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
+- `assets/meshes/textured_demo.obj`, `textured_demo.mtl`, and `checker.ppm` - demo OBJ mesh with `map_Kd` diffuse texture
 - `assets/scenes/demo_scene.json` - documented JSON scene input example
 
 ## Статус

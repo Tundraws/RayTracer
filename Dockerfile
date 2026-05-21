@@ -14,7 +14,11 @@ RUN test -f README.md \
     && test -f RayTracerRTX/docs/ai-assisted-development.md \
     && test -f RayTracerRTX/assets/meshes/demo.obj \
     && test -f RayTracerRTX/assets/meshes/demo.mtl \
+    && test -f RayTracerRTX/assets/meshes/textured_demo.obj \
+    && test -f RayTracerRTX/assets/meshes/textured_demo.mtl \
+    && test -f RayTracerRTX/assets/meshes/checker.ppm \
     && test -f RayTracerRTX/assets/scenes/demo_scene.json \
+    && test -f RayTracerRTX/assets/scenes/textured_scene.json \
     && test -f RayTracerRTX/src/app/mesh.cpp \
     && test -f RayTracerRTX/src/app/mesh.h \
     && test -f RayTracerRTX/src/app/obj_loader.cpp \
@@ -26,6 +30,8 @@ RUN test -f README.md \
     && grep -q "OBJ mesh" RayTracerRTX/docs/docker-check.md \
     && grep -q "usemtl mat_mirror" RayTracerRTX/assets/meshes/demo.obj \
     && grep -q "newmtl mat_green_diffuse" RayTracerRTX/assets/meshes/demo.mtl \
+    && grep -q "map_Kd checker.ppm" RayTracerRTX/assets/meshes/textured_demo.mtl \
+    && grep -q "vt " RayTracerRTX/assets/meshes/textured_demo.obj \
     && grep -q "OptiX" RayTracerRTX/README.md \
     && grep -q "__raygen__rg" RayTracerRTX/src/gpu/optix_device_programs.h
 

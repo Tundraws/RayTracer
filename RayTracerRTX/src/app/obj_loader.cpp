@@ -13,6 +13,7 @@ namespace
 struct FaceVertex
 {
     int positionIndex = -1;
+    int texcoordIndex = -1;
     int normalIndex = -1;
 };
 
@@ -87,6 +88,7 @@ bool parseFaceVertex(const std::string& token, FaceVertex& vertex)
     }
 
     vertex.positionIndex = objPositionIndex - 1;
+    vertex.texcoordIndex = -1;
     vertex.normalIndex = -1;
 
     if (firstSlash == std::string_view::npos)
@@ -95,6 +97,19 @@ bool parseFaceVertex(const std::string& token, FaceVertex& vertex)
     }
 
     const size_t secondSlash = view.find('/', firstSlash + 1);
+    const std::string_view texcoordPart = secondSlash == std::string_view::npos
+        ? view.substr(firstSlash + 1)
+        : view.substr(firstSlash + 1, secondSlash - firstSlash - 1);
+    if (!texcoordPart.empty())
+    {
+        int objTexcoordIndex = 0;
+        if (!parseInt(texcoordPart, objTexcoordIndex) || objTexcoordIndex <= 0)
+        {
+            return false;
+        }
+        vertex.texcoordIndex = objTexcoordIndex - 1;
+    }
+
     if (secondSlash == std::string_view::npos)
     {
         return true;
@@ -113,6 +128,83 @@ bool parseFaceVertex(const std::string& token, FaceVertex& vertex)
     }
 
     vertex.normalIndex = objNormalIndex - 1;
+    return true;
+}
+
+bool readPpmToken(std::istream& input, std::string& token)
+{
+    token.clear();
+    while (input >> token)
+    {
+        if (!token.empty() && token[0] == '#')
+        {
+            std::string ignored;
+            std::getline(input, ignored);
+            continue;
+        }
+        return true;
+    }
+    return false;
+}
+
+bool loadPpmTexture(const std::filesystem::path& path, MeshTexture& texture)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+    {
+        return false;
+    }
+
+    std::string token;
+    if (!readPpmToken(file, token) || token != "P3")
+    {
+        return false;
+    }
+
+    std::string widthToken;
+    std::string heightToken;
+    std::string maxToken;
+    if (!readPpmToken(file, widthToken) || !readPpmToken(file, heightToken) || !readPpmToken(file, maxToken))
+    {
+        return false;
+    }
+
+    const int width = std::stoi(widthToken);
+    const int height = std::stoi(heightToken);
+    const int maxValue = std::stoi(maxToken);
+    if (width <= 0 || height <= 0 || maxValue <= 0)
+    {
+        return false;
+    }
+
+    std::vector<uchar4> pixels;
+    pixels.reserve(static_cast<size_t>(width) * static_cast<size_t>(height));
+    for (int i = 0; i < width * height; ++i)
+    {
+        std::string rToken;
+        std::string gToken;
+        std::string bToken;
+        if (!readPpmToken(file, rToken) || !readPpmToken(file, gToken) || !readPpmToken(file, bToken))
+        {
+            return false;
+        }
+
+        const auto toByte = [maxValue](const int value)
+        {
+            const int clamped = value < 0 ? 0 : (value > maxValue ? maxValue : value);
+            return static_cast<unsigned char>((clamped * 255) / maxValue);
+        };
+        pixels.push_back(make_uchar4(
+            toByte(std::stoi(rToken)),
+            toByte(std::stoi(gToken)),
+            toByte(std::stoi(bToken)),
+            255));
+    }
+
+    texture.path = path.string();
+    texture.width = static_cast<unsigned int>(width);
+    texture.height = static_cast<unsigned int>(height);
+    texture.pixels = std::move(pixels);
     return true;
 }
 
@@ -262,6 +354,23 @@ void loadMtl(
                 mesh.materials[static_cast<size_t>(currentMaterial)].alpha = clampf(alpha, 0.0f, 1.0f);
             }
         }
+        else if (command == "map_Kd" && currentMaterial >= 0)
+        {
+            std::string textureName;
+            input >> textureName;
+            if (!textureName.empty())
+            {
+                MeshMaterial& material = mesh.materials[static_cast<size_t>(currentMaterial)];
+                material.texturePath = textureName;
+
+                MeshTexture texture;
+                if (loadPpmTexture(path.parent_path() / textureName, texture))
+                {
+                    material.textureIndex = static_cast<int>(mesh.textures.size());
+                    mesh.textures.push_back(std::move(texture));
+                }
+            }
+        }
     }
 }
 
@@ -288,6 +397,7 @@ ObjLoadResult loadObjMesh(const std::filesystem::path& path)
     MeshData& mesh = result.mesh;
     std::vector<float3> positions;
     std::vector<float3> normals;
+    std::vector<float2> texcoords;
     std::unordered_map<std::string, std::uint32_t> materialIndices;
 
     mesh.materials.push_back(makeDefaultMaterial());
@@ -331,6 +441,16 @@ ObjLoadResult loadObjMesh(const std::filesystem::path& path)
             }
             normals.push_back(normalize3(make_float3(x, y, z)));
         }
+        else if (command == "vt")
+        {
+            float u = 0.0f;
+            float v = 0.0f;
+            if (!(input >> u >> v))
+            {
+                return fail("Invalid texcoord at line " + std::to_string(lineNumber));
+            }
+            texcoords.push_back(make_float2(u, v));
+        }
         else if (command == "mtllib")
         {
             std::string mtlName;
@@ -368,6 +488,10 @@ ObjLoadResult loadObjMesh(const std::filesystem::path& path)
                 {
                     return fail("Face normal index out of range at line " + std::to_string(lineNumber));
                 }
+                if (faceVertex.texcoordIndex >= 0 && static_cast<size_t>(faceVertex.texcoordIndex) >= texcoords.size())
+                {
+                    return fail("Face texcoord index out of range at line " + std::to_string(lineNumber));
+                }
                 faceVertices.push_back(faceVertex);
             }
 
@@ -388,7 +512,10 @@ ObjLoadResult loadObjMesh(const std::filesystem::path& path)
                 const float3 normal = faceVertex.normalIndex >= 0
                     ? normals[static_cast<size_t>(faceVertex.normalIndex)]
                     : fallbackNormal;
-                mesh.vertices.push_back(MeshVertex{position, normal});
+                const float2 texcoord = faceVertex.texcoordIndex >= 0
+                    ? texcoords[static_cast<size_t>(faceVertex.texcoordIndex)]
+                    : make_float2(0.0f, 0.0f);
+                mesh.vertices.push_back(MeshVertex{position, normal, texcoord});
             }
 
             mesh.triangles.push_back(MeshTriangle{
