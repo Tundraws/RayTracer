@@ -1,6 +1,6 @@
 # Performance Results
 
-Date: 2026-05-20
+Date: 2026-05-21
 
 ## Hardware and Environment
 
@@ -36,15 +36,17 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low | 640x360 | 718.33 | 1.39 | 1.37 |
-| HD | 1280x720 | 230.78 | 4.33 | 4.30 |
-| Full HD | 1920x1080 | 106.10 | 9.43 | 9.37 |
+| Low | 640x360 | 671.00 | 1.49 | 1.46 |
+| HD | 1280x720 | 230.78 | 4.33 | 4.31 |
+| Full HD | 1920x1080 | 105.03 | 9.52 | 9.49 |
 
 ## Interpretation
 
-The renderer stays within real-time frame budgets for all tested resolutions.
-Even at 1920x1080, average GPU time remains below 10 ms in the headless
-benchmark, which is still under the 16.67 ms frame budget for 60 FPS.
+The renderer stays within real-time frame budgets for all tested resolutions
+with the OBJ mesh scene enabled. Full HD averages about 105 FPS, so the current
+scene remains above the 60 FPS target. The small extra mesh cost is acceptable
+for the coursework demo because average GPU time remains below 10 ms at
+1920x1080, under the 16.67 ms frame budget for 60 FPS.
 
 The close match between host frame time and GPU time indicates that the benchmark
 is dominated by GPU rendering and synchronization rather than CPU-side scene
