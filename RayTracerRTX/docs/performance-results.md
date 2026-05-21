@@ -50,18 +50,18 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low resolution / High quality | 640x360 | 455.73 | 2.19 | 2.16 |
-| HD resolution / High quality | 1280x720 | 230.50 | 4.34 | 4.31 |
-| Full HD resolution / High quality | 1920x1080 | 113.82 | 8.79 | 8.73 |
-| Low quality | 640x360 | 954.48 | 1.05 | 1.01 |
-| Medium quality | 640x360 | 176.49 | 5.67 | 5.63 |
-| High quality | 640x360 | 188.54 | 5.30 | 5.28 |
-| PathTracing quality + denoiser | 640x360 | 13.44 | 74.42 | 74.33 |
+| Low resolution / High quality | 640x360 | 609.24 | 1.64 | 1.61 |
+| HD resolution / High quality | 1280x720 | 212.12 | 4.71 | 4.68 |
+| Full HD resolution / High quality | 1920x1080 | 104.21 | 9.60 | 9.55 |
+| Low quality | 640x360 | 1349.88 | 0.74 | 0.73 |
+| Medium quality | 640x360 | 204.40 | 4.89 | 4.86 |
+| High quality | 640x360 | 124.84 | 8.01 | 7.97 |
+| PathTracing quality + denoiser | 640x360 | 12.95 | 77.23 | 77.17 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD High quality averages about 114 FPS, so the current
+with the OBJ mesh scene enabled. Full HD High quality averages about 104 FPS, so the current
 scene remains above the 60 FPS target. The extra material, diffuse texture,
 normal-map shading state, and per-object Triangle GAS/IAS layout remain within
 the real-time budget: average GPU time is below 10 ms at 1920x1080, under the

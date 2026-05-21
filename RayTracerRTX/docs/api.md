@@ -213,7 +213,7 @@ distribution term `D`, Smith geometry term `G`, and Schlick Fresnel `F`, with
 clamped roughness and dot products to avoid NaN/Inf values. `Kd` maps to
 baseColor, `Ks` tints the specular approximation, `Ns` maps to roughness, and
 material names containing `metal` use metallic shading. This is a physically
-motivated material model, not a claim of a full physically correct renderer.
+motivated material model with the limited material inputs listed above.
 
 ### `SphereMaterial`
 
