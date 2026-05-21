@@ -39,6 +39,8 @@ mirror, and metal materials.
 Progressive path tracing accumulation is available as an interactive quality
 mode. Optional OptiX denoising is measured separately because it is a quality
 feature and much heavier than the direct real-time mode.
+The benchmark scene still uses the OBJ demo mesh; glTF import is covered by
+loader and scene-input tests rather than this FPS table.
 
 The benchmark is headless and does not include GLFW window presentation, HUD
 drawing, or user input processing. Interactive FPS in the desktop app may differ
@@ -48,15 +50,15 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low | 640x360 | 499.41 | 2.00 | 1.98 |
-| HD | 1280x720 | 216.71 | 4.61 | 4.58 |
-| Full HD | 1920x1080 | 102.74 | 9.73 | 9.69 |
-| Progressive + optional OptiX denoiser | 640x360 | 21.08 | 47.44 | 47.31 |
+| Low | 640x360 | 476.12 | 2.10 | 2.08 |
+| HD | 1280x720 | 212.43 | 4.71 | 4.67 |
+| Full HD | 1920x1080 | 111.75 | 8.95 | 8.91 |
+| Progressive + optional OptiX denoiser | 640x360 | 23.53 | 42.50 | 42.42 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD averages about 103 FPS, so the current
+with the OBJ mesh scene enabled. Full HD averages about 112 FPS, so the current
 scene remains above the 60 FPS target. The extra material, diffuse texture,
 normal-map shading state, and per-object Triangle GAS/IAS layout remain within
 the real-time budget: average GPU time is below 10 ms at 1920x1080, under the

@@ -1,7 +1,9 @@
 #include "scene_config.h"
 
+#include "gltf_loader.h"
 #include "obj_loader.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cctype>
 #include <fstream>
@@ -483,6 +485,27 @@ std::filesystem::path resolvePath(const std::filesystem::path& path, const std::
     return baseDirectory / path;
 }
 
+std::string lowerExtension(const std::filesystem::path& path)
+{
+    std::string extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](const unsigned char ch)
+    {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return extension;
+}
+
+ObjLoadResult loadMeshByExtension(const std::filesystem::path& path)
+{
+    const std::string extension = lowerExtension(path);
+    if (extension == ".gltf")
+    {
+        GltfLoadResult loaded = loadGltfMesh(path);
+        return ObjLoadResult{loaded.ok, std::move(loaded.mesh), loaded.error};
+    }
+    return loadObjMesh(path);
+}
+
 SceneConfigResult parseSceneConfig(const JsonValue& root)
 {
     SceneConfigResult result;
@@ -650,7 +673,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     for (const MeshObjectConfig& object : config.meshObjects)
     {
         const std::filesystem::path meshPath = resolvePath(object.meshPath, baseDirectory);
-        const ObjLoadResult loaded = loadObjMesh(meshPath);
+        const ObjLoadResult loaded = loadMeshByExtension(meshPath);
         if (!loaded.ok)
         {
             result.ok = false;

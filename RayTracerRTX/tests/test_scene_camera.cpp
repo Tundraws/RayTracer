@@ -1,4 +1,5 @@
 #include "../src/app/camera.h"
+#include "../src/app/gltf_loader.h"
 #include "../src/app/material.h"
 #include "../src/app/obj_loader.h"
 #include "../src/app/scene.h"
@@ -11,6 +12,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -42,6 +44,17 @@ std::filesystem::path writeFixtureFile(const std::string& name, const std::strin
     const std::filesystem::path path = directory / name;
     std::ofstream file(path, std::ios::binary);
     file << content;
+    return path;
+}
+
+std::filesystem::path writeFixtureBinaryFile(const std::string& name, const std::vector<unsigned char>& content)
+{
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / "raytracerrtx_obj_loader_tests";
+    std::filesystem::create_directories(directory);
+
+    const std::filesystem::path path = directory / name;
+    std::ofstream file(path, std::ios::binary);
+    file.write(reinterpret_cast<const char*>(content.data()), static_cast<std::streamsize>(content.size()));
     return path;
 }
 
@@ -93,6 +106,73 @@ std::filesystem::path findAssetMesh(const std::string& fileName)
     }
 
     return {};
+}
+
+void appendFloat(std::vector<unsigned char>& data, const float value)
+{
+    const auto* bytes = reinterpret_cast<const unsigned char*>(&value);
+    data.insert(data.end(), bytes, bytes + sizeof(float));
+}
+
+void appendUint16(std::vector<unsigned char>& data, const std::uint16_t value)
+{
+    const auto* bytes = reinterpret_cast<const unsigned char*>(&value);
+    data.insert(data.end(), bytes, bytes + sizeof(std::uint16_t));
+}
+
+std::filesystem::path writeMinimalGltfFixture()
+{
+    std::vector<unsigned char> bin;
+    const float positions[] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+    const float normals[] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f};
+    const float texcoords[] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f};
+    for (const float value : positions)
+    {
+        appendFloat(bin, value);
+    }
+    for (const float value : normals)
+    {
+        appendFloat(bin, value);
+    }
+    for (const float value : texcoords)
+    {
+        appendFloat(bin, value);
+    }
+    appendUint16(bin, 0);
+    appendUint16(bin, 1);
+    appendUint16(bin, 2);
+    writeFixtureBinaryFile("minimal_gltf.bin", bin);
+
+    return writeFixtureFile(
+        "minimal_gltf.gltf",
+        "{\n"
+        "  \"asset\": {\"version\": \"2.0\"},\n"
+        "  \"buffers\": [{\"uri\": \"minimal_gltf.bin\", \"byteLength\": 102}],\n"
+        "  \"bufferViews\": [\n"
+        "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 36},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 72, \"byteLength\": 24},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 6}\n"
+        "  ],\n"
+        "  \"accessors\": [\n"
+        "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+        "    {\"bufferView\": 1, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+        "    {\"bufferView\": 2, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC2\"},\n"
+        "    {\"bufferView\": 3, \"componentType\": 5123, \"count\": 3, \"type\": \"SCALAR\"}\n"
+        "  ],\n"
+        "  \"materials\": [{\n"
+        "    \"name\": \"mat_metal_gltf\",\n"
+        "    \"pbrMetallicRoughness\": {\n"
+        "      \"baseColorFactor\": [0.2, 0.6, 0.9, 1.0],\n"
+        "      \"metallicFactor\": 1.0,\n"
+        "      \"roughnessFactor\": 0.25\n"
+        "    }\n"
+        "  }],\n"
+        "  \"meshes\": [{\"primitives\": [{\"attributes\": {\"POSITION\": 0, \"NORMAL\": 1, \"TEXCOORD_0\": 2}, \"indices\": 3, \"material\": 0}]}],\n"
+        "  \"nodes\": [{\"mesh\": 0, \"translation\": [1.0, 2.0, 3.0], \"scale\": [2.0, 2.0, 2.0]}],\n"
+        "  \"scenes\": [{\"nodes\": [0]}],\n"
+        "  \"scene\": 0\n"
+        "}\n");
 }
 
 void testObjLoaderTriangleWithNormals(TestContext& t)
@@ -558,6 +638,75 @@ void testObjLoaderSingleTriangleBoundary(TestContext& t)
     t.expect(!isEmptyMesh(result.mesh), "Single triangle mesh should not be empty.");
     t.expect(result.mesh.triangles[0].i0 == 0, "Single triangle first index should be 0.");
     t.expect(result.mesh.triangles[0].i2 == 2, "Single triangle third index should be 2.");
+}
+
+void testGltfLoaderMinimalMesh(TestContext& t)
+{
+    const std::filesystem::path path = writeMinimalGltfFixture();
+    const GltfLoadResult result = loadGltfMesh(path);
+
+    t.expect(result.ok, "Minimal glTF should load.");
+    if (!result.ok)
+    {
+        std::cout << "glTF load error: " << result.error << '\n';
+        return;
+    }
+    t.expect(result.mesh.vertices.size() == 3, "Minimal glTF should produce three vertices.");
+    t.expect(result.mesh.triangles.size() == 1, "Minimal glTF should produce one triangle.");
+    t.expect(result.mesh.vertices[0].hasTexcoord == 1, "glTF TEXCOORD_0 should be stored.");
+    t.expect(result.mesh.vertices[1].position.x > 2.9f, "glTF node translation/scale should affect positions.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Minimal glTF material indices should be valid.");
+}
+
+void testGltfLoaderMissingFile(TestContext& t)
+{
+    const GltfLoadResult result = loadGltfMesh(std::filesystem::temp_directory_path() / "missing_raytracerrtx_mesh.gltf");
+
+    t.expect(!result.ok, "Missing glTF should fail cleanly.");
+    t.expect(!result.error.empty(), "Missing glTF should include an error message.");
+}
+
+void testGltfLoaderMaterialFactors(TestContext& t)
+{
+    const std::filesystem::path path = writeMinimalGltfFixture();
+    const GltfLoadResult result = loadGltfMesh(path);
+
+    t.expect(result.ok, "glTF material factor fixture should load.");
+    if (!result.ok)
+    {
+        std::cout << "glTF material factor error: " << result.error << '\n';
+        return;
+    }
+    t.expect(!result.mesh.materials.empty(), "glTF material list should not be empty.");
+    t.expect(result.mesh.materials[0].materialType == MaterialMetal, "glTF metallicFactor should map to metal material.");
+    t.expect(almostEqual(result.mesh.materials[0].roughness, 0.25f), "glTF roughnessFactor should be parsed.");
+    t.expect(result.mesh.materials[0].color.z > result.mesh.materials[0].color.x, "glTF baseColorFactor should be parsed.");
+}
+
+void testDemoGltfAssetLoads(TestContext& t)
+{
+    const std::filesystem::path gltfPath = findAssetMesh("minimal_gltf.gltf");
+    t.expect(!gltfPath.empty(), "Demo glTF asset should exist.");
+    if (gltfPath.empty())
+    {
+        return;
+    }
+
+    const GltfLoadResult result = loadGltfMesh(gltfPath);
+    t.expect(result.ok, "Demo glTF asset should load.");
+    t.expect(result.mesh.vertices.size() == 3, "Demo glTF should contain three vertices.");
+    t.expect(result.mesh.materials[0].materialType == MaterialMetal, "Demo glTF material should map metallic factor.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Demo glTF material indices should be valid.");
+}
+
+void testObjStillLoadsAfterGltfSupport(TestContext& t)
+{
+    const std::filesystem::path objPath = findDemoObjAsset();
+    t.expect(!objPath.empty(), "Demo OBJ asset should exist.");
+    const ObjLoadResult result = loadObjMesh(objPath);
+
+    t.expect(result.ok, "OBJ loader should still work after adding glTF support.");
+    t.expect(!isEmptyMesh(result.mesh), "OBJ loader should still produce geometry.");
 }
 
 void testDemoObjAssetLoads(TestContext& t)
@@ -1186,6 +1335,11 @@ int main(int argc, char** argv)
     runTest("OBJ loader unknown lines ignored", testObjLoaderUnknownLinesIgnored);
     runTest("OBJ loader material fallback when MTL missing", testObjLoaderMaterialFallbackWhenMtlMissing);
     runTest("OBJ loader single triangle boundary", testObjLoaderSingleTriangleBoundary);
+    runTest("glTF loader minimal mesh", testGltfLoaderMinimalMesh);
+    runTest("glTF loader missing file", testGltfLoaderMissingFile);
+    runTest("glTF loader material factors", testGltfLoaderMaterialFactors);
+    runTest("Demo glTF asset loads", testDemoGltfAssetLoads);
+    runTest("OBJ loader still loads after glTF support", testObjStillLoadsAfterGltfSupport);
     runTest("Demo OBJ asset loads", testDemoObjAssetLoads);
     runTest("Textured cube asset loads", testTexturedCubeAssetLoads);
     runTest("Default scene mesh geometry", testDefaultSceneMeshGeometry);

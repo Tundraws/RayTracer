@@ -17,14 +17,19 @@ RUN test -f README.md \
     && test -f RayTracerRTX/assets/meshes/textured_demo.obj \
     && test -f RayTracerRTX/assets/meshes/textured_cube.obj \
     && test -f RayTracerRTX/assets/meshes/textured_demo.mtl \
+    && test -f RayTracerRTX/assets/meshes/minimal_gltf.gltf \
+    && test -f RayTracerRTX/assets/meshes/minimal_gltf.bin \
     && test -f RayTracerRTX/assets/meshes/checker.ppm \
     && test -f RayTracerRTX/assets/meshes/checker_normal.ppm \
     && test -f RayTracerRTX/assets/scenes/demo_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_cube_scene.json \
     && test -f RayTracerRTX/assets/scenes/multi_mesh_scene.json \
+    && test -f RayTracerRTX/assets/scenes/gltf_scene.json \
     && test -f RayTracerRTX/src/app/mesh.cpp \
     && test -f RayTracerRTX/src/app/mesh.h \
+    && test -f RayTracerRTX/src/app/gltf_loader.cpp \
+    && test -f RayTracerRTX/src/app/gltf_loader.h \
     && test -f RayTracerRTX/src/app/obj_loader.cpp \
     && test -f RayTracerRTX/src/app/obj_loader.h \
     && test -f RayTracerRTX/src/app/scene_config.cpp \
@@ -38,6 +43,7 @@ RUN test -f README.md \
     && grep -q "bump checker_normal.ppm" RayTracerRTX/assets/meshes/textured_demo.mtl \
     && grep -q "vt " RayTracerRTX/assets/meshes/textured_demo.obj \
     && grep -q "TexturedCourseworkCube" RayTracerRTX/assets/meshes/textured_cube.obj \
+    && grep -q "MinimalGltfTriangle" RayTracerRTX/assets/meshes/minimal_gltf.gltf \
     && grep -q "OptiX" RayTracerRTX/README.md \
     && grep -q "__raygen__rg" RayTracerRTX/src/gpu/optix_device_programs.h
 
@@ -46,6 +52,7 @@ RUN g++ -std=c++20 -Wall -Wextra -pedantic \
     -IRayTracerRTX/src \
     RayTracerRTX/tests/test_scene_camera.cpp \
     RayTracerRTX/src/app/camera.cpp \
+    RayTracerRTX/src/app/gltf_loader.cpp \
     RayTracerRTX/src/app/material.cpp \
     RayTracerRTX/src/app/mesh.cpp \
     RayTracerRTX/src/app/obj_loader.cpp \

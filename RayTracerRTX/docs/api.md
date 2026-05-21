@@ -20,8 +20,8 @@ RayTracerRTX.exe --mesh RayTracerRTX/assets/meshes/demo.obj
 RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
 ```
 
-`--mesh` loads one OBJ mesh into the default scene. `--scene` loads a JSON scene
-config with `meshObjects`, `camera`, `light`, and mesh transform fields.
+`--mesh` loads one OBJ or glTF mesh into the default scene. `--scene` loads a
+JSON scene config with `meshObjects`, `camera`, `light`, and mesh transform fields.
 Invalid input prints a diagnostic message and falls back to the default scene.
 The interactive app starts in `RenderModeRealtime`; pressing `P` toggles
 progressive path tracing accumulation and resets samples when the camera, light,
@@ -72,7 +72,7 @@ Declared in `src/app/scene_config.h`.
 `loadSceneConfigFile(...)` parses the documented JSON scene input. The config
 supports:
 
-- `mesh`: shorthand path for one OBJ mesh;
+- `mesh`: shorthand path for one OBJ or glTF mesh;
 - `meshObjects`: array of mesh objects with `path`, `position`, `rotation`, and
   `scale`;
 - `camera`: `position`, `yaw`, `pitch`, `fov`;
@@ -115,6 +115,27 @@ keeps the path for diagnostics and the shader falls back to the interpolated
 geometric normal. Basic normal mapping requires OBJ `vt` coordinates and a
 valid computed tangent basis; it perturbs shading normals only and does not
 perform displacement mapping.
+
+## glTF Mesh API
+
+Declared in `src/app/gltf_loader.h`.
+
+```cpp
+GltfLoadResult loadGltfMesh(const std::filesystem::path& path);
+```
+
+The glTF loader is a small coursework importer for a limited glTF 2.0 subset.
+It supports `.gltf` JSON files with external `.bin` buffers, `bufferViews`,
+`accessors`, mesh primitives, triangle indices, `POSITION`, `NORMAL`,
+`TEXCOORD_0`, and simple node `translation`/`scale`. Material import reads
+`pbrMetallicRoughness.baseColorFactor`, `metallicFactor`, `roughnessFactor`,
+and optionally `baseColorTexture` when the referenced image is a simple PPM
+file compatible with the existing texture path.
+
+Unsupported glTF features include `.glb`, embedded base64 buffers, animations,
+skins, morph targets, cameras, lights, sparse accessors, sampler state,
+normal/metallic/roughness texture maps, and full node rotation matrices. This
+is an additional mesh input path; OBJ/MTL remains supported separately.
 
 ### `MeshData`
 

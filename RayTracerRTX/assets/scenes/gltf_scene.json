@@ -1,0 +1,19 @@
+{
+  "camera": {
+    "position": [0.0, 3.2, 8.0],
+    "yaw": -90.0,
+    "pitch": -14.0,
+    "fov": 60.0
+  },
+  "light": {
+    "position": [4.0, 8.0, 3.0]
+  },
+  "meshObjects": [
+    {
+      "path": "../meshes/minimal_gltf.gltf",
+      "position": [0.0, 0.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    }
+  ]
+}

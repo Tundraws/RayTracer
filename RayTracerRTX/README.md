@@ -29,6 +29,10 @@ Renderer поддерживает default real-time direct lighting mode и opti
 progressive path tracing mode с GPU accumulation. Progressive mode can
 optionally run the OptiX denoiser; if denoiser initialization or invocation
 fails, rendering continues without it.
+Basic glTF 2.0 `.gltf` import is also supported for external `.bin` buffers,
+positions, normals, texcoords, indices, simple node translation/scale, and
+`pbrMetallicRoughness` base color, metallic and roughness factors. It is an
+additional mesh input path and does not replace OBJ/MTL.
 
 ## Технологии
 
@@ -91,7 +95,8 @@ JSON scene config с `meshObjects`, `camera`, `light` и transform-полями
 - `tests` — unit-тесты и тестовый проект
 - `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
 - `assets/meshes/textured_demo.obj`, `textured_cube.obj`, `textured_demo.mtl`, `checker.ppm`, and `checker_normal.ppm` - demo OBJ meshes with `map_Kd` diffuse texture and basic normal map
-- `assets/scenes/demo_scene.json`, `textured_scene.json`, `textured_cube_scene.json`, and `multi_mesh_scene.json` - documented JSON scene input examples
+- `assets/meshes/minimal_gltf.gltf` and `minimal_gltf.bin` - minimal glTF 2.0 mesh import example
+- `assets/scenes/demo_scene.json`, `textured_scene.json`, `textured_cube_scene.json`, `multi_mesh_scene.json`, and `gltf_scene.json` - documented JSON scene input examples
 
 ## Статус
 

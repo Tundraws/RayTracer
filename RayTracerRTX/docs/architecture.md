@@ -59,10 +59,10 @@ sequenceDiagram
     participant GPU as RTX GPU
 
     User->>Args: Optional --mesh or --scene input
-    Args->>ObjLoader: Resolve mesh path(s) and transforms
+    Args->>ObjLoader: Resolve OBJ/glTF mesh path(s) and transforms
     Args->>Scene: Apply camera and light config
     User->>App: Keyboard and mouse input
-    ObjLoader->>Scene: Load MeshObject list with OBJ data, tangents, materials, textures and transforms
+    ObjLoader->>Scene: Load MeshObject list with OBJ or glTF data, tangents, materials, textures and transforms
     App->>Scene: Move sphere, light, or toggle material
     App->>Renderer: Optional P toggle for progressive accumulation
     App->>Renderer: Optional N toggle for OptiX denoiser
@@ -136,7 +136,7 @@ flowchart LR
 | Area | Files | Responsibility |
 |---|---|---|
 | Application loop | `src/app/maingpu.cpp`, `src/app/application.*` | Window creation, input, scene updates, presentation |
-| Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*` | Spheres, OBJ mesh data, materials, selected object, light movement and clamping |
+| Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*`, `src/app/gltf_loader.*` | Spheres, OBJ/glTF mesh data, materials, selected object, light movement and clamping |
 | Camera | `src/app/camera.*` | Camera state and basis vectors for ray generation |
 | Shared GPU data | `src/common/rtx_shared.h` | Host/device structures used by CUDA and OptiX |
 | Renderer host side | `src/gpu/optix_renderer.*` | CUDA resources, OptiX context, sphere GAS, triangle GAS, IAS, SBT, pipeline, launch, progressive accumulation, and optional denoiser |

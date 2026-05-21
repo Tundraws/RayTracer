@@ -4,7 +4,7 @@
 
 - GPU-based real-time ray tracing implemented (`C++ + CUDA + OptiX`)
 - Functional scene: geometry, materials, light, shadows, camera controls
-- Scene description with analytic primitives and OBJ polygon meshes
+- Scene description with analytic primitives, OBJ polygon meshes, and a limited glTF mesh subset
 - Git-based development history with clear commits
 - Tests (unit + at least one GPU smoke/integration check)
 - Static analysis and quality report
@@ -37,6 +37,8 @@
   - MTL `map_Kd` diffuse texture loading and missing-texture fallback
   - MTL `bump`/`map_Bump`/`norm` normal map loading and safe fallback
   - tangent computation for textured triangles
+  - minimal glTF `.gltf/.bin` mesh loading
+  - glTF material factors
   - default scene mesh presence
   - mesh material index validation
 - GPU smoke test:
@@ -71,6 +73,7 @@
 | GPU smoke test | `tests/RayTracerRTX.Tests.vcxproj` |
 | Demo OBJ mesh | `assets/meshes/demo.obj`, `assets/meshes/demo.mtl` |
 | Demo textured OBJ mesh | `assets/meshes/textured_demo.obj`, `assets/meshes/textured_cube.obj`, `assets/meshes/textured_demo.mtl`, `assets/meshes/checker.ppm`, `assets/meshes/checker_normal.ppm` |
+| Demo glTF mesh | `assets/meshes/minimal_gltf.gltf`, `assets/meshes/minimal_gltf.bin` |
 | Demo scene configs | `assets/scenes/demo_scene.json`, `assets/scenes/textured_scene.json`, `assets/scenes/textured_cube_scene.json`, `assets/scenes/multi_mesh_scene.json` |
 | Docker / Compose | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
 | README | `README.md`, `RayTracerRTX/README.md` |

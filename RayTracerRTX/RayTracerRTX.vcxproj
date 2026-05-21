@@ -94,6 +94,7 @@
     <ClInclude Include="glfw\include\GLFW\glfw3native.h" />
     <ClInclude Include="src\app\application.h" />
     <ClInclude Include="src\app\camera.h" />
+    <ClInclude Include="src\app\gltf_loader.h" />
     <ClInclude Include="src\app\material.h" />
     <ClInclude Include="src\app\mesh.h" />
     <ClInclude Include="src\app\obj_loader.h" />
@@ -111,6 +112,7 @@
   <ItemGroup>
     <ClCompile Include="src\app\application.cpp" />
     <ClCompile Include="src\app\camera.cpp" />
+    <ClCompile Include="src\app\gltf_loader.cpp" />
     <ClCompile Include="src\app\material.cpp" />
     <ClCompile Include="src\app\mesh.cpp" />
     <ClCompile Include="src\app\obj_loader.cpp" />

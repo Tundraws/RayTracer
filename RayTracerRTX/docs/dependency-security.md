@@ -22,6 +22,9 @@ is limited to vertices, normals, texture coordinates, triangular faces,
 `mtllib`, `usemtl`, and selected MTL fields: `Kd`, `Ks`, `Ns`, `Ni`, `d`,
 `map_Kd`, `bump`, `map_Bump`, and `norm`. The OptiX denoiser uses the already
 required NVIDIA OptiX SDK and does not add a new third-party dependency.
+The basic glTF path also uses local parsing code and adds no new package. Its
+supported subset is limited to `.gltf` JSON files with external `.bin` buffers
+and selected mesh/material fields.
 
 ## Dependency Check Approach
 
