@@ -317,12 +317,14 @@ static __forceinline__ __device__ float3 traceRadiance(
     const float3 direction,
     const float tmin,
     const float tmax,
-    const unsigned int depth)
+    const unsigned int depth,
+    const unsigned int seed)
 {
     unsigned int p0 = 0u;
     unsigned int p1 = 0u;
     unsigned int p2 = 0u;
     unsigned int p3 = depth;
+    unsigned int p4 = seed;
     optixTrace(
         handle,
         origin,
@@ -335,8 +337,84 @@ static __forceinline__ __device__ float3 traceRadiance(
         RAY_TYPE_RADIANCE,
         RAY_TYPE_COUNT,
         RAY_TYPE_RADIANCE,
-        p0, p1, p2, p3);
+        p0, p1, p2, p3, p4);
     return make_vec(__uint_as_float(p0), __uint_as_float(p1), __uint_as_float(p2));
+}
+
+static __forceinline__ __device__ unsigned int hash32(unsigned int x)
+{
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+static __forceinline__ __device__ float random01(unsigned int& seed)
+{
+    seed = hash32(seed);
+    return static_cast<float>(seed & 0x00ffffffu) / 16777216.0f;
+}
+
+static __forceinline__ __device__ float3 cosineHemisphereDirection(const float3 normal, unsigned int& seed)
+{
+    const float r1 = random01(seed);
+    const float r2 = random01(seed);
+    const float phi = 6.2831853f * r1;
+    const float radius = sqrtf(r2);
+    const float x = cosf(phi) * radius;
+    const float z = sinf(phi) * radius;
+    const float y = sqrtf(fmaxf(0.0f, 1.0f - r2));
+    const float3 helper = fabsf(normal.y) < 0.999f ? make_vec(0.0f, 1.0f, 0.0f) : make_vec(1.0f, 0.0f, 0.0f);
+    const float3 tangent = normalize3(cross3(helper, normal));
+    const float3 bitangent = normalize3(cross3(normal, tangent));
+    return normalize3(add3(add3(mul3(tangent, x), mul3(normal, y)), mul3(bitangent, z)));
+}
+
+static __forceinline__ __device__ float3 progressiveBounce(
+    const float3 hitPoint,
+    const float3 normal,
+    const float3 rayDirection,
+    const float3 baseColor,
+    const MeshMaterialGpu material,
+    const unsigned int depth)
+{
+    if (depth >= static_cast<unsigned int>(params.maxDepth))
+    {
+        return make_vec(0.0f, 0.0f, 0.0f);
+    }
+
+    unsigned int seed = optixGetPayload_4() ^ (depth * 0x9e3779b9u);
+    float3 bounceDir{};
+    float3 throughput = baseColor;
+    if (material.materialType == MaterialMirror || material.materialType == MaterialMetal)
+    {
+        const float3 reflected = normalize3(reflect3(rayDirection, normal));
+        const float3 diffuseLobe = cosineHemisphereDirection(normal, seed);
+        bounceDir = roughReflectionDir(lerp3(reflected, diffuseLobe, saturate1(material.roughness)), normal, material.roughness);
+        const float3 tint = material.materialType == MaterialMetal ? material.color : material.specularColor;
+        throughput = make_vec(tint.x * baseColor.x, tint.y * baseColor.y, tint.z * baseColor.z);
+    }
+    else if (material.materialType == MaterialDielectric)
+    {
+        bounceDir = normalize3(reflect3(rayDirection, normal));
+        throughput = lerp3(make_vec(1.0f, 1.0f, 1.0f), material.color, 0.25f);
+    }
+    else
+    {
+        bounceDir = cosineHemisphereDirection(normal, seed);
+    }
+
+    const float3 bounced = traceRadiance(
+        params.handle,
+        add3(hitPoint, mul3(normal, 0.003f)),
+        bounceDir,
+        0.001f,
+        1e20f,
+        depth + 1u,
+        seed);
+    return make_vec(bounced.x * throughput.x, bounced.y * throughput.y, bounced.z * throughput.z);
 }
 
 static __forceinline__ __device__ uchar4 toColor(const float3 color)
@@ -420,7 +498,8 @@ static __forceinline__ __device__ float3 shadeMaterial(
                 reflectedDir,
                 0.001f,
                 1e20f,
-                depth + 1u);
+                depth + 1u,
+                optixGetPayload_4() ^ 0x9e3779b9u);
             const float mirrorHighlight = 0.55f;
             const float3 highlight = mul3(make_vec(1.0f, 1.0f, 1.0f), mirrorHighlight * specular);
             localColor = add3(reflectedColor, highlight);
@@ -441,7 +520,8 @@ static __forceinline__ __device__ float3 shadeMaterial(
                 reflectedDir,
                 0.001f,
                 1e20f,
-                depth + 1u);
+                depth + 1u,
+                optixGetPayload_4() ^ 0x85ebca6bu);
             const float3 specularTint = lerp3(material.specularColor, material.color, 0.65f);
             const float reflectionWeight = 0.65f + 0.25f * (1.0f - roughness);
             localColor = add3(
@@ -467,7 +547,8 @@ static __forceinline__ __device__ float3 shadeMaterial(
                 reflectedDir,
                 0.001f,
                 1e20f,
-                depth + 1u);
+                depth + 1u,
+                optixGetPayload_4() ^ 0xc2b2ae35u);
 
             float3 transmittedColor = localColor;
             float3 refractedDir{};
@@ -479,7 +560,8 @@ static __forceinline__ __device__ float3 shadeMaterial(
                     refractedDir,
                     0.001f,
                     1e20f,
-                    depth + 1u);
+                    depth + 1u,
+                    optixGetPayload_4() ^ 0x27d4eb2fu);
             }
 
             const float opacity = saturate1(material.alpha);
@@ -490,6 +572,12 @@ static __forceinline__ __device__ float3 shadeMaterial(
                 fminf(1.0f, fresnel + roughness * 0.25f));
             localColor = lerp3(glassColor, localColor, opacity * 0.18f);
         }
+    }
+
+    if (params.renderMode == RenderModeProgressive)
+    {
+        const float3 indirect = progressiveBounce(hitPoint, normal, rayDirection, diffuseColor, material, depth);
+        localColor = add3(mul3(localColor, 0.72f), mul3(indirect, 0.28f));
     }
 
     return localColor;
@@ -513,8 +601,11 @@ extern "C" __global__ void __raygen__rg()
     float3 color = make_vec(0.0f, 0.0f, 0.0f);
     for (int sample = 0; sample < primarySampleCount; ++sample)
     {
-        const float u = (static_cast<float>(idx.x) + offsets[sample].x) / static_cast<float>(dim.x);
-        const float v = (static_cast<float>(idx.y) + offsets[sample].y) / static_cast<float>(dim.y);
+        unsigned int seed = hash32(idx.x + idx.y * dim.x + params.accumulationSample * 9781u + static_cast<unsigned int>(sample) * 6271u);
+        const float jitterX = params.renderMode == RenderModeProgressive ? random01(seed) : offsets[sample].x;
+        const float jitterY = params.renderMode == RenderModeProgressive ? random01(seed) : offsets[sample].y;
+        const float u = (static_cast<float>(idx.x) + jitterX) / static_cast<float>(dim.x);
+        const float v = (static_cast<float>(idx.y) + jitterY) / static_cast<float>(dim.y);
 
         const float px = (2.0f * u - 1.0f) * params.cameraAspect * params.cameraScale;
         const float py = (2.0f * v - 1.0f) * params.cameraScale;
@@ -530,11 +621,28 @@ extern "C" __global__ void __raygen__rg()
             direction,
             0.001f,
             1e20f,
-            0u));
+            0u,
+            seed));
     }
     color = mul3(color, 1.0f / static_cast<float>(primarySampleCount));
 
-    params.image[idx.y * params.imageWidth + idx.x] = toColor(color);
+    const unsigned int pixelIndex = idx.y * params.imageWidth + idx.x;
+    if (params.renderMode == RenderModeProgressive && params.accumulation != nullptr)
+    {
+        const float sampleCount = static_cast<float>(params.accumulationSample);
+        const float invCount = 1.0f / (sampleCount + 1.0f);
+        const float4 previous = params.accumulation[pixelIndex];
+        const float3 accumulated = make_vec(
+            (previous.x * sampleCount + color.x) * invCount,
+            (previous.y * sampleCount + color.y) * invCount,
+            (previous.z * sampleCount + color.z) * invCount);
+        params.accumulation[pixelIndex] = make_float4(accumulated.x, accumulated.y, accumulated.z, 1.0f);
+        params.image[pixelIndex] = toColor(accumulated);
+    }
+    else
+    {
+        params.image[pixelIndex] = toColor(color);
+    }
 
 }
 

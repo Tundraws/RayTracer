@@ -22,7 +22,9 @@ normal maps through `bump`, `map_Bump`, or `norm` are supported for PPM demo
 textures; normal mapping perturbs shading normals only and does not displace
 geometry. Direct lighting uses a physically motivated GGX/Trowbridge-Reitz
 microfacet BRDF for diffuse, mirror and metal materials; glass remains a
-separate simplified dielectric approximation.
+separate simplified dielectric approximation. The renderer has a default
+real-time direct lighting mode and an optional progressive path tracing mode
+with GPU accumulation.
 
 ## Технологии
 
@@ -74,6 +76,7 @@ JSON scene config поддерживает `meshObjects`, `camera`, `light` и t
 - `R/F` - движение сферы по оси Y
 - `J/L`, `I/K`, `U/O` - перемещение источника света
 - `M` - переключение материала выбранной сферы
+- `P` - переключение real-time direct / progressive path tracing mode
 - `Esc` - выход
 
 ## Структура проекта

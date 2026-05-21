@@ -39,6 +39,8 @@ struct AppState
     InputState input;
     SceneState scene;
     bool cursorCaptured = true;
+    int renderMode = RenderModeRealtime;
+    unsigned int progressiveSamples = 0;
 };
 
 struct FrameStats
@@ -146,7 +148,7 @@ void ensureHudTextCache(int width, int height)
     ReleaseDC(nullptr, screenDC);
 }
 
-void drawHud(GLFWwindow* window, const SceneState& scene, const FrameStats& stats)
+void drawHud(GLFWwindow* window, const SceneState& scene, const FrameStats& stats, const int renderMode, const unsigned int progressiveSamples)
 {
     if (window == nullptr)
     {
@@ -201,12 +203,15 @@ void drawHud(GLFWwindow* window, const SceneState& scene, const FrameStats& stat
           << L"   \u041c\u0410\u0422\u0415\u0420\u0418\u0410\u041b: " << materialNameW(scene.materials[scene.selectedSphere].materialType)
           << L"   \u0421\u0412\u0415\u0422: " << std::fixed << std::setprecision(1)
           << scene.lightPosition.x << L" " << scene.lightPosition.y << L" " << scene.lightPosition.z;
+    std::wostringstream lineMode;
+    lineMode << L"MODE: " << (renderMode == RenderModeProgressive ? L"PROGRESSIVE PATH" : L"REAL-TIME DIRECT")
+             << L"   SAMPLES: " << progressiveSamples;
 
-    const std::wstring line3 = L"\u0421\u0424\u0415\u0420\u042b: 1-3 \u0412\u042b\u0411\u041e\u0420";
+    const std::wstring line3 = lineMode.str();
     const std::wstring line4 = L"\u0414\u0412\u0418\u0416\u0415\u041d\u0418\u0415 \u0421\u0424\u0415\u0420\u042b: \u0421\u0422\u0420\u0415\u041b\u041a\u0418 - X/Z";
     const std::wstring line5 = L"R/F - Y";
     const std::wstring line6 = L"\u0421\u0412\u0415\u0422: J/L-X, I/K-Z, U/O-Y";
-    const std::wstring line7 = L"\u041c\u0410\u0422\u0415\u0420\u0418\u0410\u041b: M   \u041a\u0410\u041c\u0415\u0420\u0410: WASD/SPACE + \u041c\u042b\u0428\u042c";
+    const std::wstring line7 = L"\u041c\u0410\u0422\u0415\u0420\u0418\u0410\u041b: M   MODE: P   \u041a\u0410\u041c\u0415\u0420\u0410: WASD/SPACE + \u041c\u042b\u0428\u042c";
 
     const std::wstring text1 = line1.str();
     const std::wstring text2 = line2.str();
@@ -401,6 +406,15 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     }
     mWasDown = mIsDown;
 
+    static bool pWasDown = false;
+    const bool pIsDown = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
+    if (pIsDown && !pWasDown)
+    {
+        appState.renderMode = appState.renderMode == RenderModeProgressive ? RenderModeRealtime : RenderModeProgressive;
+        appState.progressiveSamples = 0;
+    }
+    pWasDown = pIsDown;
+
 }
 } // namespace
 
@@ -500,7 +514,9 @@ void run_optix_app(const ApplicationOptions& options)
 
         const auto hostFrameStart = std::chrono::steady_clock::now();
         float gpuTimeMs = 0.0f;
+        renderer.setRenderMode(appState.renderMode);
         renderer.renderFrame(appState.scene, appState.camera, pixels, &gpuTimeMs);
+        appState.progressiveSamples = renderer.getAccumulationSampleCount();
         const auto hostFrameEnd = std::chrono::steady_clock::now();
 
         const double hostFrameMs = std::chrono::duration<double, std::milli>(hostFrameEnd - hostFrameStart).count();
@@ -543,7 +559,7 @@ void run_optix_app(const ApplicationOptions& options)
         glClear(GL_COLOR_BUFFER_BIT);
         glDrawPixels(gWidth, gHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
         glfwSwapBuffers(window);
-        drawHud(window, appState.scene, stats);
+        drawHud(window, appState.scene, stats, appState.renderMode, appState.progressiveSamples);
         glfwPollEvents();
     }
 

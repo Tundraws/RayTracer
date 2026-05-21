@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <cstring>
@@ -35,6 +36,59 @@ int gWidth = 800;
 int gHeight = 600;
 constexpr unsigned int kMaxReflectionDepth = 6;
 constexpr unsigned int kMaxTraceDepth = kMaxReflectionDepth + 2;
+
+void hashCombine(std::size_t& seed, const std::size_t value)
+{
+    seed ^= value + 0x9e3779b97f4a7c15ull + (seed << 6u) + (seed >> 2u);
+}
+
+std::size_t hashFloat(const float value)
+{
+    return std::hash<int>{}(static_cast<int>(value * 1000.0f));
+}
+
+std::size_t makeAccumulationSignature(const SceneState& scene, const CameraState& camera)
+{
+    std::size_t seed = 1469598103934665603ull;
+    hashCombine(seed, hashFloat(camera.position.x));
+    hashCombine(seed, hashFloat(camera.position.y));
+    hashCombine(seed, hashFloat(camera.position.z));
+    hashCombine(seed, hashFloat(camera.yaw));
+    hashCombine(seed, hashFloat(camera.pitch));
+    hashCombine(seed, hashFloat(camera.fov));
+    hashCombine(seed, hashFloat(scene.lightPosition.x));
+    hashCombine(seed, hashFloat(scene.lightPosition.y));
+    hashCombine(seed, hashFloat(scene.lightPosition.z));
+    for (const SphereGeometry& sphere : scene.spheres)
+    {
+        hashCombine(seed, hashFloat(sphere.center.x));
+        hashCombine(seed, hashFloat(sphere.center.y));
+        hashCombine(seed, hashFloat(sphere.center.z));
+        hashCombine(seed, hashFloat(sphere.radius));
+    }
+    for (const SphereMaterial& material : scene.materials)
+    {
+        hashCombine(seed, static_cast<std::size_t>(material.materialType));
+        hashCombine(seed, hashFloat(material.roughness));
+        hashCombine(seed, hashFloat(material.color.x));
+        hashCombine(seed, hashFloat(material.color.y));
+        hashCombine(seed, hashFloat(material.color.z));
+    }
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        hashCombine(seed, std::hash<std::string>{}(object.assetReference));
+        hashCombine(seed, hashFloat(object.position.x));
+        hashCombine(seed, hashFloat(object.position.y));
+        hashCombine(seed, hashFloat(object.position.z));
+        hashCombine(seed, hashFloat(object.rotation.x));
+        hashCombine(seed, hashFloat(object.rotation.y));
+        hashCombine(seed, hashFloat(object.rotation.z));
+        hashCombine(seed, hashFloat(object.scale.x));
+        hashCombine(seed, hashFloat(object.scale.y));
+        hashCombine(seed, hashFloat(object.scale.z));
+    }
+    return seed;
+}
 
 template <typename T>
 struct SbtRecord
@@ -237,6 +291,36 @@ void OptixRenderer::setRenderSize(int width, int height)
     gHeight = height;
 }
 
+void OptixRenderer::setRenderMode(const int mode)
+{
+    const int nextMode = mode == RenderModeProgressive ? RenderModeProgressive : RenderModeRealtime;
+    if (renderMode != nextMode)
+    {
+        renderMode = nextMode;
+        resetAccumulation();
+    }
+}
+
+int OptixRenderer::getRenderMode() const
+{
+    return renderMode;
+}
+
+void OptixRenderer::resetAccumulation()
+{
+    accumulationSampleCount = 0;
+    lastAccumulationSignature = 0;
+    if (dAccumulationBuffer != 0)
+    {
+        cudaMemset(reinterpret_cast<void*>(dAccumulationBuffer), 0, static_cast<size_t>(gWidth) * static_cast<size_t>(gHeight) * sizeof(float4));
+    }
+}
+
+unsigned int OptixRenderer::getAccumulationSampleCount() const
+{
+    return accumulationSampleCount;
+}
+
 void OptixRenderer::initialize()
 {
     initialize(makeDefaultScene());
@@ -254,6 +338,8 @@ void OptixRenderer::initialize(const SceneState& initialScene)
     createPipeline();
     createSbt();
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dFrameBuffer), gWidth * gHeight * sizeof(uchar4)));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dAccumulationBuffer), gWidth * gHeight * sizeof(float4)));
+    CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(dAccumulationBuffer), 0, gWidth * gHeight * sizeof(float4)));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dLaunchParams), sizeof(LaunchParams)));
 }
 
@@ -641,7 +727,7 @@ void OptixRenderer::createModule()
 
     pipelineCompileOptions.usesMotionBlur = false;
     pipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
-    pipelineCompileOptions.numPayloadValues = 4;
+    pipelineCompileOptions.numPayloadValues = 5;
     pipelineCompileOptions.numAttributeValues = 2;
     pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
     pipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
@@ -810,6 +896,18 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     float aspect = 0.0f;
     updateCameraBasis(camera, gWidth, gHeight, forward, right, up, scale, aspect);
 
+    const std::size_t accumulationSignature = makeAccumulationSignature(scene, camera);
+    if (renderMode == RenderModeProgressive && accumulationSignature != lastAccumulationSignature)
+    {
+        resetAccumulation();
+        lastAccumulationSignature = accumulationSignature;
+    }
+    if (renderMode == RenderModeRealtime)
+    {
+        accumulationSampleCount = 0;
+        lastAccumulationSignature = accumulationSignature;
+    }
+
     std::vector<float3> centers;
     std::vector<float> radii;
     centers.reserve(scene.spheres.size());
@@ -846,6 +944,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
 
     LaunchParams params{};
     params.image = dFrameBuffer;
+    params.accumulation = reinterpret_cast<float4*>(dAccumulationBuffer);
     params.imageWidth = gWidth;
     params.imageHeight = gHeight;
     params.handle = iasHandle;
@@ -881,6 +980,8 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.meshObjectCount = meshObjectCount;
     params.meshTexturePixelCount = meshTexturePixelCount;
     params.maxDepth = kMaxReflectionDepth;
+    params.renderMode = renderMode;
+    params.accumulationSample = accumulationSampleCount;
 
     CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(dLaunchParams), &params, sizeof(LaunchParams), cudaMemcpyHostToDevice, stream));
     OPTIX_CHECK(optixLaunch(pipeline, stream, dLaunchParams, sizeof(LaunchParams), &sbt, gWidth, gHeight, 1));
@@ -891,6 +992,10 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     if (gpuTimeMs != nullptr)
     {
         CUDA_CHECK(cudaEventElapsedTime(gpuTimeMs, frameStart, frameStop));
+    }
+    if (renderMode == RenderModeProgressive)
+    {
+        ++accumulationSampleCount;
     }
 }
 
@@ -905,6 +1010,12 @@ void OptixRenderer::destroy()
     {
         cudaFree(reinterpret_cast<void*>(dLaunchParams));
         dLaunchParams = 0;
+    }
+    if (dAccumulationBuffer != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dAccumulationBuffer));
+        dAccumulationBuffer = 0;
+        accumulationSampleCount = 0;
     }
     if (dSphereGasBuffer != 0)
     {

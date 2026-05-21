@@ -25,6 +25,8 @@ mapping через `bump`, `map_Bump` или `norm`; normal map изменяет
 normal и не делает displacement геометрии. Direct lighting использует
 physically motivated GGX/Trowbridge-Reitz microfacet BRDF для diffuse, mirror и
 metal материалов; glass остается отдельной упрощенной dielectric-моделью.
+Renderer поддерживает default real-time direct lighting mode и optional
+progressive path tracing mode с GPU accumulation.
 
 ## Технологии
 
@@ -75,6 +77,7 @@ JSON scene config с `meshObjects`, `camera`, `light` и transform-полями
 - `R/F` — движение сферы по оси Y
 - `J/L`, `I/K`, `U/O` — перемещение источника света
 - `M` — переключение материала выбранной сферы
+- `P` — переключение real-time direct / progressive path tracing mode
 - `Esc` — выход
 
 ## Структура проекта

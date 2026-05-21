@@ -26,16 +26,20 @@ flowchart LR
     Scene --> Materials["SphereMaterial"]
     Scene --> MeshMaterials["Mesh materials"]
     App --> Renderer["OptixRenderer"]
+    App --> Mode["Render mode toggle"]
     Camera --> Renderer
     Scene --> Renderer
+    Mode --> Renderer
     Renderer --> TriangleGAS["Triangle GAS per mesh object"]
     Renderer --> IAS["IAS with mesh transforms"]
     Renderer --> Shared["LaunchParams / rtx_shared.h"]
     Renderer --> Device["OptiX device programs"]
     TriangleGAS --> IAS
     IAS --> Device
+    Device --> Accum["Progressive accumulation buffer"]
     Device --> Framebuffer["CUDA framebuffer"]
     Device --> Post["Tone mapping + gamma"]
+    Accum --> Post
     Post --> Framebuffer
     Framebuffer --> App
 ```
@@ -60,6 +64,7 @@ sequenceDiagram
     User->>App: Keyboard and mouse input
     ObjLoader->>Scene: Load MeshObject list with OBJ data, tangents, materials, textures and transforms
     App->>Scene: Move sphere, light, or toggle material
+    App->>Renderer: Optional P toggle for progressive accumulation
     App->>Renderer: renderFrame(scene, camera)
     Renderer->>CUDA: Upload sphere materials, mesh buffers, diffuse/normal texture pixels, and LaunchParams
     Renderer->>OptiX: Build sphere GAS + one triangle GAS per mesh object + IAS transforms

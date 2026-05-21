@@ -42,6 +42,8 @@
 - GPU smoke test:
   - renderer initialization
   - one-frame render
+  - progressive accumulation render
+  - accumulation reset on camera change
   - non-empty pixel buffer
   - valid GPU frame time
 

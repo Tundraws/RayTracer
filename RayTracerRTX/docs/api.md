@@ -23,6 +23,9 @@ RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
 `--mesh` loads one OBJ mesh into the default scene. `--scene` loads a JSON scene
 config with `meshObjects`, `camera`, `light`, and mesh transform fields.
 Invalid input prints a diagnostic message and falls back to the default scene.
+The interactive app starts in `RenderModeRealtime`; pressing `P` toggles
+progressive path tracing accumulation and resets samples when the camera, light,
+scene, material, or mesh signature changes.
 
 ## Scene API
 
@@ -196,6 +199,22 @@ Uploaded to the GPU before each OptiX launch.
 | `meshTriangles`, `meshTriangleCount` | OBJ mesh triangle buffer with material indices |
 | `meshMaterials`, `meshMaterialCount` | OBJ mesh material buffer |
 | `meshTexturePixels`, `meshTexturePixelCount` | Packed diffuse and normal texture pixels for mesh materials |
+| `accumulation` | Progressive float accumulation buffer |
+| `renderMode` | `RenderModeRealtime` or `RenderModeProgressive` |
+| `accumulationSample` | Current progressive sample index |
+
+### Render Modes
+
+`RenderModeRealtime` is the default mode used by the benchmark and interactive
+startup. It evaluates direct lighting, shadows, reflections and material
+branches without accumulating previous frames.
+
+`RenderModeProgressive` keeps a float accumulation buffer on the GPU. Each frame
+adds jittered primary samples and stochastic diffuse/rough reflection bounces,
+then tone maps the running average. The renderer resets accumulation when the
+camera or scene signature changes, and the HUD displays the current sample
+count. This is a coursework-scale progressive path tracing mode, not a full
+offline path tracer.
 | `maxDepth` | Recursive reflection depth limit |
 
 ## Renderer API

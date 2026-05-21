@@ -1,9 +1,12 @@
 #pragma once
 
+#include "../common/rtx_shared.h"
+
 #include <cuda_runtime.h>
 #include <optix.h>
 
 #include <array>
+#include <cstddef>
 #include <vector>
 
 struct ProgramGroups
@@ -23,6 +26,10 @@ class OptixRenderer
 {
 public:
     void setRenderSize(int width, int height);
+    void setRenderMode(int mode);
+    int getRenderMode() const;
+    void resetAccumulation();
+    unsigned int getAccumulationSampleCount() const;
     void initialize();
     void initialize(const struct SceneState& initialScene);
     void renderFrame(const struct SceneState& scene, const struct CameraState& camera, std::vector<uchar4>& hostPixels, float* gpuTimeMs = nullptr);
@@ -63,6 +70,7 @@ private:
     CUdeviceptr dIasBuffer = 0;
     CUdeviceptr dIasInstances = 0;
     CUdeviceptr dLaunchParams = 0;
+    CUdeviceptr dAccumulationBuffer = 0;
     OptixTraversableHandle sphereGasHandle = 0;
     OptixTraversableHandle planeGasHandle = 0;
     std::vector<OptixTraversableHandle> meshGasHandles;
@@ -76,6 +84,9 @@ private:
     std::vector<std::array<float, 12>> meshInstanceTransforms;
     unsigned int meshTexturePixelCount = 0;
     unsigned int meshObjectCount = 0;
+    unsigned int accumulationSampleCount = 0;
+    int renderMode = RenderModeRealtime;
+    std::size_t lastAccumulationSignature = 0;
     OptixBuildInput sphereBuildInput = {};
     OptixBuildInput planeBuildInput = {};
     OptixBuildInput iasBuildInput = {};

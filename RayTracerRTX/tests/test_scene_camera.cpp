@@ -918,6 +918,57 @@ bool runGpuSmokeTest(TestContext& t)
 #endif
 }
 
+bool runProgressiveGpuSmokeTest(TestContext& t)
+{
+#if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
+    (void)t;
+    std::cout << "[SKIP] Progressive GPU smoke test skipped: RAYTRACERRTX_ENABLE_GPU_TESTS is not enabled.\n";
+    return false;
+#else
+    try
+    {
+        OptixRenderer renderer;
+        renderer.setRenderSize(64, 64);
+        renderer.initialize();
+        renderer.setRenderMode(RenderModeProgressive);
+
+        SceneState scene = makeDefaultScene();
+        CameraState camera;
+        std::vector<uchar4> pixels(64u * 64u);
+        float gpuTimeMs = -1.0f;
+
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        t.expect(renderer.getAccumulationSampleCount() == 1u, "Progressive mode should increment sample count after first frame.");
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        t.expect(renderer.getAccumulationSampleCount() == 2u, "Progressive mode should keep accumulating stable frames.");
+
+        camera.yaw += 2.0f;
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        t.expect(renderer.getAccumulationSampleCount() == 1u, "Progressive accumulation should reset on camera change.");
+
+        bool hasNonZeroPixel = false;
+        for (const uchar4 px : pixels)
+        {
+            if (px.x != 0u || px.y != 0u || px.z != 0u || px.w != 0u)
+            {
+                hasNonZeroPixel = true;
+                break;
+            }
+        }
+
+        t.expect(hasNonZeroPixel, "Progressive GPU smoke: rendered frame must contain non-zero pixels.");
+        t.expect(gpuTimeMs >= 0.0f, "Progressive GPU smoke: GPU time must be non-negative.");
+        renderer.destroy();
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << "[SKIP] Progressive GPU smoke test skipped: " << ex.what() << '\n';
+        return false;
+    }
+#endif
+}
+
 int runGpuBenchmark()
 {
 #if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
@@ -946,6 +997,7 @@ int runGpuBenchmark()
         OptixRenderer renderer;
         renderer.setRenderSize(scenario.width, scenario.height);
         renderer.initialize();
+        renderer.setRenderMode(RenderModeRealtime);
 
         SceneState scene = makeDefaultScene();
         CameraState camera;
@@ -1062,6 +1114,15 @@ int main(int argc, char** argv)
     if (runGpuSmokeTest(t))
     {
         std::cout << "[PASS] GPU smoke test (checks: 2)\n";
+    }
+    else
+    {
+        ++testsSkipped;
+    }
+    ++testsRun;
+    if (runProgressiveGpuSmokeTest(t))
+    {
+        std::cout << "[PASS] Progressive GPU smoke test (checks: 5)\n";
     }
     else
     {

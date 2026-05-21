@@ -15,6 +15,12 @@ enum MaterialType
     MaterialDielectric = 3
 };
 
+enum RenderMode
+{
+    RenderModeRealtime = 0,
+    RenderModeProgressive = 1
+};
+
 #if !defined(__CUDACC_RTC__)
 inline float clamp01(const float value)
 {
@@ -140,6 +146,7 @@ struct MeshObjectGpu
 struct LaunchParams
 {
     uchar4* image;
+    float4* accumulation;
     unsigned int imageWidth;
     unsigned int imageHeight;
     OptixTraversableHandle handle;
@@ -163,4 +170,6 @@ struct LaunchParams
     unsigned int meshObjectCount;
     unsigned int meshTexturePixelCount;
     int maxDepth;
+    int renderMode;
+    unsigned int accumulationSample;
 };
