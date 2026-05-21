@@ -144,6 +144,76 @@ static __forceinline__ __device__ uchar4 toColor(const float3 color)
         255);
 }
 
+static __forceinline__ __device__ float3 shadeMaterial(
+    const float3 hitPoint,
+    float3 normal,
+    const float3 rayDirection,
+    const unsigned int depth,
+    const MeshMaterialGpu material)
+{
+    if (dot3(normal, rayDirection) > 0.0f)
+    {
+        normal = mul3(normal, -1.0f);
+    }
+
+    const float3 lightVector = sub3(params.lightPosition, hitPoint);
+    const float lightDistance = sqrtf(dot3(lightVector, lightVector));
+    const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
+
+    const bool visible = traceShadow(
+        params.handle,
+        add3(hitPoint, mul3(normal, 0.002f)),
+        lightDir,
+        0.001f,
+        lightDistance - 0.01f);
+    const float visibility = visible ? 1.0f : 0.0f;
+
+    const float ambient = 0.18f;
+    const float diffuseShadowFloor = 0.34f;
+    const float mirrorShadowFloor = 0.50f;
+    const float shadowFloor = material.materialType == MaterialMirror ? mirrorShadowFloor : diffuseShadowFloor;
+    const float shadowFactor = shadowFloor + (1.0f - shadowFloor) * visibility;
+    const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
+    const float diffuse = ndotl * shadowFactor;
+    const float3 viewDir = mul3(rayDirection, -1.0f);
+    const float3 halfDir = normalize3(add3(lightDir, viewDir));
+    const float specularPower = material.materialType == MaterialMirror ? 96.0f : 128.0f;
+    const float specular = visibility * powf(fmaxf(dot3(normal, halfDir), 0.0f), specularPower);
+    const float diffuseSpecularWeight = material.materialType == MaterialMirror ? 0.0f : 0.06f;
+    const float diffuseLightWeight = material.materialType == MaterialMirror ? 1.0f : 0.88f;
+    const float3 diffuseColor = material.materialType == MaterialMirror
+        ? material.color
+        : clamp3(material.color, 0.0f, 0.96f);
+
+    float3 localColor = add3(
+        mul3(diffuseColor, ambient + diffuseLightWeight * diffuse),
+        mul3(make_vec(1.0f, 1.0f, 1.0f), diffuseSpecularWeight * specular));
+
+    if (material.materialType == MaterialMirror)
+    {
+        if (depth < static_cast<unsigned int>(params.maxDepth))
+        {
+            const float3 reflectedDir = normalize3(reflect3(rayDirection, normal));
+            const float3 reflectedColor = traceRadiance(
+                params.handle,
+                add3(hitPoint, mul3(normal, 0.002f)),
+                reflectedDir,
+                0.001f,
+                1e20f,
+                depth + 1u);
+            const float mirrorHighlight = 0.55f;
+            const float3 highlight = mul3(make_vec(1.0f, 1.0f, 1.0f), mirrorHighlight * specular);
+            localColor = add3(reflectedColor, highlight);
+        }
+        else
+        {
+            localColor = make_vec(0.231f, 0.251f, 0.251f);
+        }
+    }
+
+    return localColor;
+}
+
 extern "C" __global__ void __raygen__rg()
 {
     const uint3 idx = optixGetLaunchIndex();
@@ -220,68 +290,9 @@ extern "C" __global__ void __closesthit__radiance()
         optixTransformNormalFromObjectToWorldSpace(
             sub3(objectPoint, make_vec(sphereData.x, sphereData.y, sphereData.z))));
 
-    if (dot3(normal, rayDirection) > 0.0f)
-    {
-        normal = mul3(normal, -1.0f);
-    }
-
     SphereMaterial material = params.materials[primitiveIndex];
-    const float3 lightVector = sub3(params.lightPosition, hitPoint);
-    const float lightDistance = sqrtf(dot3(lightVector, lightVector));
-    const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
-
-    const bool visible = traceShadow(
-        params.handle,
-        add3(hitPoint, mul3(normal, 0.002f)),
-        lightDir,
-        0.001f,
-        lightDistance - 0.01f);
-    const float visibility = visible ? 1.0f : 0.0f;
-
-    const float ambient = 0.18f;
-    const float diffuseShadowFloor = 0.34f;
-    const float mirrorShadowFloor = 0.50f;
-    const float shadowFloor = material.materialType == MaterialMirror ? mirrorShadowFloor : diffuseShadowFloor;
-    const float shadowFactor = shadowFloor + (1.0f - shadowFloor) * visibility;
-    const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
-    const float diffuse = ndotl * shadowFactor;
-    const float3 viewDir = mul3(rayDirection, -1.0f);
-    const float3 halfDir = normalize3(add3(lightDir, viewDir));
-    const float specularPower = material.materialType == MaterialMirror ? 96.0f : 128.0f;
-    const float specular = visibility * powf(fmaxf(dot3(normal, halfDir), 0.0f), specularPower);
-    const float diffuseSpecularWeight = material.materialType == MaterialMirror ? 0.0f : 0.06f;
-    const float diffuseLightWeight = material.materialType == MaterialMirror ? 1.0f : 0.88f;
-    const float3 diffuseColor = material.materialType == MaterialMirror
-        ? material.color
-        : clamp3(material.color, 0.0f, 0.96f);
-
-    float3 localColor = add3(
-        mul3(diffuseColor, ambient + diffuseLightWeight * diffuse),
-        mul3(make_vec(1.0f, 1.0f, 1.0f), diffuseSpecularWeight * specular));
-
-    if (material.materialType == MaterialMirror)
-    {
-        if (depth < static_cast<unsigned int>(params.maxDepth))
-        {
-            const float3 reflectedDir = normalize3(reflect3(rayDirection, normal));
-            const float3 reflectedColor = traceRadiance(
-                params.handle,
-                add3(hitPoint, mul3(normal, 0.002f)),
-                reflectedDir,
-                0.001f,
-                1e20f,
-                depth + 1u);
-            const float mirrorHighlight = 0.55f;
-            const float3 highlight = mul3(make_vec(1.0f, 1.0f, 1.0f), mirrorHighlight * specular);
-            localColor = add3(reflectedColor, highlight);
-        }
-        else
-        {
-            localColor = make_vec(0.231f, 0.251f, 0.251f);
-        }
-    }
-
-    setRadiancePayload(localColor);
+    MeshMaterialGpu materialGpu{material.color, material.materialType};
+    setRadiancePayload(shadeMaterial(hitPoint, normal, rayDirection, depth, materialGpu));
 }
 
 extern "C" __global__ void __closesthit__shadow()
@@ -334,6 +345,42 @@ extern "C" __global__ void __closesthit__radiance_plane()
 }
 
 extern "C" __global__ void __closesthit__shadow_plane()
+{
+    setShadowPayload(false);
+}
+
+extern "C" __global__ void __closesthit__radiance_mesh()
+{
+    const unsigned int depth = optixGetPayload_3();
+    const unsigned int primitiveIndex = optixGetPrimitiveIndex();
+
+    const MeshTriangleGpu triangle = params.meshTriangles[primitiveIndex];
+    const MeshVertexGpu v0 = params.meshVertices[triangle.i0];
+    const MeshVertexGpu v1 = params.meshVertices[triangle.i1];
+    const MeshVertexGpu v2 = params.meshVertices[triangle.i2];
+
+    const float2 bary = optixGetTriangleBarycentrics();
+    const float w0 = 1.0f - bary.x - bary.y;
+    const float w1 = bary.x;
+    const float w2 = bary.y;
+    float3 normal = normalize3(add3(add3(mul3(v0.normal, w0), mul3(v1.normal, w1)), mul3(v2.normal, w2)));
+    normal = normalize3(optixTransformNormalFromObjectToWorldSpace(normal));
+
+    const float3 rayOrigin = optixGetWorldRayOrigin();
+    const float3 rayDirection = normalize3(optixGetWorldRayDirection());
+    const float tHit = optixGetRayTmax();
+    const float3 hitPoint = add3(rayOrigin, mul3(rayDirection, tHit));
+
+    MeshMaterialGpu material = params.meshMaterials[0];
+    if (triangle.materialIndex < params.meshMaterialCount)
+    {
+        material = params.meshMaterials[triangle.materialIndex];
+    }
+
+    setRadiancePayload(shadeMaterial(hitPoint, normal, rayDirection, depth, material));
+}
+
+extern "C" __global__ void __closesthit__shadow_mesh()
 {
     setShadowPayload(false);
 }

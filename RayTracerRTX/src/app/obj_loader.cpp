@@ -123,7 +123,8 @@ bool parseFaceVertex(const std::string& token, FaceVertex& vertex)
 
 MeshMaterial makeDefaultMaterial(const std::string& name = "default")
 {
-    return MeshMaterial{make_float3(0.80f, 0.80f, 0.78f), MaterialDiffuse, name};
+    const bool mirror = name.find("mirror") != std::string::npos || name.find("Mirror") != std::string::npos;
+    return MeshMaterial{make_float3(0.80f, 0.80f, 0.78f), mirror ? MaterialMirror : MaterialDiffuse, name};
 }
 
 int ensureMaterial(

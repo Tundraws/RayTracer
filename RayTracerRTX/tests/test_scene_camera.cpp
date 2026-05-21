@@ -198,6 +198,15 @@ void testDefaultScene(TestContext& t)
     const SceneState scene = makeDefaultScene();
     t.expect(scene.spheres.size() == 3, "Default scene must contain 3 spheres.");
     t.expect(scene.materials.size() == 3, "Default scene must contain 3 materials.");
+    t.expect(!isEmptyMesh(scene.mesh), "Default scene must contain a triangle mesh.");
+    t.expect(scene.mesh.materials.size() >= 3, "Default mesh should contain several materials.");
+    t.expect(hasValidMeshMaterialIndices(scene.mesh), "Default mesh material indices should be valid.");
+    bool hasMirrorMeshMaterial = false;
+    for (const MeshMaterial& material : scene.mesh.materials)
+    {
+        hasMirrorMeshMaterial = hasMirrorMeshMaterial || material.materialType == MaterialMirror;
+    }
+    t.expect(hasMirrorMeshMaterial, "Default mesh should include a mirror material.");
     for (const SphereMaterial& material : scene.materials)
     {
         t.expect(material.materialType == MaterialDiffuse, "All default spheres should start as diffuse.");

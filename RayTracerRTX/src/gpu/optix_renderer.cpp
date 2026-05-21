@@ -288,6 +288,43 @@ void OptixRenderer::createScene()
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMaterials), scene.materials.size() * sizeof(SphereMaterial)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMaterials), scene.materials.data(), scene.materials.size() * sizeof(SphereMaterial), cudaMemcpyHostToDevice));
 
+    std::vector<MeshVertexGpu> meshVertices;
+    meshVertices.reserve(scene.mesh.vertices.size());
+    for (const MeshVertex& vertex : scene.mesh.vertices)
+    {
+        meshVertices.push_back(MeshVertexGpu{vertex.position, vertex.normal});
+    }
+
+    std::vector<uint3> meshIndices;
+    std::vector<MeshTriangleGpu> meshTriangles;
+    meshIndices.reserve(scene.mesh.triangles.size());
+    meshTriangles.reserve(scene.mesh.triangles.size());
+    for (const MeshTriangle& triangle : scene.mesh.triangles)
+    {
+        meshIndices.push_back(make_uint3(triangle.i0, triangle.i1, triangle.i2));
+        meshTriangles.push_back(MeshTriangleGpu{triangle.i0, triangle.i1, triangle.i2, triangle.materialIndex});
+    }
+
+    std::vector<MeshMaterialGpu> meshMaterials;
+    meshMaterials.reserve(scene.mesh.materials.size());
+    for (const MeshMaterial& material : scene.mesh.materials)
+    {
+        meshMaterials.push_back(MeshMaterialGpu{material.color, material.materialType});
+    }
+    if (meshMaterials.empty())
+    {
+        meshMaterials.push_back(MeshMaterialGpu{make_float3(0.8f, 0.8f, 0.78f), MaterialDiffuse});
+    }
+
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshVertices), meshVertices.size() * sizeof(MeshVertexGpu)));
+    CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshVertices), meshVertices.data(), meshVertices.size() * sizeof(MeshVertexGpu), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshIndices), meshIndices.size() * sizeof(uint3)));
+    CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshIndices), meshIndices.data(), meshIndices.size() * sizeof(uint3), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshTriangles), meshTriangles.size() * sizeof(MeshTriangleGpu)));
+    CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshTriangles), meshTriangles.data(), meshTriangles.size() * sizeof(MeshTriangleGpu), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshMaterials), meshMaterials.size() * sizeof(MeshMaterialGpu)));
+    CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshMaterials), meshMaterials.data(), meshMaterials.size() * sizeof(MeshMaterialGpu), cudaMemcpyHostToDevice));
+
     sphereAccelOptions.buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION | OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS;
     sphereAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
     sphereBuildInput = {};
@@ -338,11 +375,30 @@ void OptixRenderer::createScene()
     OPTIX_CHECK(optixAccelComputeMemoryUsage(context, &planeAccelOptions, &planeBuildInput, 1, &planeGasSizes));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dPlaneGasBuffer), planeGasSizes.outputSizeInBytes));
 
+    meshFlags.assign(1, OPTIX_GEOMETRY_FLAG_NONE);
+    meshAccelOptions.buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION | OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS;
+    meshAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+    meshBuildInput = {};
+    meshBuildInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+    meshBuildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+    meshBuildInput.triangleArray.vertexStrideInBytes = sizeof(MeshVertexGpu);
+    meshBuildInput.triangleArray.numVertices = static_cast<unsigned int>(meshVertices.size());
+    meshBuildInput.triangleArray.vertexBuffers = &dMeshVertices;
+    meshBuildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+    meshBuildInput.triangleArray.indexStrideInBytes = sizeof(uint3);
+    meshBuildInput.triangleArray.numIndexTriplets = static_cast<unsigned int>(meshIndices.size());
+    meshBuildInput.triangleArray.indexBuffer = dMeshIndices;
+    meshBuildInput.triangleArray.flags = meshFlags.data();
+    meshBuildInput.triangleArray.numSbtRecords = 1;
+
+    OPTIX_CHECK(optixAccelComputeMemoryUsage(context, &meshAccelOptions, &meshBuildInput, 1, &meshGasSizes));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshGasBuffer), meshGasSizes.outputSizeInBytes));
+
     iasAccelOptions.buildFlags = OPTIX_BUILD_FLAG_NONE;
     iasAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
     iasBuildInput = {};
     iasBuildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    iasBuildInput.instanceArray.numInstances = 2;
+    iasBuildInput.instanceArray.numInstances = 3;
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dIasInstances), iasBuildInput.instanceArray.numInstances * sizeof(OptixInstance)));
     iasBuildInput.instanceArray.instances = dIasInstances;
     OPTIX_CHECK(optixAccelComputeMemoryUsage(context, &iasAccelOptions, &iasBuildInput, 1, &iasSizes));
@@ -392,7 +448,28 @@ void OptixRenderer::rebuildAccelerationStructure()
         CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dPlaneTempBuffer)));
     }
 
-    std::array<OptixInstance, 2> instances{};
+    if (meshGasHandle == 0)
+    {
+        CUdeviceptr dMeshTempBuffer = 0;
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshTempBuffer), meshGasSizes.tempSizeInBytes));
+        meshAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+        OPTIX_CHECK(optixAccelBuild(
+            context,
+            stream,
+            &meshAccelOptions,
+            &meshBuildInput,
+            1,
+            dMeshTempBuffer,
+            meshGasSizes.tempSizeInBytes,
+            dMeshGasBuffer,
+            meshGasSizes.outputSizeInBytes,
+            &meshGasHandle,
+            nullptr,
+            0));
+        CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dMeshTempBuffer)));
+    }
+
+    std::array<OptixInstance, 3> instances{};
     for (OptixInstance& instance : instances)
     {
         std::memset(&instance, 0, sizeof(OptixInstance));
@@ -409,6 +486,9 @@ void OptixRenderer::rebuildAccelerationStructure()
     instances[1].instanceId = 1u;
     instances[1].sbtOffset = 2u;
     instances[1].traversableHandle = planeGasHandle;
+    instances[2].instanceId = 2u;
+    instances[2].sbtOffset = 4u;
+    instances[2].traversableHandle = meshGasHandle;
 
     CUDA_CHECK(cudaMemcpyAsync(
         reinterpret_cast<void*>(dIasInstances),
@@ -527,6 +607,24 @@ void OptixRenderer::createProgramGroups()
     hitPlaneShadowDesc.hitgroup.entryFunctionNameIS = nullptr;
     logSize = sizeof(log);
     OPTIX_CHECK(optixProgramGroupCreate(context, &hitPlaneShadowDesc, 1, &options, log, &logSize, &programGroups.hitPlaneShadow));
+
+    OptixProgramGroupDesc hitMeshRadianceDesc{};
+    hitMeshRadianceDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    hitMeshRadianceDesc.hitgroup.moduleCH = module;
+    hitMeshRadianceDesc.hitgroup.entryFunctionNameCH = "__closesthit__radiance_mesh";
+    hitMeshRadianceDesc.hitgroup.moduleIS = nullptr;
+    hitMeshRadianceDesc.hitgroup.entryFunctionNameIS = nullptr;
+    logSize = sizeof(log);
+    OPTIX_CHECK(optixProgramGroupCreate(context, &hitMeshRadianceDesc, 1, &options, log, &logSize, &programGroups.hitMeshRadiance));
+
+    OptixProgramGroupDesc hitMeshShadowDesc{};
+    hitMeshShadowDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    hitMeshShadowDesc.hitgroup.moduleCH = module;
+    hitMeshShadowDesc.hitgroup.entryFunctionNameCH = "__closesthit__shadow_mesh";
+    hitMeshShadowDesc.hitgroup.moduleIS = nullptr;
+    hitMeshShadowDesc.hitgroup.entryFunctionNameIS = nullptr;
+    logSize = sizeof(log);
+    OPTIX_CHECK(optixProgramGroupCreate(context, &hitMeshShadowDesc, 1, &options, log, &logSize, &programGroups.hitMeshShadow));
 }
 
 void OptixRenderer::createPipeline()
@@ -538,7 +636,9 @@ void OptixRenderer::createPipeline()
         programGroups.hitSphereRadiance,
         programGroups.hitSphereShadow,
         programGroups.hitPlaneRadiance,
-        programGroups.hitPlaneShadow
+        programGroups.hitPlaneShadow,
+        programGroups.hitMeshRadiance,
+        programGroups.hitMeshShadow
     };
 
     OptixPipelineLinkOptions linkOptions{};
@@ -577,11 +677,13 @@ void OptixRenderer::createSbt()
     sbt.missRecordStrideInBytes = sizeof(MissRecord);
     sbt.missRecordCount = static_cast<unsigned int>(missRecords.size());
 
-    std::vector<HitgroupRecord> hitRecords(4);
+    std::vector<HitgroupRecord> hitRecords(6);
     OPTIX_CHECK(optixSbtRecordPackHeader(programGroups.hitSphereRadiance, &hitRecords[0]));
     OPTIX_CHECK(optixSbtRecordPackHeader(programGroups.hitSphereShadow, &hitRecords[1]));
     OPTIX_CHECK(optixSbtRecordPackHeader(programGroups.hitPlaneRadiance, &hitRecords[2]));
     OPTIX_CHECK(optixSbtRecordPackHeader(programGroups.hitPlaneShadow, &hitRecords[3]));
+    OPTIX_CHECK(optixSbtRecordPackHeader(programGroups.hitMeshRadiance, &hitRecords[4]));
+    OPTIX_CHECK(optixSbtRecordPackHeader(programGroups.hitMeshShadow, &hitRecords[5]));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&sbt.hitgroupRecordBase), hitRecords.size() * sizeof(HitgroupRecord)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(sbt.hitgroupRecordBase), hitRecords.data(), hitRecords.size() * sizeof(HitgroupRecord), cudaMemcpyHostToDevice));
     sbt.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
@@ -645,6 +747,12 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.lightPosition = scene.lightPosition;
     params.materials = reinterpret_cast<SphereMaterial*>(dMaterials);
     params.sphereCount = static_cast<int>(scene.spheres.size());
+    params.meshVertices = reinterpret_cast<MeshVertexGpu*>(dMeshVertices);
+    params.meshTriangles = reinterpret_cast<MeshTriangleGpu*>(dMeshTriangles);
+    params.meshMaterials = reinterpret_cast<MeshMaterialGpu*>(dMeshMaterials);
+    params.meshVertexCount = static_cast<unsigned int>(scene.mesh.vertices.size());
+    params.meshTriangleCount = static_cast<unsigned int>(scene.mesh.triangles.size());
+    params.meshMaterialCount = static_cast<unsigned int>(scene.mesh.materials.size());
     params.maxDepth = kMaxReflectionDepth;
 
     CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(dLaunchParams), &params, sizeof(LaunchParams), cudaMemcpyHostToDevice, stream));
@@ -681,6 +789,11 @@ void OptixRenderer::destroy()
         cudaFree(reinterpret_cast<void*>(dPlaneGasBuffer));
         dPlaneGasBuffer = 0;
     }
+    if (dMeshGasBuffer != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dMeshGasBuffer));
+        dMeshGasBuffer = 0;
+    }
     if (dIasBuffer != 0)
     {
         cudaFree(reinterpret_cast<void*>(dIasBuffer));
@@ -715,6 +828,16 @@ void OptixRenderer::destroy()
     {
         optixProgramGroupDestroy(programGroups.hitPlaneShadow);
         programGroups.hitPlaneShadow = nullptr;
+    }
+    if (programGroups.hitMeshShadow != nullptr)
+    {
+        optixProgramGroupDestroy(programGroups.hitMeshShadow);
+        programGroups.hitMeshShadow = nullptr;
+    }
+    if (programGroups.hitMeshRadiance != nullptr)
+    {
+        optixProgramGroupDestroy(programGroups.hitMeshRadiance);
+        programGroups.hitMeshRadiance = nullptr;
     }
     if (programGroups.hitPlaneRadiance != nullptr)
     {
@@ -760,6 +883,26 @@ void OptixRenderer::destroy()
     {
         cudaFree(reinterpret_cast<void*>(dMaterials));
         dMaterials = 0;
+    }
+    if (dMeshMaterials != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dMeshMaterials));
+        dMeshMaterials = 0;
+    }
+    if (dMeshTriangles != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dMeshTriangles));
+        dMeshTriangles = 0;
+    }
+    if (dMeshIndices != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dMeshIndices));
+        dMeshIndices = 0;
+    }
+    if (dMeshVertices != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dMeshVertices));
+        dMeshVertices = 0;
     }
     if (dSphereRadii != 0)
     {

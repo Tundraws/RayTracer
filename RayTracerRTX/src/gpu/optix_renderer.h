@@ -14,6 +14,8 @@ struct ProgramGroups
     OptixProgramGroup hitSphereShadow = nullptr;
     OptixProgramGroup hitPlaneRadiance = nullptr;
     OptixProgramGroup hitPlaneShadow = nullptr;
+    OptixProgramGroup hitMeshRadiance = nullptr;
+    OptixProgramGroup hitMeshShadow = nullptr;
 };
 
 class OptixRenderer
@@ -47,24 +49,34 @@ private:
     CUdeviceptr dMaterials = 0;
     CUdeviceptr dPlaneVertices = 0;
     CUdeviceptr dPlaneIndices = 0;
+    CUdeviceptr dMeshVertices = 0;
+    CUdeviceptr dMeshIndices = 0;
+    CUdeviceptr dMeshTriangles = 0;
+    CUdeviceptr dMeshMaterials = 0;
     CUdeviceptr dSphereGasBuffer = 0;
     CUdeviceptr dPlaneGasBuffer = 0;
+    CUdeviceptr dMeshGasBuffer = 0;
     CUdeviceptr dIasBuffer = 0;
     CUdeviceptr dIasInstances = 0;
     CUdeviceptr dLaunchParams = 0;
     OptixTraversableHandle sphereGasHandle = 0;
     OptixTraversableHandle planeGasHandle = 0;
+    OptixTraversableHandle meshGasHandle = 0;
     OptixTraversableHandle iasHandle = 0;
     std::vector<uint32_t> sphereFlags;
     std::vector<uint32_t> planeFlags;
+    std::vector<uint32_t> meshFlags;
     OptixBuildInput sphereBuildInput = {};
     OptixBuildInput planeBuildInput = {};
+    OptixBuildInput meshBuildInput = {};
     OptixBuildInput iasBuildInput = {};
     OptixAccelBuildOptions sphereAccelOptions = {};
     OptixAccelBuildOptions planeAccelOptions = {};
+    OptixAccelBuildOptions meshAccelOptions = {};
     OptixAccelBuildOptions iasAccelOptions = {};
     OptixAccelBufferSizes sphereGasSizes = {};
     OptixAccelBufferSizes planeGasSizes = {};
+    OptixAccelBufferSizes meshGasSizes = {};
     OptixAccelBufferSizes iasSizes = {};
     cudaEvent_t frameStart = nullptr;
     cudaEvent_t frameStop = nullptr;

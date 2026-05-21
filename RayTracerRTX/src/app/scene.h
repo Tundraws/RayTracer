@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../common/rtx_shared.h"
+#include "mesh.h"
 
 #include <vector>
 
@@ -14,6 +15,7 @@ struct SceneState
 {
     std::vector<SphereGeometry> spheres;
     std::vector<SphereMaterial> materials;
+    MeshData mesh;
     float3 lightPosition;
     int selectedSphere = 0;
 };
