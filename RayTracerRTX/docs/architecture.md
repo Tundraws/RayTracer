@@ -27,6 +27,8 @@ flowchart LR
     Renderer --> Device["OptiX device programs"]
     TriangleGAS --> Device
     Device --> Framebuffer["CUDA framebuffer"]
+    Device --> Post["Tone mapping + gamma"]
+    Post --> Framebuffer
     Framebuffer --> App
 ```
 
@@ -70,6 +72,7 @@ flowchart TD
     Primary --> HitMesh{"Triangle mesh hit?"}
     Primary --> HitPlane{"Plane hit?"}
     Primary --> Miss["__miss__radiance sky color"]
+    Miss --> Environment["Gradient environment lighting"]
     HitSphere --> Shadow["Point-light shadow ray"]
     HitMesh --> MeshClosestHit["Mesh closest-hit shader"]
     MeshClosestHit --> MeshMaterial{"Mesh material type"}
@@ -92,7 +95,7 @@ flowchart TD
     Diffuse --> Output["setRadiancePayload"]
     Mirror --> Output
     PlaneLight --> Output
-    Miss --> Output
+    Environment --> Output
 ```
 
 ## Data Boundaries

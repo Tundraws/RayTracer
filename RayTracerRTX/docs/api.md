@@ -197,3 +197,16 @@ Declared in `src/gpu/optix_renderer.h`.
 | `createSbt()` | Builds shader binding table records |
 | `rebuildAccelerationStructure()` | Builds GAS/IAS acceleration structures |
 
+## Output Processing
+
+Final framebuffer colors are processed in the OptiX device program before
+conversion to `uchar4`:
+
+- HDR values are clamped to a bounded range;
+- Reinhard tone mapping compresses bright values;
+- gamma correction with gamma 2.2 converts linear color to display color.
+
+The miss shader uses a procedural gradient environment with a horizon glow and
+small sun highlight. Reflective materials sample this environment through their
+existing reflection rays.
+

@@ -82,6 +82,41 @@ static __forceinline__ __device__ float3 lerp3(const float3 a, const float3 b, c
     return add3(mul3(a, 1.0f - t), mul3(b, t));
 }
 
+static __forceinline__ __device__ float3 environmentColor(const float3 rayDir)
+{
+    const float t = saturate1(0.5f * (rayDir.y + 1.0f));
+    const float horizonGlow = expf(-6.0f * fabsf(rayDir.y));
+    const float sun = powf(fmaxf(dot3(rayDir, normalize3(make_vec(0.35f, 0.55f, -0.75f))), 0.0f), 96.0f);
+    const float3 ground = make_vec(0.20f, 0.22f, 0.21f);
+    const float3 horizon = make_vec(0.62f, 0.70f, 0.78f);
+    const float3 zenith = make_vec(0.12f, 0.18f, 0.30f);
+    const float3 sky = lerp3(horizon, zenith, t * t);
+    const float3 base = rayDir.y < 0.0f ? lerp3(ground, horizon, saturate1(rayDir.y + 1.0f)) : sky;
+    return add3(add3(base, mul3(make_vec(0.95f, 0.74f, 0.42f), 0.18f * horizonGlow)), mul3(make_vec(1.0f, 0.86f, 0.58f), 1.2f * sun));
+}
+
+static __forceinline__ __device__ float3 reinhardToneMapDevice(const float3 color)
+{
+    return make_vec(
+        color.x / (1.0f + color.x),
+        color.y / (1.0f + color.y),
+        color.z / (1.0f + color.z));
+}
+
+static __forceinline__ __device__ float3 gammaCorrectDevice(const float3 color)
+{
+    const float invGamma = 1.0f / 2.2f;
+    return make_vec(
+        powf(saturate1(color.x), invGamma),
+        powf(saturate1(color.y), invGamma),
+        powf(saturate1(color.z), invGamma));
+}
+
+static __forceinline__ __device__ float3 postProcessColor(const float3 color)
+{
+    return gammaCorrectDevice(reinhardToneMapDevice(clamp3(color, 0.0f, 16.0f)));
+}
+
 static __forceinline__ __device__ float fresnelSchlick(const float cosTheta, const float f0)
 {
     const float m = saturate1(1.0f - cosTheta);
@@ -161,7 +196,7 @@ static __forceinline__ __device__ float3 traceRadiance(
 
 static __forceinline__ __device__ uchar4 toColor(const float3 color)
 {
-    const float3 c = clamp3(color, 0.0f, 1.0f);
+    const float3 c = postProcessColor(color);
     return make_uchar4(
         static_cast<unsigned char>(c.x * 255.0f),
         static_cast<unsigned char>(c.y * 255.0f),
@@ -192,8 +227,9 @@ static __forceinline__ __device__ float3 shadeMaterial(
         0.001f,
         lightDistance - 0.01f);
     const float visibility = visible ? 1.0f : 0.0f;
+    const float3 env = environmentColor(normal);
 
-    const float ambient = 0.18f;
+    const float ambient = 0.14f;
     const float diffuseShadowFloor = 0.34f;
     const float mirrorShadowFloor = 0.50f;
     const float roughness = fmaxf(saturate1(material.roughness), 0.02f);
@@ -217,6 +253,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
     float3 localColor = add3(
         mul3(diffuseColor, ambient + diffuseLightWeight * diffuse),
         mul3(make_vec(1.0f, 1.0f, 1.0f), diffuseSpecularWeight * specular));
+    localColor = add3(localColor, mul3(make_vec(diffuseColor.x * env.x, diffuseColor.y * env.y, diffuseColor.z * env.z), 0.10f));
 
     if (material.materialType == MaterialMirror)
     {
@@ -350,12 +387,7 @@ extern "C" __global__ void __raygen__rg()
 extern "C" __global__ void __miss__radiance()
 {
     const float3 rayDir = normalize3(optixGetWorldRayDirection());
-    const float t = saturate1(0.5f * (rayDir.y + 1.0f));
-    const float tt = t * t;
-    const float3 horizon = make_vec(0.231f, 0.251f, 0.251f);
-    const float3 zenith = make_vec(0.333f, 0.341f, 0.341f);
-    const float3 sky = add3(mul3(horizon, 1.0f - tt), mul3(zenith, tt));
-    setRadiancePayload(sky);
+    setRadiancePayload(environmentColor(rayDir));
 }
 
 extern "C" __global__ void __miss__shadow()
@@ -436,7 +468,7 @@ extern "C" __global__ void __closesthit__radiance_plane()
     const float distanceToCamera = sqrtf(dot3(toCamera, toCamera));
     const float fog = saturate1((distanceToCamera - 18.0f) / 70.0f);
     const float fogCurve = fog * fog * (3.0f - 2.0f * fog);
-    const float3 fadeToSky = make_vec(0.231f, 0.251f, 0.251f);
+    const float3 fadeToSky = environmentColor(normalize3(sub3(hitPoint, params.cameraPosition)));
     localColor = lerp3(localColor, fadeToSky, 0.30f * fogCurve);
 
     setRadiancePayload(localColor);

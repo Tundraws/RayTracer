@@ -3,6 +3,10 @@
 #include <cuda_runtime.h>
 #include <optix.h>
 
+#if !defined(__CUDACC_RTC__)
+#include <cmath>
+#endif
+
 enum MaterialType
 {
     MaterialDiffuse = 0,
@@ -10,6 +14,35 @@ enum MaterialType
     MaterialMetal = 2,
     MaterialDielectric = 3
 };
+
+#if !defined(__CUDACC_RTC__)
+inline float clamp01(const float value)
+{
+    return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+}
+
+inline float3 reinhardToneMap(const float3 color)
+{
+    return make_float3(
+        color.x / (1.0f + color.x),
+        color.y / (1.0f + color.y),
+        color.z / (1.0f + color.z));
+}
+
+inline float3 gammaCorrect(const float3 color, const float gamma = 2.2f)
+{
+    const float invGamma = 1.0f / gamma;
+    return make_float3(
+        std::pow(clamp01(color.x), invGamma),
+        std::pow(clamp01(color.y), invGamma),
+        std::pow(clamp01(color.z), invGamma));
+}
+
+inline float3 toneMapAndGammaCorrect(const float3 color)
+{
+    return gammaCorrect(reinhardToneMap(color));
+}
+#endif
 
 struct SphereMaterial
 {

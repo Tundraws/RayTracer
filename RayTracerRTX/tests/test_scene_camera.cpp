@@ -556,6 +556,17 @@ void testCameraScaleIncreasesWithFov(TestContext& t)
     t.expect(scaleWide > scaleNarrow, "Camera scale should increase with larger FOV.");
 }
 
+void testToneMappingAndGammaCorrection(TestContext& t)
+{
+    const float3 mapped = toneMapAndGammaCorrect(make_float3(4.0f, 1.0f, 0.25f));
+    t.expect(mapped.x > mapped.y, "Tone mapping should preserve channel ordering.");
+    t.expect(mapped.x <= 1.0f && mapped.y <= 1.0f && mapped.z <= 1.0f, "Tone mapping output should stay displayable.");
+    t.expect(mapped.z > 0.0f, "Gamma correction should keep positive low-intensity color visible.");
+
+    const float3 clamped = toneMapAndGammaCorrect(make_float3(-1.0f, 0.0f, 0.0f));
+    t.expect(almostEqual(clamped.x, 0.0f), "Tone mapping should clamp negative output before gamma.");
+}
+
 bool runGpuSmokeTest(TestContext& t)
 {
 #if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
@@ -707,6 +718,7 @@ int main(int argc, char** argv)
     runTest("Camera basis", testCameraBasis);
     runTest("Camera aspect fallback", testCameraAspectFallback);
     runTest("Camera scale vs FOV", testCameraScaleIncreasesWithFov);
+    runTest("Tone mapping and gamma correction", testToneMappingAndGammaCorrection);
     runTest("OBJ loader triangle with normals", testObjLoaderTriangleWithNormals);
     runTest("OBJ loader multiple materials", testObjLoaderMultipleMaterials);
     runTest("OBJ loader mirror material name mapping", testObjLoaderMirrorMaterialNameMapping);
