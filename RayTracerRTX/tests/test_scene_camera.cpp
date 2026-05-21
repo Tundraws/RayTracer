@@ -17,6 +17,10 @@
 #include <string>
 #include <vector>
 
+#ifndef RAYTRACERRTX_SOURCE_DIR
+#define RAYTRACERRTX_SOURCE_DIR ""
+#endif
+
 namespace
 {
 float length3(const float3& v)
@@ -38,6 +42,31 @@ std::filesystem::path writeFixtureFile(const std::string& name, const std::strin
     std::ofstream file(path, std::ios::binary);
     file << content;
     return path;
+}
+
+std::filesystem::path findDemoObjAsset()
+{
+    const std::filesystem::path sourceDir = RAYTRACERRTX_SOURCE_DIR;
+    const std::filesystem::path fromSource = sourceDir.empty()
+        ? std::filesystem::path{}
+        : sourceDir.parent_path() / "assets" / "meshes" / "demo.obj";
+
+    const std::filesystem::path candidates[] = {
+        fromSource,
+        std::filesystem::path("RayTracerRTX") / "assets" / "meshes" / "demo.obj",
+        std::filesystem::path("assets") / "meshes" / "demo.obj",
+        std::filesystem::path("..") / "assets" / "meshes" / "demo.obj"
+    };
+
+    for (const std::filesystem::path& candidate : candidates)
+    {
+        if (!candidate.empty() && std::filesystem::exists(candidate))
+        {
+            return candidate;
+        }
+    }
+
+    return {};
 }
 
 void testObjLoaderTriangleWithNormals(TestContext& t)
@@ -209,6 +238,23 @@ void testObjLoaderSingleTriangleBoundary(TestContext& t)
     t.expect(result.mesh.triangles[0].i2 == 2, "Single triangle third index should be 2.");
 }
 
+void testDemoObjAssetLoads(TestContext& t)
+{
+    const std::filesystem::path objPath = findDemoObjAsset();
+    t.expect(!objPath.empty(), "Demo OBJ asset must exist.");
+    if (objPath.empty())
+    {
+        return;
+    }
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "Demo OBJ asset should load.");
+    t.expect(result.mesh.vertices.size() > 0, "Demo OBJ should contain vertices.");
+    t.expect(result.mesh.triangles.size() > 0, "Demo OBJ should contain triangles.");
+    t.expect(result.mesh.materials.size() >= 4, "Demo OBJ should load default plus named MTL materials.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Demo OBJ material indices should be valid.");
+}
+
 void testDefaultScene(TestContext& t)
 {
     const SceneState scene = makeDefaultScene();
@@ -228,6 +274,15 @@ void testDefaultScene(TestContext& t)
         t.expect(material.materialType == MaterialDiffuse, "All default spheres should start as diffuse.");
     }
     t.expect(scene.selectedSphere == 0, "Default selected sphere should be index 0.");
+}
+
+void testDefaultSceneMeshGeometry(TestContext& t)
+{
+    const SceneState scene = makeDefaultScene();
+    t.expect(scene.mesh.vertices.size() > 0, "Default mesh vertex count should be positive.");
+    t.expect(scene.mesh.triangles.size() > 0, "Default mesh triangle count should be positive.");
+    t.expect(!scene.mesh.materials.empty(), "Default mesh material count should be positive.");
+    t.expect(hasValidMeshMaterialIndices(scene.mesh), "Default mesh material indices should stay in range.");
 }
 
 void testToggleMaterial(TestContext& t)
@@ -529,6 +584,8 @@ int main(int argc, char** argv)
     runTest("OBJ loader unknown lines ignored", testObjLoaderUnknownLinesIgnored);
     runTest("OBJ loader material fallback when MTL missing", testObjLoaderMaterialFallbackWhenMtlMissing);
     runTest("OBJ loader single triangle boundary", testObjLoaderSingleTriangleBoundary);
+    runTest("Demo OBJ asset loads", testDemoObjAssetLoads);
+    runTest("Default scene mesh geometry", testDefaultSceneMeshGeometry);
 
     ++testsRun;
     if (runGpuSmokeTest(t))
