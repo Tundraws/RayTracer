@@ -4,6 +4,7 @@
 
 - GPU-based real-time ray tracing implemented (`C++ + CUDA + OptiX`)
 - Functional scene: geometry, materials, light, shadows, camera controls
+- Scene description with analytic primitives and OBJ polygon meshes
 - Git-based development history with clear commits
 - Tests (unit + at least one GPU smoke/integration check)
 - Static analysis and quality report
@@ -23,6 +24,14 @@
   - normalized and orthogonal basis vectors
   - aspect ratio fallback
   - FOV influence on camera scale
+- Unit tests for OBJ mesh logic:
+  - loader success case
+  - missing file
+  - invalid face rejection
+  - missing normals fallback
+  - multiple material mapping through MTL
+  - default scene mesh presence
+  - mesh material index validation
 - GPU smoke test:
   - renderer initialization
   - one-frame render
@@ -50,6 +59,7 @@
 | CI/CD | `.github/workflows/coursework-check.yml` |
 | Unit tests | `tests/test_scene_camera.cpp` |
 | GPU smoke test | `tests/RayTracerRTX.Tests.vcxproj` |
+| Demo OBJ mesh | `assets/meshes/demo.obj`, `assets/meshes/demo.mtl` |
 | Docker / Compose | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
 | README | `README.md`, `RayTracerRTX/README.md` |
 | Architecture diagrams | `docs/architecture.md` |
@@ -61,7 +71,6 @@
 
 ## Remaining before final submission
 
-1. Confirm final mirror material appearance in the interactive application.
-2. Commit final visual shader changes after visual acceptance.
-3. Capture final application screenshots for the report.
-4. Re-run native tests and Docker check before final GitHub submission.
+1. Capture final application screenshots for the report.
+2. Re-run native tests and Docker check before final GitHub submission.
+3. Push final `main` branch to GitHub.

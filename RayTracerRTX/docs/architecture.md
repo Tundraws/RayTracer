@@ -11,13 +11,18 @@ flowchart LR
     Main["maingpu.cpp"] --> App["Application loop"]
     App --> Input["Input handling"]
     App --> Camera["CameraState / updateCameraBasis"]
+    ObjLoader["ObjLoader"] --> MeshData["MeshData"]
+    MeshData --> Scene
     App --> Scene["SceneState"]
     Scene --> Materials["SphereMaterial"]
+    Scene --> MeshMaterials["Mesh materials"]
     App --> Renderer["OptixRenderer"]
     Camera --> Renderer
     Scene --> Renderer
+    Renderer --> TriangleGAS["Triangle GAS"]
     Renderer --> Shared["LaunchParams / rtx_shared.h"]
     Renderer --> Device["OptiX device programs"]
+    TriangleGAS --> Device
     Device --> Framebuffer["CUDA framebuffer"]
     Framebuffer --> App
 ```
@@ -28,6 +33,7 @@ flowchart LR
 sequenceDiagram
     participant User
     participant App as GLFW application
+    participant ObjLoader as ObjLoader
     participant Scene as SceneState
     participant Renderer as OptixRenderer
     participant CUDA as CUDA buffers
@@ -35,11 +41,13 @@ sequenceDiagram
     participant GPU as RTX GPU
 
     User->>App: Keyboard and mouse input
+    ObjLoader->>Scene: Load OBJ vertices, normals, triangles, MTL materials
     App->>Scene: Move sphere, light, or toggle material
     App->>Renderer: renderFrame(scene, camera)
-    Renderer->>CUDA: Upload materials and LaunchParams
+    Renderer->>CUDA: Upload sphere materials, mesh buffers, and LaunchParams
+    Renderer->>OptiX: Build sphere GAS + triangle GAS + IAS
     Renderer->>OptiX: optixLaunch
-    OptiX->>GPU: Ray generation, hit, miss, shadow, reflection programs
+    OptiX->>GPU: Ray generation, sphere hit, mesh closest-hit, miss, shadow, reflection programs
     GPU-->>CUDA: Write uchar4 framebuffer
     Renderer->>CUDA: Copy framebuffer to host
     Renderer-->>App: hostPixels + gpuTimeMs
@@ -52,9 +60,16 @@ sequenceDiagram
 flowchart TD
     RG["__raygen__rg"] --> Primary["traceRadiance primary ray"]
     Primary --> HitSphere{"Sphere hit?"}
+    Primary --> HitMesh{"Triangle mesh hit?"}
     Primary --> HitPlane{"Plane hit?"}
     Primary --> Miss["__miss__radiance sky color"]
     HitSphere --> Shadow["Point-light shadow ray"]
+    HitMesh --> MeshClosestHit["Mesh closest-hit shader"]
+    MeshClosestHit --> MeshMaterial{"Mesh material type"}
+    MeshMaterial --> MeshDiffuse["MTL Kd diffuse lighting + shadow"]
+    MeshMaterial --> MeshMirror["Mirror reflection ray"]
+    MeshMirror --> Depth
+    MeshDiffuse --> Output
     Shadow --> Material{"Material type"}
     Material --> Diffuse["Diffuse lighting + hard shadow"]
     Material --> Mirror["Reflection ray"]
@@ -86,10 +101,10 @@ flowchart LR
 | Area | Files | Responsibility |
 |---|---|---|
 | Application loop | `src/app/maingpu.cpp`, `src/app/application.*` | Window creation, input, scene updates, presentation |
-| Scene model | `src/app/scene.*`, `src/app/material.*` | Spheres, materials, selected object, light movement and clamping |
+| Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*` | Spheres, OBJ mesh data, materials, selected object, light movement and clamping |
 | Camera | `src/app/camera.*` | Camera state and basis vectors for ray generation |
 | Shared GPU data | `src/common/rtx_shared.h` | Host/device structures used by CUDA and OptiX |
-| Renderer host side | `src/gpu/optix_renderer.*` | CUDA resources, OptiX context, acceleration structures, SBT, pipeline and launch |
-| Renderer device side | `src/gpu/optix_device_programs.h` | Ray generation, hit programs, miss programs, shadow and reflection logic |
+| Renderer host side | `src/gpu/optix_renderer.*` | CUDA resources, OptiX context, sphere GAS, triangle GAS, IAS, SBT, pipeline and launch |
+| Renderer device side | `src/gpu/optix_device_programs.h` | Ray generation, sphere hit, mesh closest-hit shader, miss programs, shadow and reflection logic |
 | Tests | `tests/*` | CPU unit tests and native GPU smoke test |
 

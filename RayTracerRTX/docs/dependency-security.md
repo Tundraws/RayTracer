@@ -16,6 +16,11 @@ security limitations for the coursework project.
 | OpenGL | Image presentation | Used to display the rendered framebuffer |
 | Docker / Docker Compose | Reproducible checks | Runs documentation/structure checks and CPU-only tests |
 
+The OBJ mesh path does not add external runtime dependencies. OBJ and MTL files
+are parsed by the local `src/app/obj_loader.*` implementation. Supported input
+is limited to vertices, normals, triangular faces, `mtllib`, `usemtl`, and MTL
+`Kd` values with a simple material-name mapping for mirror materials.
+
 ## Dependency Check Approach
 
 The project does not use a package manager lock file such as `package-lock.json`,
@@ -30,7 +35,8 @@ The practical dependency check is:
    source constants.
 3. Avoid downloading dependencies during application startup.
 4. Use Docker only for reproducible source, documentation and CPU-test checks.
-5. Keep vendored GLFW files limited to the required include/library paths.
+5. Verify demo OBJ/MTL assets and OBJ loader files as part of the coursework check.
+6. Keep vendored GLFW files limited to the required include/library paths.
 
 ## Security Controls
 
@@ -49,4 +55,3 @@ The practical dependency check is:
 - Confirm the installed NVIDIA driver supports the target OptiX version.
 - Re-run native GPU smoke test after GPU driver or SDK updates.
 - Re-run Docker CPU check before final GitHub submission.
-

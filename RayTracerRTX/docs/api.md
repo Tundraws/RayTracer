@@ -32,6 +32,7 @@ Declared in `src/app/scene.h`.
 |---|---|---|
 | `spheres` | `std::vector<SphereGeometry>` | Scene geometry controlled by the CPU |
 | `materials` | `std::vector<SphereMaterial>` | Per-sphere material data uploaded to GPU |
+| `mesh` | `MeshData` | Polygonal OBJ mesh loaded from `assets/meshes/demo.obj` or fallback mesh |
 | `lightPosition` | `float3` | Point-light position used by hit programs |
 | `selectedSphere` | `int` | Index used by interactive controls |
 
@@ -44,6 +45,38 @@ Declared in `src/app/scene.h`.
 | `moveSelectedSphere(SceneState&, float3)` | Moves selected sphere and applies bounds |
 | `toggleSelectedMaterial(SceneState&)` | Switches selected sphere between diffuse and mirror material |
 | `moveLight(SceneState&, float3)` | Moves the light and applies bounds |
+
+## OBJ Mesh API
+
+### `loadObjMesh(...)`
+
+Declared in `src/app/obj_loader.h`.
+
+Loads a simple OBJ mesh description into `MeshData`. The loader supports:
+
+- `v` positions;
+- `vn` normals;
+- triangular `f` faces;
+- `mtllib` and `usemtl` material references;
+- MTL `Kd` diffuse color values;
+- multiple named materials.
+
+Material names containing `mirror` are mapped to `MaterialMirror`; all other
+OBJ materials are mapped to `MaterialDiffuse`. The loader is intentionally
+limited to the listed OBJ and MTL records.
+
+### `MeshData`
+
+Declared in `src/app/mesh.h`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `vertices` | `std::vector<MeshVertex>` | Packed mesh vertices with position and normal |
+| `triangles` | `std::vector<MeshTriangle>` | Triangle indices plus material index |
+| `materials` | `std::vector<MeshMaterial>` | OBJ/MTL materials used by mesh triangles |
+
+`hasValidMeshMaterialIndices(const MeshData&)` validates that every triangle
+material index is inside the material array.
 
 ## Camera API
 
@@ -98,6 +131,9 @@ Uploaded to the GPU before each OptiX launch.
 | `cameraScale`, `cameraAspect` | Projection parameters |
 | `lightPosition` | Point-light input for hit programs |
 | `materials`, `sphereCount` | Per-sphere material data |
+| `meshVertices`, `meshVertexCount` | OBJ mesh vertex buffer |
+| `meshTriangles`, `meshTriangleCount` | OBJ mesh triangle buffer with material indices |
+| `meshMaterials`, `meshMaterialCount` | OBJ mesh material buffer |
 | `maxDepth` | Recursive reflection depth limit |
 
 ## Renderer API

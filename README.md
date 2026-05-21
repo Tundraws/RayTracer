@@ -2,13 +2,19 @@
 
 Интерактивный трассировщик лучей в реальном времени на `C++`, `CUDA` и `NVIDIA OptiX`.
 
-Проект рендерит простую 3D-сцену (сферы и плоскость) с поддержкой:
+Проект рендерит простую 3D-сцену (сферы, плоскость и OBJ mesh) с поддержкой:
 
 - диффузных и зеркальных материалов;
 - направленного освещения и теней;
 - отражений (для зеркального материала);
 - интерактивного управления камерой и параметрами сцены;
 - отображения FPS и времени кадра/GPU.
+
+Program input is represented as a scene description with analytic primitives
+and polygonal OBJ meshes. The OBJ path supports vertices, normals, triangular
+faces, and multiple materials through MTL files. MTL `Kd` values define diffuse
+colors; material names containing `mirror` are mapped to the mirror material,
+while other OBJ materials use diffuse shading.
 
 ## Технологии
 

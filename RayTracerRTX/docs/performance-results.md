@@ -25,6 +25,9 @@ renders a fixed number of frames for each resolution. Reported frame time is
 measured on the host around `OptixRenderer::renderFrame`; reported GPU time is
 measured with CUDA events inside the renderer.
 
+The benchmark scene includes analytic primitives and the demo OBJ mesh loaded
+from `assets/meshes/demo.obj` with multiple MTL materials.
+
 The benchmark is headless and does not include GLFW window presentation, HUD
 drawing, or user input processing. Interactive FPS in the desktop app may differ
 because it includes display presentation and VSync settings.
