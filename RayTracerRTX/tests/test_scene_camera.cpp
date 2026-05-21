@@ -142,6 +142,77 @@ void testObjLoaderMirrorMaterialNameMapping(TestContext& t)
     t.expect(result.mesh.materials[1].materialType == MaterialMirror, "Material name containing mirror should map to MaterialMirror.");
 }
 
+void testObjLoaderExtendedMtlParameters(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "extended_mtl.obj",
+        "mtllib extended_mtl.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl mat_metal\n"
+        "f 1 2 3\n");
+
+    writeFixtureFile(
+        "extended_mtl.mtl",
+        "newmtl mat_metal\n"
+        "Kd 0.7 0.6 0.5\n"
+        "Ks 0.9 0.8 0.7\n"
+        "Ns 100\n"
+        "Ni 1.7\n"
+        "d 0.65\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with extended MTL material should load.");
+    t.expect(result.mesh.materials[1].materialType == MaterialMetal, "Material name containing metal should map to MaterialMetal.");
+    t.expect(almostEqual(result.mesh.materials[1].color.x, 0.7f), "MTL Kd should set base color.");
+    t.expect(almostEqual(result.mesh.materials[1].specularColor.x, 0.9f), "MTL Ks should set specular color.");
+    t.expect(result.mesh.materials[1].roughness > 0.02f && result.mesh.materials[1].roughness < 0.2f, "MTL Ns should map to low roughness for glossy material.");
+    t.expect(almostEqual(result.mesh.materials[1].ior, 1.7f), "MTL Ni should set index of refraction.");
+    t.expect(almostEqual(result.mesh.materials[1].alpha, 0.65f), "MTL d should set alpha.");
+}
+
+void testObjLoaderDielectricMaterialNameMapping(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "glass_material.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl mat_glass\n"
+        "f 1 2 3\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with glass material name should load.");
+    t.expect(result.mesh.materials[1].materialType == MaterialDielectric, "Material name containing glass should map to MaterialDielectric.");
+}
+
+void testObjLoaderMaterialParameterClamping(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "clamped_mtl.obj",
+        "mtllib clamped_mtl.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl mat_glass\n"
+        "f 1 2 3\n");
+
+    writeFixtureFile(
+        "clamped_mtl.mtl",
+        "newmtl mat_glass\n"
+        "Ns 10000\n"
+        "Ni 8\n"
+        "d -2\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with out-of-range material parameters should load.");
+    t.expect(result.mesh.materials[1].roughness >= 0.02f && result.mesh.materials[1].roughness <= 1.0f, "Roughness should be clamped.");
+    t.expect(almostEqual(result.mesh.materials[1].ior, 2.8f), "IOR should be clamped to supported upper bound.");
+    t.expect(almostEqual(result.mesh.materials[1].alpha, 0.0f), "Alpha should be clamped to supported lower bound.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Material indices should remain valid after extended MTL parsing.");
+}
+
 void testObjLoaderMissingNormalsFallback(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -639,6 +710,9 @@ int main(int argc, char** argv)
     runTest("OBJ loader triangle with normals", testObjLoaderTriangleWithNormals);
     runTest("OBJ loader multiple materials", testObjLoaderMultipleMaterials);
     runTest("OBJ loader mirror material name mapping", testObjLoaderMirrorMaterialNameMapping);
+    runTest("OBJ loader extended MTL parameters", testObjLoaderExtendedMtlParameters);
+    runTest("OBJ loader dielectric material name mapping", testObjLoaderDielectricMaterialNameMapping);
+    runTest("OBJ loader material parameter clamping", testObjLoaderMaterialParameterClamping);
     runTest("OBJ loader missing normals fallback", testObjLoaderMissingNormalsFallback);
     runTest("OBJ loader empty file", testObjLoaderEmptyFile);
     runTest("OBJ loader invalid face", testObjLoaderInvalidFace);

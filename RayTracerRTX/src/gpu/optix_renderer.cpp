@@ -312,11 +312,18 @@ void OptixRenderer::createScene(const SceneState& scene)
     meshMaterials.reserve(scene.mesh.materials.size());
     for (const MeshMaterial& material : scene.mesh.materials)
     {
-        meshMaterials.push_back(MeshMaterialGpu{material.color, material.materialType});
+        meshMaterials.push_back(MeshMaterialGpu{
+            material.color,
+            material.materialType,
+            material.specularColor,
+            material.roughness,
+            material.ior,
+            material.alpha});
     }
     if (meshMaterials.empty())
     {
-        meshMaterials.push_back(MeshMaterialGpu{make_float3(0.8f, 0.8f, 0.78f), MaterialDiffuse});
+        meshMaterials.push_back(MeshMaterialGpu{});
+        meshMaterials.back().color = make_float3(0.8f, 0.8f, 0.78f);
     }
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshVertices), meshVertices.size() * sizeof(MeshVertexGpu)));

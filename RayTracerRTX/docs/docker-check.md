@@ -11,7 +11,7 @@ The Docker setup provides a reproducible coursework verification environment for
 - demo OBJ mesh and MTL asset checks;
 - demo JSON scene config checks;
 - OBJ loader source-file checks;
-- CPU-only unit tests for scene, camera, material, and OBJ loader logic.
+- CPU-only unit tests for scene, camera, material, extended MTL, and OBJ loader logic.
 
 The RTX GUI application itself is not launched in Docker because it depends on a
 Windows desktop session, GLFW window creation, NVIDIA OptiX, CUDA, and RTX GPU
@@ -77,7 +77,7 @@ raytracerrtx-coursework-check:latest
 passing:
 
 ```text
-All tests passed. Tests: 23, skipped: 1
+All tests passed. Tests: 30, skipped: 1
 ```
 
 The skipped test is the GPU smoke test. This is expected in Docker because the

@@ -26,7 +26,9 @@ measured on the host around `OptixRenderer::renderFrame`; reported GPU time is
 measured with CUDA events inside the renderer.
 
 The benchmark scene includes analytic primitives and the demo OBJ mesh loaded
-from `assets/meshes/demo.obj` with multiple MTL materials.
+from `assets/meshes/demo.obj` with multiple MTL materials. The material path
+includes diffuse, mirror, metal and dielectric shader branches, though the demo
+asset currently uses diffuse and mirror assignments.
 
 The benchmark is headless and does not include GLFW window presentation, HUD
 drawing, or user input processing. Interactive FPS in the desktop app may differ
@@ -36,14 +38,14 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low | 640x360 | 671.00 | 1.49 | 1.46 |
-| HD | 1280x720 | 230.78 | 4.33 | 4.31 |
-| Full HD | 1920x1080 | 105.03 | 9.52 | 9.49 |
+| Low | 640x360 | 689.39 | 1.45 | 1.43 |
+| HD | 1280x720 | 221.47 | 4.52 | 4.49 |
+| Full HD | 1920x1080 | 108.40 | 9.22 | 9.19 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD averages about 105 FPS, so the current
+with the OBJ mesh scene enabled. Full HD averages about 108 FPS, so the current
 scene remains above the 60 FPS target. The small extra mesh cost is acceptable
 for the coursework demo because average GPU time remains below 10 ms at
 1920x1080, under the 16.67 ms frame budget for 60 FPS.

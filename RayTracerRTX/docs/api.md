@@ -85,12 +85,15 @@ Loads a simple OBJ mesh description into `MeshData`. The loader supports:
 - `vn` normals;
 - triangular `f` faces;
 - `mtllib` and `usemtl` material references;
-- MTL `Kd` diffuse color values;
+- MTL `Kd`, `Ks`, `Ns`, `Ni`, and `d` material values;
 - multiple named materials.
 
 Material names containing `mirror` are mapped to `MaterialMirror`; all other
-OBJ materials are mapped to `MaterialDiffuse`. The loader is intentionally
-limited to the listed OBJ and MTL records.
+OBJ materials are mapped by name: `metal` to `MaterialMetal`, `glass` or
+`dielectric` to `MaterialDielectric`, and the remaining names to
+`MaterialDiffuse`. `Ns` is converted to a clamped roughness value, `Ni` stores
+index of refraction, `d` stores alpha, and `Ks` stores specular color. The
+loader is intentionally limited to the listed OBJ and MTL records.
 
 ### `MeshData`
 
@@ -138,6 +141,8 @@ Declared in `src/common/rtx_shared.h`.
 |---|---|
 | `MaterialDiffuse` | Local diffuse shading with shadow and specular component |
 | `MaterialMirror` | Recursive mirror reflection with depth limit |
+| `MaterialMetal` | Tinted reflective material with roughness-controlled reflection |
+| `MaterialDielectric` | Simple glass/dielectric approximation with Fresnel and refraction |
 
 ### `SphereMaterial`
 
@@ -145,6 +150,10 @@ Declared in `src/common/rtx_shared.h`.
 |---|---|---|
 | `color` | `float3` | Base color for diffuse material |
 | `materialType` | `int` | Material type from `MaterialType` |
+| `specularColor` | `float3` | Specular tint, parsed from OBJ MTL `Ks` for mesh materials |
+| `roughness` | `float` | Reflection blur approximation, parsed from MTL `Ns` for mesh materials |
+| `ior` | `float` | Index of refraction, parsed from MTL `Ni` for mesh materials |
+| `alpha` | `float` | Opacity/transparency control, parsed from MTL `d` for mesh materials |
 
 ### `LaunchParams`
 

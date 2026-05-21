@@ -13,8 +13,10 @@
 Program input is represented as a scene description with analytic primitives
 and polygonal OBJ meshes. The OBJ path supports vertices, normals, triangular
 faces, and multiple materials through MTL files. MTL `Kd` values define diffuse
-colors; material names containing `mirror` are mapped to the mirror material,
-while other OBJ materials use diffuse shading.
+colors; `Ks`, `Ns`, `Ni`, and `d` provide specular color, roughness/glossiness,
+index of refraction, and alpha values. Material names containing `mirror`,
+`metal`, `glass`, or `dielectric` select the corresponding simplified material
+model; other OBJ materials use diffuse shading.
 
 ## Технологии
 

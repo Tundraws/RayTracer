@@ -62,7 +62,7 @@ def main() -> None:
     for marker in ["mtllib demo.mtl", "usemtl mat_white_diffuse", "usemtl mat_green_diffuse", "usemtl mat_mirror"]:
         if marker not in demo_obj:
             fail(f"Demo OBJ misses marker: {marker}")
-    for marker in ["newmtl mat_white_diffuse", "newmtl mat_green_diffuse", "newmtl mat_mirror", "Kd"]:
+    for marker in ["newmtl mat_white_diffuse", "newmtl mat_green_diffuse", "newmtl mat_mirror", "Kd", "Ks", "Ns", "Ni", "d"]:
         if marker not in demo_mtl:
             fail(f"Demo MTL misses marker: {marker}")
 

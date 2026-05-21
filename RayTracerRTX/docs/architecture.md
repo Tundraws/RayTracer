@@ -75,7 +75,11 @@ flowchart TD
     MeshClosestHit --> MeshMaterial{"Mesh material type"}
     MeshMaterial --> MeshDiffuse["MTL Kd diffuse lighting + shadow"]
     MeshMaterial --> MeshMirror["Mirror reflection ray"]
+    MeshMaterial --> MeshMetal["Tinted metal reflection + roughness"]
+    MeshMaterial --> MeshGlass["Dielectric Fresnel/refraction approximation"]
     MeshMirror --> Depth
+    MeshMetal --> Depth
+    MeshGlass --> Depth
     MeshDiffuse --> Output
     Shadow --> Material{"Material type"}
     Material --> Diffuse["Diffuse lighting + hard shadow"]

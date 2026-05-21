@@ -116,10 +116,55 @@ bool parseFaceVertex(const std::string& token, FaceVertex& vertex)
     return true;
 }
 
+float clampf(const float value, const float minValue, const float maxValue)
+{
+    return value < minValue ? minValue : (value > maxValue ? maxValue : value);
+}
+
+std::string toLower(std::string value)
+{
+    std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char ch)
+    {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
+
+int materialTypeFromName(const std::string& name)
+{
+    const std::string lowerName = toLower(name);
+    if (lowerName.find("glass") != std::string::npos || lowerName.find("dielectric") != std::string::npos)
+    {
+        return MaterialDielectric;
+    }
+    if (lowerName.find("metal") != std::string::npos)
+    {
+        return MaterialMetal;
+    }
+    if (lowerName.find("mirror") != std::string::npos)
+    {
+        return MaterialMirror;
+    }
+    return MaterialDiffuse;
+}
+
+float roughnessFromNs(const float ns)
+{
+    const float clampedNs = clampf(ns, 1.0f, 1000.0f);
+    return clampf(std::sqrt(2.0f / (clampedNs + 2.0f)), 0.02f, 1.0f);
+}
+
 MeshMaterial makeDefaultMaterial(const std::string& name = "default")
 {
-    const bool mirror = name.find("mirror") != std::string::npos || name.find("Mirror") != std::string::npos;
-    return MeshMaterial{make_float3(0.80f, 0.80f, 0.78f), mirror ? MaterialMirror : MaterialDiffuse, name};
+    MeshMaterial material;
+    material.color = make_float3(0.80f, 0.80f, 0.78f);
+    material.materialType = materialTypeFromName(name);
+    material.name = name;
+    material.specularColor = make_float3(1.0f, 1.0f, 1.0f);
+    material.roughness = material.materialType == MaterialMirror ? 0.02f : 0.35f;
+    material.ior = 1.5f;
+    material.alpha = 1.0f;
+    return material;
 }
 
 int ensureMaterial(
@@ -181,6 +226,40 @@ void loadMtl(
             if (input >> r >> g >> b)
             {
                 mesh.materials[static_cast<size_t>(currentMaterial)].color = make_float3(r, g, b);
+            }
+        }
+        else if (command == "Ks" && currentMaterial >= 0)
+        {
+            float r = 1.0f;
+            float g = 1.0f;
+            float b = 1.0f;
+            if (input >> r >> g >> b)
+            {
+                mesh.materials[static_cast<size_t>(currentMaterial)].specularColor = make_float3(r, g, b);
+            }
+        }
+        else if (command == "Ns" && currentMaterial >= 0)
+        {
+            float ns = 64.0f;
+            if (input >> ns)
+            {
+                mesh.materials[static_cast<size_t>(currentMaterial)].roughness = roughnessFromNs(ns);
+            }
+        }
+        else if (command == "Ni" && currentMaterial >= 0)
+        {
+            float ior = 1.5f;
+            if (input >> ior)
+            {
+                mesh.materials[static_cast<size_t>(currentMaterial)].ior = clampf(ior, 1.0f, 2.8f);
+            }
+        }
+        else if (command == "d" && currentMaterial >= 0)
+        {
+            float alpha = 1.0f;
+            if (input >> alpha)
+            {
+                mesh.materials[static_cast<size_t>(currentMaterial)].alpha = clampf(alpha, 0.0f, 1.0f);
             }
         }
     }

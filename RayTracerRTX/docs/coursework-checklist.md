@@ -30,6 +30,9 @@
   - invalid face rejection
   - missing normals fallback
   - multiple material mapping through MTL
+  - extended MTL `Kd`/`Ks`/`Ns`/`Ni`/`d` parsing
+  - metal and dielectric material-name mapping
+  - roughness, IOR and alpha clamping
   - default scene mesh presence
   - mesh material index validation
 - GPU smoke test:

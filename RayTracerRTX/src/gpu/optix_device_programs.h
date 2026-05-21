@@ -52,6 +52,18 @@ static __forceinline__ __device__ float3 reflect3(const float3 i, const float3 n
     return sub3(i, mul3(n, 2.0f * dot3(i, n)));
 }
 
+static __forceinline__ __device__ bool refract3(const float3 i, const float3 n, const float eta, float3& refracted)
+{
+    const float cosi = fminf(fmaxf(dot3(i, n), -1.0f), 1.0f);
+    const float k = 1.0f - eta * eta * (1.0f - cosi * cosi);
+    if (k < 0.0f)
+    {
+        return false;
+    }
+    refracted = normalize3(add3(mul3(i, eta), mul3(n, eta * -cosi - sqrtf(k))));
+    return true;
+}
+
 static __forceinline__ __device__ float3 clamp3(const float3 v, const float minValue, const float maxValue)
 {
     return make_vec(
@@ -68,6 +80,19 @@ static __forceinline__ __device__ float saturate1(const float value)
 static __forceinline__ __device__ float3 lerp3(const float3 a, const float3 b, const float t)
 {
     return add3(mul3(a, 1.0f - t), mul3(b, t));
+}
+
+static __forceinline__ __device__ float fresnelSchlick(const float cosTheta, const float f0)
+{
+    const float m = saturate1(1.0f - cosTheta);
+    const float m2 = m * m;
+    return f0 + (1.0f - f0) * m2 * m2 * m;
+}
+
+static __forceinline__ __device__ float3 roughReflectionDir(const float3 reflectedDir, const float3 normal, const float roughness)
+{
+    const float blend = saturate1(roughness * roughness);
+    return normalize3(lerp3(reflectedDir, normal, 0.45f * blend));
 }
 
 static __forceinline__ __device__ void setRadiancePayload(const float3 color)
@@ -171,17 +196,21 @@ static __forceinline__ __device__ float3 shadeMaterial(
     const float ambient = 0.18f;
     const float diffuseShadowFloor = 0.34f;
     const float mirrorShadowFloor = 0.50f;
-    const float shadowFloor = material.materialType == MaterialMirror ? mirrorShadowFloor : diffuseShadowFloor;
+    const float roughness = fmaxf(saturate1(material.roughness), 0.02f);
+    const float shadowFloor = material.materialType == MaterialMirror || material.materialType == MaterialMetal || material.materialType == MaterialDielectric
+        ? mirrorShadowFloor
+        : diffuseShadowFloor;
     const float shadowFactor = shadowFloor + (1.0f - shadowFloor) * visibility;
     const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
     const float diffuse = ndotl * shadowFactor;
     const float3 viewDir = mul3(rayDirection, -1.0f);
     const float3 halfDir = normalize3(add3(lightDir, viewDir));
-    const float specularPower = material.materialType == MaterialMirror ? 96.0f : 128.0f;
+    const float specularPower = fmaxf(8.0f, 160.0f * (1.0f - roughness));
     const float specular = visibility * powf(fmaxf(dot3(normal, halfDir), 0.0f), specularPower);
-    const float diffuseSpecularWeight = material.materialType == MaterialMirror ? 0.0f : 0.06f;
-    const float diffuseLightWeight = material.materialType == MaterialMirror ? 1.0f : 0.88f;
-    const float3 diffuseColor = material.materialType == MaterialMirror
+    const bool reflectiveMaterial = material.materialType == MaterialMirror || material.materialType == MaterialMetal || material.materialType == MaterialDielectric;
+    const float diffuseSpecularWeight = reflectiveMaterial ? 0.0f : 0.06f;
+    const float diffuseLightWeight = reflectiveMaterial ? 1.0f : 0.88f;
+    const float3 diffuseColor = reflectiveMaterial
         ? material.color
         : clamp3(material.color, 0.0f, 0.96f);
 
@@ -193,7 +222,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
     {
         if (depth < static_cast<unsigned int>(params.maxDepth))
         {
-            const float3 reflectedDir = normalize3(reflect3(rayDirection, normal));
+            const float3 reflectedDir = roughReflectionDir(normalize3(reflect3(rayDirection, normal)), normal, roughness);
             const float3 reflectedColor = traceRadiance(
                 params.handle,
                 add3(hitPoint, mul3(normal, 0.002f)),
@@ -210,10 +239,73 @@ static __forceinline__ __device__ float3 shadeMaterial(
             localColor = make_vec(0.231f, 0.251f, 0.251f);
         }
     }
+    else if (material.materialType == MaterialMetal)
+    {
+        if (depth < static_cast<unsigned int>(params.maxDepth))
+        {
+            const float3 reflectedDir = roughReflectionDir(normalize3(reflect3(rayDirection, normal)), normal, roughness);
+            const float3 reflectedColor = traceRadiance(
+                params.handle,
+                add3(hitPoint, mul3(normal, 0.002f)),
+                reflectedDir,
+                0.001f,
+                1e20f,
+                depth + 1u);
+            const float3 specularTint = lerp3(material.specularColor, material.color, 0.65f);
+            const float reflectionWeight = 0.65f + 0.25f * (1.0f - roughness);
+            localColor = add3(
+                mul3(make_vec(reflectedColor.x * specularTint.x, reflectedColor.y * specularTint.y, reflectedColor.z * specularTint.z), reflectionWeight),
+                mul3(material.color, (ambient + diffuse * 0.28f) * roughness));
+        }
+    }
+    else if (material.materialType == MaterialDielectric)
+    {
+        if (depth < static_cast<unsigned int>(params.maxDepth))
+        {
+            const float frontFace = dot3(rayDirection, normal) < 0.0f ? 1.0f : 0.0f;
+            const float eta = frontFace > 0.5f ? 1.0f / fmaxf(material.ior, 1.01f) : fmaxf(material.ior, 1.01f);
+            const float3 orientedNormal = frontFace > 0.5f ? normal : mul3(normal, -1.0f);
+            const float cosTheta = fminf(dot3(mul3(rayDirection, -1.0f), orientedNormal), 1.0f);
+            const float f0 = (material.ior - 1.0f) / (material.ior + 1.0f);
+            const float fresnel = fresnelSchlick(cosTheta, f0 * f0);
+
+            const float3 reflectedDir = roughReflectionDir(normalize3(reflect3(rayDirection, orientedNormal)), orientedNormal, roughness);
+            const float3 reflectedColor = traceRadiance(
+                params.handle,
+                add3(hitPoint, mul3(orientedNormal, 0.002f)),
+                reflectedDir,
+                0.001f,
+                1e20f,
+                depth + 1u);
+
+            float3 transmittedColor = localColor;
+            float3 refractedDir{};
+            if (refract3(rayDirection, orientedNormal, eta, refractedDir))
+            {
+                transmittedColor = traceRadiance(
+                    params.handle,
+                    sub3(hitPoint, mul3(orientedNormal, 0.002f)),
+                    refractedDir,
+                    0.001f,
+                    1e20f,
+                    depth + 1u);
+            }
+
+            const float opacity = saturate1(material.alpha);
+            const float3 tint = lerp3(make_vec(1.0f, 1.0f, 1.0f), material.color, 0.35f);
+            const float3 glassColor = lerp3(
+                make_vec(transmittedColor.x * tint.x, transmittedColor.y * tint.y, transmittedColor.z * tint.z),
+                reflectedColor,
+                fminf(1.0f, fresnel + roughness * 0.25f));
+            localColor = lerp3(glassColor, localColor, opacity * 0.18f);
+        }
+    }
 
     return localColor;
 }
 
+)"
+R"(
 extern "C" __global__ void __raygen__rg()
 {
     const uint3 idx = optixGetLaunchIndex();
@@ -291,7 +383,13 @@ extern "C" __global__ void __closesthit__radiance()
             sub3(objectPoint, make_vec(sphereData.x, sphereData.y, sphereData.z))));
 
     SphereMaterial material = params.materials[primitiveIndex];
-    MeshMaterialGpu materialGpu{material.color, material.materialType};
+    MeshMaterialGpu materialGpu{};
+    materialGpu.color = material.color;
+    materialGpu.materialType = material.materialType;
+    materialGpu.specularColor = material.specularColor;
+    materialGpu.roughness = material.roughness;
+    materialGpu.ior = material.ior;
+    materialGpu.alpha = material.alpha;
     setRadiancePayload(shadeMaterial(hitPoint, normal, rayDirection, depth, materialGpu));
 }
 

@@ -25,6 +25,10 @@ struct MeshMaterial
     float3 color{};
     int materialType = MaterialDiffuse;
     std::string name;
+    float3 specularColor{1.0f, 1.0f, 1.0f};
+    float roughness = 0.35f;
+    float ior = 1.5f;
+    float alpha = 1.0f;
 };
 
 struct MeshData

@@ -6,13 +6,19 @@
 enum MaterialType
 {
     MaterialDiffuse = 0,
-    MaterialMirror = 1
+    MaterialMirror = 1,
+    MaterialMetal = 2,
+    MaterialDielectric = 3
 };
 
 struct SphereMaterial
 {
-    float3 color;
-    int materialType;
+    float3 color{};
+    int materialType = MaterialDiffuse;
+    float3 specularColor{1.0f, 1.0f, 1.0f};
+    float roughness = 0.35f;
+    float ior = 1.5f;
+    float alpha = 1.0f;
 };
 
 struct MeshVertexGpu
@@ -31,8 +37,12 @@ struct MeshTriangleGpu
 
 struct MeshMaterialGpu
 {
-    float3 color;
-    int materialType;
+    float3 color{};
+    int materialType = MaterialDiffuse;
+    float3 specularColor{1.0f, 1.0f, 1.0f};
+    float roughness = 0.35f;
+    float ior = 1.5f;
+    float alpha = 1.0f;
 };
 
 struct LaunchParams
