@@ -572,8 +572,15 @@ extern "C" __global__ void __closesthit__radiance_mesh()
 {
     const unsigned int depth = optixGetPayload_3();
     const unsigned int primitiveIndex = optixGetPrimitiveIndex();
+    const unsigned int instanceId = optixGetInstanceId();
+    const unsigned int meshObjectIndex = instanceId >= 2u ? instanceId - 2u : 0u;
+    MeshObjectGpu object{};
+    if (params.meshObjects != nullptr && meshObjectIndex < params.meshObjectCount)
+    {
+        object = params.meshObjects[meshObjectIndex];
+    }
 
-    const MeshTriangleGpu triangle = params.meshTriangles[primitiveIndex];
+    const MeshTriangleGpu triangle = params.meshTriangles[object.triangleOffset + primitiveIndex];
     const MeshVertexGpu v0 = params.meshVertices[triangle.i0];
     const MeshVertexGpu v1 = params.meshVertices[triangle.i1];
     const MeshVertexGpu v2 = params.meshVertices[triangle.i2];

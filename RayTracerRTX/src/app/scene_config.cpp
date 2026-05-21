@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <variant>
 
 namespace
@@ -432,6 +433,17 @@ MeshData transformMesh(const MeshData& source, const MeshTransformConfig& transf
     return mesh;
 }
 
+std::array<float, 12> makeTransformMatrix(const MeshTransformConfig& transform)
+{
+    const float3 xAxis = rotateEulerXyz(make_float3(transform.scale.x, 0.0f, 0.0f), transform.rotation);
+    const float3 yAxis = rotateEulerXyz(make_float3(0.0f, transform.scale.y, 0.0f), transform.rotation);
+    const float3 zAxis = rotateEulerXyz(make_float3(0.0f, 0.0f, transform.scale.z), transform.rotation);
+    return {
+        xAxis.x, yAxis.x, zAxis.x, transform.position.x,
+        xAxis.y, yAxis.y, zAxis.y, transform.position.y,
+        xAxis.z, yAxis.z, zAxis.z, transform.position.z};
+}
+
 void appendMesh(MeshData& target, const MeshData& source)
 {
     const std::uint32_t vertexOffset = static_cast<std::uint32_t>(target.vertices.size());
@@ -634,6 +646,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     }
 
     MeshData combinedMesh;
+    std::vector<MeshObject> meshObjects;
     for (const MeshObjectConfig& object : config.meshObjects)
     {
         const std::filesystem::path meshPath = resolvePath(object.meshPath, baseDirectory);
@@ -644,12 +657,21 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
             result.error = loaded.error;
             return result;
         }
+        MeshObject meshObject;
+        meshObject.assetReference = meshPath.string();
+        meshObject.mesh = loaded.mesh;
+        meshObject.position = object.transform.position;
+        meshObject.rotation = object.transform.rotation;
+        meshObject.scale = object.transform.scale;
+        meshObject.transform = makeTransformMatrix(object.transform);
+        meshObjects.push_back(std::move(meshObject));
         appendMesh(combinedMesh, transformMesh(loaded.mesh, object.transform));
     }
 
-    if (!isEmptyMesh(combinedMesh) && hasValidMeshMaterialIndices(combinedMesh))
+    if (!isEmptyMesh(combinedMesh) && hasValidMeshMaterialIndices(combinedMesh) && !meshObjects.empty())
     {
         result.scene.mesh = std::move(combinedMesh);
+        result.scene.meshObjects = std::move(meshObjects);
     }
     else
     {

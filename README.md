@@ -53,6 +53,7 @@ RayTracerRTX.exe --mesh RayTracerRTX/assets/meshes/demo.obj
 RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
 RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/textured_scene.json
 RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/textured_cube_scene.json
+RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/multi_mesh_scene.json
 ```
 
 JSON scene config поддерживает `meshObjects`, `camera`, `light` и transform
@@ -80,7 +81,7 @@ JSON scene config поддерживает `meshObjects`, `camera`, `light` и t
 - `src/common` - общие структуры данных host/device
 - `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
 - `assets/meshes/textured_demo.obj`, `textured_cube.obj`, `textured_demo.mtl`, `checker.ppm`, and `checker_normal.ppm` - demo OBJ meshes with `map_Kd` diffuse texture and basic normal map
-- `assets/scenes/demo_scene.json`, `textured_scene.json`, and `textured_cube_scene.json` - documented JSON scene input examples
+- `assets/scenes/demo_scene.json`, `textured_scene.json`, `textured_cube_scene.json`, and `multi_mesh_scene.json` - documented JSON scene input examples
 
 ## Текущий статус
 

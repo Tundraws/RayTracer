@@ -43,7 +43,8 @@ Declared in `src/app/scene.h`.
 |---|---|---|
 | `spheres` | `std::vector<SphereGeometry>` | Scene geometry controlled by the CPU |
 | `materials` | `std::vector<SphereMaterial>` | Per-sphere material data uploaded to GPU |
-| `mesh` | `MeshData` | Polygonal OBJ mesh loaded from `assets/meshes/demo.obj` or fallback mesh |
+| `meshObjects` | `std::vector<MeshObject>` | Polygonal OBJ mesh objects with asset reference, mesh data, and transform |
+| `mesh` | `MeshData` | Compatibility combined mesh used by tests/docs and fallback paths |
 | `lightPosition` | `float3` | Point-light position used by hit programs |
 | `selectedSphere` | `int` | Index used by interactive controls |
 
@@ -72,8 +73,11 @@ supports:
 - `camera`: `position`, `yaw`, `pitch`, `fov`;
 - `light`: `position`.
 
-For this stage, configured mesh objects are transformed on the CPU and merged
-into the single `SceneState::mesh` used by the current renderer.
+Configured mesh objects are stored in `SceneState::meshObjects`. Each object
+keeps its source mesh data and transform, while `SceneState::mesh` remains as a
+compatibility combined mesh for tests and legacy fallback code. The OptiX
+renderer builds a Triangle GAS per mesh object and places each object in the
+IAS with its transform matrix.
 
 ### `loadObjMesh(...)`
 

@@ -13,23 +13,27 @@ flowchart LR
     Args --> SceneConfig["SceneConfig JSON"]
     App --> Input["Input handling"]
     App --> Camera["CameraState / updateCameraBasis"]
-    SceneConfig --> ObjLoader
+    SceneConfig --> MeshObject["MeshObject + transform"]
+    MeshObject --> ObjLoader
     ObjLoader["ObjLoader"] --> MeshData["MeshData"]
     ObjLoader --> Textures["map_Kd / normal PPM textures"]
     ObjLoader --> Tangents["Tangent basis"]
     Textures --> MeshData
     Tangents --> MeshData
-    MeshData --> Scene
+    MeshData --> MeshObject
+    MeshObject --> Scene
     App --> Scene["SceneState"]
     Scene --> Materials["SphereMaterial"]
     Scene --> MeshMaterials["Mesh materials"]
     App --> Renderer["OptixRenderer"]
     Camera --> Renderer
     Scene --> Renderer
-    Renderer --> TriangleGAS["Triangle GAS"]
+    Renderer --> TriangleGAS["Triangle GAS per mesh object"]
+    Renderer --> IAS["IAS with mesh transforms"]
     Renderer --> Shared["LaunchParams / rtx_shared.h"]
     Renderer --> Device["OptiX device programs"]
-    TriangleGAS --> Device
+    TriangleGAS --> IAS
+    IAS --> Device
     Device --> Framebuffer["CUDA framebuffer"]
     Device --> Post["Tone mapping + gamma"]
     Post --> Framebuffer
@@ -54,11 +58,11 @@ sequenceDiagram
     Args->>ObjLoader: Resolve mesh path(s) and transforms
     Args->>Scene: Apply camera and light config
     User->>App: Keyboard and mouse input
-    ObjLoader->>Scene: Load OBJ vertices, normals, UVs, tangents, triangles, MTL materials and textures
+    ObjLoader->>Scene: Load MeshObject list with OBJ data, tangents, materials, textures and transforms
     App->>Scene: Move sphere, light, or toggle material
     App->>Renderer: renderFrame(scene, camera)
     Renderer->>CUDA: Upload sphere materials, mesh buffers, diffuse/normal texture pixels, and LaunchParams
-    Renderer->>OptiX: Build sphere GAS + triangle GAS + IAS
+    Renderer->>OptiX: Build sphere GAS + one triangle GAS per mesh object + IAS transforms
     Renderer->>OptiX: optixLaunch
     OptiX->>GPU: Ray generation, sphere hit, mesh closest-hit, miss, shadow, reflection programs
     GPU-->>CUDA: Write uchar4 framebuffer

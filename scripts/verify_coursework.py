@@ -30,6 +30,7 @@ REQUIRED_PATHS = [
     "RayTracerRTX/assets/scenes/demo_scene.json",
     "RayTracerRTX/assets/scenes/textured_scene.json",
     "RayTracerRTX/assets/scenes/textured_cube_scene.json",
+    "RayTracerRTX/assets/scenes/multi_mesh_scene.json",
     "RayTracerRTX/tests/test_scene_camera.cpp",
     "RayTracerRTX/docs/coursework-checklist.md",
     "RayTracerRTX/docs/docker-check.md",

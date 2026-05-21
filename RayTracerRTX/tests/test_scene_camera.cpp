@@ -581,6 +581,7 @@ void testDefaultScene(TestContext& t)
     t.expect(scene.spheres.size() == 3, "Default scene must contain 3 spheres.");
     t.expect(scene.materials.size() == 3, "Default scene must contain 3 materials.");
     t.expect(!isEmptyMesh(scene.mesh), "Default scene must contain a triangle mesh.");
+    t.expect(!scene.meshObjects.empty(), "Default scene must contain mesh objects.");
     t.expect(scene.mesh.materials.size() >= 3, "Default mesh should contain several materials.");
     t.expect(hasValidMeshMaterialIndices(scene.mesh), "Default mesh material indices should be valid.");
     bool hasMirrorMeshMaterial = false;
@@ -633,6 +634,44 @@ void testSceneConfigLoadsValidScene(TestContext& t)
     t.expect(almostEqual(scene.scene.lightPosition.y, 5.0f), "Scene config should apply light position.");
     t.expect(scene.scene.mesh.vertices.size() == 3, "Scene config mesh path should load OBJ vertices.");
     t.expect(almostEqual(scene.scene.mesh.vertices[1].position.x, 4.0f), "Scene config transform should affect mesh vertices.");
+    t.expect(scene.scene.meshObjects.size() == 1, "Scene config should preserve mesh object list.");
+    t.expect(almostEqual(scene.scene.meshObjects[0].scale.x, 2.0f), "Scene config should preserve mesh object scale.");
+}
+
+void testSceneConfigMultipleMeshes(TestContext& t)
+{
+    writeFixtureFile(
+        "multi_a.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    writeFixtureFile(
+        "multi_b.obj",
+        "v 0 0 0\n"
+        "v 0 1 0\n"
+        "v 0 0 1\n"
+        "f 1 2 3\n");
+
+    const std::filesystem::path configPath = writeFixtureFile(
+        "multi_scene.json",
+        "{\n"
+        "  \"meshObjects\": [\n"
+        "    {\"path\": \"multi_a.obj\", \"position\": [1, 0, 0], \"rotation\": [0, 0, 0], \"scale\": [1, 1, 1]},\n"
+        "    {\"path\": \"multi_b.obj\", \"position\": [-1, 0, 0], \"rotation\": [0, 45, 0], \"scale\": [2, 1, 1]}\n"
+        "  ]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Multiple-mesh scene config should parse: " + config.error);
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Multiple-mesh scene config should build.");
+    t.expect(scene.scene.meshObjects.size() == 2, "SceneState should store two mesh objects.");
+    t.expect(scene.scene.mesh.triangles.size() == 2, "Compatibility combined mesh should include both triangles.");
+    t.expect(almostEqual(scene.scene.meshObjects[1].rotation.y, 45.0f), "Mesh object rotation should be preserved.");
+    t.expect(almostEqual(scene.scene.meshObjects[1].scale.x, 2.0f), "Mesh object scale should be preserved.");
+    t.expect(hasValidMeshMaterialIndices(scene.scene.meshObjects[0].mesh), "First mesh object material indices should be valid.");
+    t.expect(hasValidMeshMaterialIndices(scene.scene.meshObjects[1].mesh), "Second mesh object material indices should be valid.");
 }
 
 void testSceneConfigMissingFile(TestContext& t)
@@ -656,6 +695,7 @@ void testSceneConfigMeshPathApplied(TestContext& t)
     t.expect(scene.ok, "Direct mesh path should build a scene.");
     t.expect(scene.scene.mesh.vertices.size() == 3, "Direct mesh path should replace default mesh vertices.");
     t.expect(almostEqual(scene.scene.mesh.vertices[1].position.y, 2.0f), "Direct mesh path should use requested OBJ data.");
+    t.expect(scene.scene.meshObjects.size() == 1, "Direct mesh path should create one mesh object.");
 }
 
 void testSceneConfigFallbackDemoScene(TestContext& t)
@@ -663,6 +703,7 @@ void testSceneConfigFallbackDemoScene(TestContext& t)
     const SceneBuildResult scene = buildDefaultSceneInput();
     t.expect(scene.ok, "Default scene input should build.");
     t.expect(!isEmptyMesh(scene.scene.mesh), "Default scene input should keep fallback/demo mesh.");
+    t.expect(!scene.scene.meshObjects.empty(), "Default scene input should keep mesh object list.");
     t.expect(hasValidMeshMaterialIndices(scene.scene.mesh), "Default scene input mesh material indices should be valid.");
 }
 
@@ -992,6 +1033,7 @@ int main(int argc, char** argv)
     runTest("Textured cube asset loads", testTexturedCubeAssetLoads);
     runTest("Default scene mesh geometry", testDefaultSceneMeshGeometry);
     runTest("Scene config loads valid scene", testSceneConfigLoadsValidScene);
+    runTest("Scene config with multiple meshes loads", testSceneConfigMultipleMeshes);
     runTest("Scene config missing file", testSceneConfigMissingFile);
     runTest("Scene config mesh path applied", testSceneConfigMeshPathApplied);
     runTest("Scene config fallback demo scene", testSceneConfigFallbackDemoScene);

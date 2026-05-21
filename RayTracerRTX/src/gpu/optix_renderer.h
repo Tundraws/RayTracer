@@ -3,6 +3,7 @@
 #include <cuda_runtime.h>
 #include <optix.h>
 
+#include <array>
 #include <vector>
 
 struct ProgramGroups
@@ -51,35 +52,38 @@ private:
     CUdeviceptr dPlaneVertices = 0;
     CUdeviceptr dPlaneIndices = 0;
     CUdeviceptr dMeshVertices = 0;
-    CUdeviceptr dMeshIndices = 0;
     CUdeviceptr dMeshTriangles = 0;
     CUdeviceptr dMeshMaterials = 0;
+    CUdeviceptr dMeshObjects = 0;
     CUdeviceptr dMeshTexturePixels = 0;
     CUdeviceptr dSphereGasBuffer = 0;
     CUdeviceptr dPlaneGasBuffer = 0;
-    CUdeviceptr dMeshGasBuffer = 0;
+    std::vector<CUdeviceptr> dMeshIndexBuffers;
+    std::vector<CUdeviceptr> dMeshGasBuffers;
     CUdeviceptr dIasBuffer = 0;
     CUdeviceptr dIasInstances = 0;
     CUdeviceptr dLaunchParams = 0;
     OptixTraversableHandle sphereGasHandle = 0;
     OptixTraversableHandle planeGasHandle = 0;
-    OptixTraversableHandle meshGasHandle = 0;
+    std::vector<OptixTraversableHandle> meshGasHandles;
     OptixTraversableHandle iasHandle = 0;
     std::vector<uint32_t> sphereFlags;
     std::vector<uint32_t> planeFlags;
-    std::vector<uint32_t> meshFlags;
+    std::vector<std::vector<uint32_t>> meshFlags;
+    std::vector<OptixBuildInput> meshBuildInputs;
+    std::vector<OptixAccelBuildOptions> meshAccelOptions;
+    std::vector<OptixAccelBufferSizes> meshGasSizes;
+    std::vector<std::array<float, 12>> meshInstanceTransforms;
     unsigned int meshTexturePixelCount = 0;
+    unsigned int meshObjectCount = 0;
     OptixBuildInput sphereBuildInput = {};
     OptixBuildInput planeBuildInput = {};
-    OptixBuildInput meshBuildInput = {};
     OptixBuildInput iasBuildInput = {};
     OptixAccelBuildOptions sphereAccelOptions = {};
     OptixAccelBuildOptions planeAccelOptions = {};
-    OptixAccelBuildOptions meshAccelOptions = {};
     OptixAccelBuildOptions iasAccelOptions = {};
     OptixAccelBufferSizes sphereGasSizes = {};
     OptixAccelBufferSizes planeGasSizes = {};
-    OptixAccelBufferSizes meshGasSizes = {};
     OptixAccelBufferSizes iasSizes = {};
     cudaEvent_t frameStart = nullptr;
     cudaEvent_t frameStop = nullptr;

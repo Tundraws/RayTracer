@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <utility>
 
 #ifndef RAYTRACERRTX_SOURCE_DIR
 #define RAYTRACERRTX_SOURCE_DIR ""
@@ -101,6 +102,10 @@ SceneState makeDefaultScene()
     };
 
     scene.mesh = loadDefaultMesh();
+    MeshObject defaultMeshObject;
+    defaultMeshObject.assetReference = "assets/meshes/demo.obj";
+    defaultMeshObject.mesh = scene.mesh;
+    scene.meshObjects = {std::move(defaultMeshObject)};
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
     scene.selectedSphere = 0;
     return scene;

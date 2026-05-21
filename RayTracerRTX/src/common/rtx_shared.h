@@ -89,6 +89,12 @@ struct MeshMaterialGpu
     unsigned int normalTextureHeight = 0;
 };
 
+struct MeshObjectGpu
+{
+    unsigned int triangleOffset = 0;
+    unsigned int triangleCount = 0;
+};
+
 struct LaunchParams
 {
     uchar4* image;
@@ -107,10 +113,12 @@ struct LaunchParams
     MeshVertexGpu* meshVertices;
     MeshTriangleGpu* meshTriangles;
     MeshMaterialGpu* meshMaterials;
+    MeshObjectGpu* meshObjects;
     uchar4* meshTexturePixels;
     unsigned int meshVertexCount;
     unsigned int meshTriangleCount;
     unsigned int meshMaterialCount;
+    unsigned int meshObjectCount;
     unsigned int meshTexturePixelCount;
     int maxDepth;
 };

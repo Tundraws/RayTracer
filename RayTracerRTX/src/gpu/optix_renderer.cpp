@@ -26,6 +26,7 @@
 #include <stdexcept>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -291,60 +292,92 @@ void OptixRenderer::createScene(const SceneState& scene)
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMaterials), scene.materials.size() * sizeof(SphereMaterial)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMaterials), scene.materials.data(), scene.materials.size() * sizeof(SphereMaterial), cudaMemcpyHostToDevice));
 
+    std::vector<MeshObject> renderMeshObjects = scene.meshObjects;
+    if (renderMeshObjects.empty() && !isEmptyMesh(scene.mesh))
+    {
+        MeshObject legacyMeshObject;
+        legacyMeshObject.assetReference = "legacy SceneState::mesh";
+        legacyMeshObject.mesh = scene.mesh;
+        renderMeshObjects.push_back(std::move(legacyMeshObject));
+    }
+
     std::vector<MeshVertexGpu> meshVertices;
-    meshVertices.reserve(scene.mesh.vertices.size());
-    for (const MeshVertex& vertex : scene.mesh.vertices)
-    {
-        meshVertices.push_back(MeshVertexGpu{vertex.position, vertex.normal, vertex.texcoord, vertex.tangent, vertex.hasTexcoord});
-    }
-
-    std::vector<uint3> meshIndices;
     std::vector<MeshTriangleGpu> meshTriangles;
-    meshIndices.reserve(scene.mesh.triangles.size());
-    meshTriangles.reserve(scene.mesh.triangles.size());
-    for (const MeshTriangle& triangle : scene.mesh.triangles)
-    {
-        meshIndices.push_back(make_uint3(triangle.i0, triangle.i1, triangle.i2));
-        meshTriangles.push_back(MeshTriangleGpu{triangle.i0, triangle.i1, triangle.i2, triangle.materialIndex});
-    }
-
     std::vector<MeshMaterialGpu> meshMaterials;
-    meshMaterials.reserve(scene.mesh.materials.size());
+    std::vector<MeshObjectGpu> meshObjectsGpu;
+    std::vector<std::vector<uint3>> meshIndexBuffers;
     std::vector<uchar4> meshTexturePixels;
-    for (const MeshMaterial& material : scene.mesh.materials)
+    meshInstanceTransforms.clear();
+
+    for (const MeshObject& object : renderMeshObjects)
     {
-        MeshMaterialGpu materialGpu{
-            material.color,
-            material.materialType,
-            material.specularColor,
-            material.roughness,
-            material.ior,
-            material.alpha};
-        if (material.textureIndex >= 0 && static_cast<size_t>(material.textureIndex) < scene.mesh.textures.size())
+        if (isEmptyMesh(object.mesh) || !hasValidMeshMaterialIndices(object.mesh))
         {
-            const MeshTexture& texture = scene.mesh.textures[static_cast<size_t>(material.textureIndex)];
-            if (!texture.pixels.empty() && texture.width > 0 && texture.height > 0)
-            {
-                materialGpu.hasTexture = 1;
-                materialGpu.textureOffset = static_cast<unsigned int>(meshTexturePixels.size());
-                materialGpu.textureWidth = texture.width;
-                materialGpu.textureHeight = texture.height;
-                meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
-            }
+            continue;
         }
-        if (material.normalTextureIndex >= 0 && static_cast<size_t>(material.normalTextureIndex) < scene.mesh.textures.size())
+
+        const unsigned int vertexOffset = static_cast<unsigned int>(meshVertices.size());
+        const unsigned int triangleOffset = static_cast<unsigned int>(meshTriangles.size());
+        const unsigned int materialOffset = static_cast<unsigned int>(meshMaterials.size());
+        for (const MeshVertex& vertex : object.mesh.vertices)
         {
-            const MeshTexture& texture = scene.mesh.textures[static_cast<size_t>(material.normalTextureIndex)];
-            if (!texture.pixels.empty() && texture.width > 0 && texture.height > 0)
-            {
-                materialGpu.hasNormalTexture = 1;
-                materialGpu.normalTextureOffset = static_cast<unsigned int>(meshTexturePixels.size());
-                materialGpu.normalTextureWidth = texture.width;
-                materialGpu.normalTextureHeight = texture.height;
-                meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
-            }
+            meshVertices.push_back(MeshVertexGpu{vertex.position, vertex.normal, vertex.texcoord, vertex.tangent, vertex.hasTexcoord});
         }
-        meshMaterials.push_back(materialGpu);
+
+        std::vector<uint3> objectIndices;
+        objectIndices.reserve(object.mesh.triangles.size());
+        for (const MeshTriangle& triangle : object.mesh.triangles)
+        {
+            objectIndices.push_back(make_uint3(
+                vertexOffset + triangle.i0,
+                vertexOffset + triangle.i1,
+                vertexOffset + triangle.i2));
+            meshTriangles.push_back(MeshTriangleGpu{
+                vertexOffset + triangle.i0,
+                vertexOffset + triangle.i1,
+                vertexOffset + triangle.i2,
+                materialOffset + triangle.materialIndex});
+        }
+
+        for (const MeshMaterial& material : object.mesh.materials)
+        {
+            MeshMaterialGpu materialGpu{
+                material.color,
+                material.materialType,
+                material.specularColor,
+                material.roughness,
+                material.ior,
+                material.alpha};
+            if (material.textureIndex >= 0 && static_cast<size_t>(material.textureIndex) < object.mesh.textures.size())
+            {
+                const MeshTexture& texture = object.mesh.textures[static_cast<size_t>(material.textureIndex)];
+                if (!texture.pixels.empty() && texture.width > 0 && texture.height > 0)
+                {
+                    materialGpu.hasTexture = 1;
+                    materialGpu.textureOffset = static_cast<unsigned int>(meshTexturePixels.size());
+                    materialGpu.textureWidth = texture.width;
+                    materialGpu.textureHeight = texture.height;
+                    meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
+                }
+            }
+            if (material.normalTextureIndex >= 0 && static_cast<size_t>(material.normalTextureIndex) < object.mesh.textures.size())
+            {
+                const MeshTexture& texture = object.mesh.textures[static_cast<size_t>(material.normalTextureIndex)];
+                if (!texture.pixels.empty() && texture.width > 0 && texture.height > 0)
+                {
+                    materialGpu.hasNormalTexture = 1;
+                    materialGpu.normalTextureOffset = static_cast<unsigned int>(meshTexturePixels.size());
+                    materialGpu.normalTextureWidth = texture.width;
+                    materialGpu.normalTextureHeight = texture.height;
+                    meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
+                }
+            }
+            meshMaterials.push_back(materialGpu);
+        }
+
+        meshObjectsGpu.push_back(MeshObjectGpu{triangleOffset, static_cast<unsigned int>(object.mesh.triangles.size())});
+        meshIndexBuffers.push_back(std::move(objectIndices));
+        meshInstanceTransforms.push_back(object.transform);
     }
     if (meshMaterials.empty())
     {
@@ -356,15 +389,16 @@ void OptixRenderer::createScene(const SceneState& scene)
         meshTexturePixels.push_back(make_uchar4(255, 255, 255, 255));
     }
     meshTexturePixelCount = static_cast<unsigned int>(meshTexturePixels.size());
+    meshObjectCount = static_cast<unsigned int>(meshObjectsGpu.size());
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshVertices), meshVertices.size() * sizeof(MeshVertexGpu)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshVertices), meshVertices.data(), meshVertices.size() * sizeof(MeshVertexGpu), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshIndices), meshIndices.size() * sizeof(uint3)));
-    CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshIndices), meshIndices.data(), meshIndices.size() * sizeof(uint3), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshTriangles), meshTriangles.size() * sizeof(MeshTriangleGpu)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshTriangles), meshTriangles.data(), meshTriangles.size() * sizeof(MeshTriangleGpu), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshMaterials), meshMaterials.size() * sizeof(MeshMaterialGpu)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshMaterials), meshMaterials.data(), meshMaterials.size() * sizeof(MeshMaterialGpu), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshObjects), meshObjectsGpu.size() * sizeof(MeshObjectGpu)));
+    CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshObjects), meshObjectsGpu.data(), meshObjectsGpu.size() * sizeof(MeshObjectGpu), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshTexturePixels), meshTexturePixels.size() * sizeof(uchar4)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshTexturePixels), meshTexturePixels.data(), meshTexturePixels.size() * sizeof(uchar4), cudaMemcpyHostToDevice));
 
@@ -418,30 +452,56 @@ void OptixRenderer::createScene(const SceneState& scene)
     OPTIX_CHECK(optixAccelComputeMemoryUsage(context, &planeAccelOptions, &planeBuildInput, 1, &planeGasSizes));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dPlaneGasBuffer), planeGasSizes.outputSizeInBytes));
 
-    meshFlags.assign(1, OPTIX_GEOMETRY_FLAG_NONE);
-    meshAccelOptions.buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION | OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS;
-    meshAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-    meshBuildInput = {};
-    meshBuildInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
-    meshBuildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-    meshBuildInput.triangleArray.vertexStrideInBytes = sizeof(MeshVertexGpu);
-    meshBuildInput.triangleArray.numVertices = static_cast<unsigned int>(meshVertices.size());
-    meshBuildInput.triangleArray.vertexBuffers = &dMeshVertices;
-    meshBuildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-    meshBuildInput.triangleArray.indexStrideInBytes = sizeof(uint3);
-    meshBuildInput.triangleArray.numIndexTriplets = static_cast<unsigned int>(meshIndices.size());
-    meshBuildInput.triangleArray.indexBuffer = dMeshIndices;
-    meshBuildInput.triangleArray.flags = meshFlags.data();
-    meshBuildInput.triangleArray.numSbtRecords = 1;
+    meshFlags.clear();
+    meshBuildInputs.clear();
+    meshAccelOptions.clear();
+    meshGasSizes.clear();
+    dMeshIndexBuffers.clear();
+    dMeshGasBuffers.clear();
+    meshGasHandles.assign(meshIndexBuffers.size(), 0);
 
-    OPTIX_CHECK(optixAccelComputeMemoryUsage(context, &meshAccelOptions, &meshBuildInput, 1, &meshGasSizes));
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshGasBuffer), meshGasSizes.outputSizeInBytes));
+    for (const std::vector<uint3>& objectIndices : meshIndexBuffers)
+    {
+        CUdeviceptr dObjectIndices = 0;
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dObjectIndices), objectIndices.size() * sizeof(uint3)));
+        CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dObjectIndices), objectIndices.data(), objectIndices.size() * sizeof(uint3), cudaMemcpyHostToDevice));
+        dMeshIndexBuffers.push_back(dObjectIndices);
+
+        meshFlags.push_back(std::vector<uint32_t>{OPTIX_GEOMETRY_FLAG_NONE});
+
+        OptixAccelBuildOptions accelOptions{};
+        accelOptions.buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION | OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS;
+        accelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+        meshAccelOptions.push_back(accelOptions);
+
+        OptixBuildInput buildInput{};
+        buildInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+        buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+        buildInput.triangleArray.vertexStrideInBytes = sizeof(MeshVertexGpu);
+        buildInput.triangleArray.numVertices = static_cast<unsigned int>(meshVertices.size());
+        buildInput.triangleArray.vertexBuffers = &dMeshVertices;
+        buildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+        buildInput.triangleArray.indexStrideInBytes = sizeof(uint3);
+        buildInput.triangleArray.numIndexTriplets = static_cast<unsigned int>(objectIndices.size());
+        buildInput.triangleArray.indexBuffer = dObjectIndices;
+        buildInput.triangleArray.flags = meshFlags.back().data();
+        buildInput.triangleArray.numSbtRecords = 1;
+        meshBuildInputs.push_back(buildInput);
+
+        OptixAccelBufferSizes gasSizes{};
+        OPTIX_CHECK(optixAccelComputeMemoryUsage(context, &meshAccelOptions.back(), &meshBuildInputs.back(), 1, &gasSizes));
+        meshGasSizes.push_back(gasSizes);
+
+        CUdeviceptr dGasBuffer = 0;
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dGasBuffer), gasSizes.outputSizeInBytes));
+        dMeshGasBuffers.push_back(dGasBuffer);
+    }
 
     iasAccelOptions.buildFlags = OPTIX_BUILD_FLAG_NONE;
     iasAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
     iasBuildInput = {};
     iasBuildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    iasBuildInput.instanceArray.numInstances = 3;
+    iasBuildInput.instanceArray.numInstances = 2u + meshObjectCount;
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dIasInstances), iasBuildInput.instanceArray.numInstances * sizeof(OptixInstance)));
     iasBuildInput.instanceArray.instances = dIasInstances;
     OPTIX_CHECK(optixAccelComputeMemoryUsage(context, &iasAccelOptions, &iasBuildInput, 1, &iasSizes));
@@ -491,28 +551,28 @@ void OptixRenderer::rebuildAccelerationStructure()
         CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dPlaneTempBuffer)));
     }
 
-    if (meshGasHandle == 0)
+    for (size_t i = 0; i < meshBuildInputs.size(); ++i)
     {
         CUdeviceptr dMeshTempBuffer = 0;
-        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshTempBuffer), meshGasSizes.tempSizeInBytes));
-        meshAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshTempBuffer), meshGasSizes[i].tempSizeInBytes));
+        meshAccelOptions[i].operation = OPTIX_BUILD_OPERATION_BUILD;
         OPTIX_CHECK(optixAccelBuild(
             context,
             stream,
-            &meshAccelOptions,
-            &meshBuildInput,
+            &meshAccelOptions[i],
+            &meshBuildInputs[i],
             1,
             dMeshTempBuffer,
-            meshGasSizes.tempSizeInBytes,
-            dMeshGasBuffer,
-            meshGasSizes.outputSizeInBytes,
-            &meshGasHandle,
+            meshGasSizes[i].tempSizeInBytes,
+            dMeshGasBuffers[i],
+            meshGasSizes[i].outputSizeInBytes,
+            &meshGasHandles[i],
             nullptr,
             0));
         CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dMeshTempBuffer)));
     }
 
-    std::array<OptixInstance, 3> instances{};
+    std::vector<OptixInstance> instances(2u + meshObjectCount);
     for (OptixInstance& instance : instances)
     {
         std::memset(&instance, 0, sizeof(OptixInstance));
@@ -529,9 +589,17 @@ void OptixRenderer::rebuildAccelerationStructure()
     instances[1].instanceId = 1u;
     instances[1].sbtOffset = 2u;
     instances[1].traversableHandle = planeGasHandle;
-    instances[2].instanceId = 2u;
-    instances[2].sbtOffset = 4u;
-    instances[2].traversableHandle = meshGasHandle;
+    for (unsigned int i = 0; i < meshObjectCount; ++i)
+    {
+        OptixInstance& instance = instances[2u + i];
+        instance.instanceId = 2u + i;
+        instance.sbtOffset = 4u;
+        instance.traversableHandle = meshGasHandles[i];
+        if (i < meshInstanceTransforms.size())
+        {
+            std::copy(meshInstanceTransforms[i].begin(), meshInstanceTransforms[i].end(), instance.transform);
+        }
+    }
 
     CUDA_CHECK(cudaMemcpyAsync(
         reinterpret_cast<void*>(dIasInstances),
@@ -793,10 +861,24 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.meshVertices = reinterpret_cast<MeshVertexGpu*>(dMeshVertices);
     params.meshTriangles = reinterpret_cast<MeshTriangleGpu*>(dMeshTriangles);
     params.meshMaterials = reinterpret_cast<MeshMaterialGpu*>(dMeshMaterials);
+    params.meshObjects = reinterpret_cast<MeshObjectGpu*>(dMeshObjects);
     params.meshTexturePixels = reinterpret_cast<uchar4*>(dMeshTexturePixels);
-    params.meshVertexCount = static_cast<unsigned int>(scene.mesh.vertices.size());
-    params.meshTriangleCount = static_cast<unsigned int>(scene.mesh.triangles.size());
-    params.meshMaterialCount = static_cast<unsigned int>(scene.mesh.materials.size());
+    params.meshVertexCount = 0u;
+    params.meshTriangleCount = 0u;
+    params.meshMaterialCount = 0u;
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        params.meshVertexCount += static_cast<unsigned int>(object.mesh.vertices.size());
+        params.meshTriangleCount += static_cast<unsigned int>(object.mesh.triangles.size());
+        params.meshMaterialCount += static_cast<unsigned int>(object.mesh.materials.size());
+    }
+    if (scene.meshObjects.empty())
+    {
+        params.meshVertexCount = static_cast<unsigned int>(scene.mesh.vertices.size());
+        params.meshTriangleCount = static_cast<unsigned int>(scene.mesh.triangles.size());
+        params.meshMaterialCount = static_cast<unsigned int>(scene.mesh.materials.size());
+    }
+    params.meshObjectCount = meshObjectCount;
     params.meshTexturePixelCount = meshTexturePixelCount;
     params.maxDepth = kMaxReflectionDepth;
 
@@ -834,11 +916,14 @@ void OptixRenderer::destroy()
         cudaFree(reinterpret_cast<void*>(dPlaneGasBuffer));
         dPlaneGasBuffer = 0;
     }
-    if (dMeshGasBuffer != 0)
+    for (CUdeviceptr buffer : dMeshGasBuffers)
     {
-        cudaFree(reinterpret_cast<void*>(dMeshGasBuffer));
-        dMeshGasBuffer = 0;
+        if (buffer != 0)
+        {
+            cudaFree(reinterpret_cast<void*>(buffer));
+        }
     }
+    dMeshGasBuffers.clear();
     if (dIasBuffer != 0)
     {
         cudaFree(reinterpret_cast<void*>(dIasBuffer));
@@ -934,6 +1019,12 @@ void OptixRenderer::destroy()
         cudaFree(reinterpret_cast<void*>(dMeshMaterials));
         dMeshMaterials = 0;
     }
+    if (dMeshObjects != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dMeshObjects));
+        dMeshObjects = 0;
+        meshObjectCount = 0;
+    }
     if (dMeshTexturePixels != 0)
     {
         cudaFree(reinterpret_cast<void*>(dMeshTexturePixels));
@@ -945,11 +1036,14 @@ void OptixRenderer::destroy()
         cudaFree(reinterpret_cast<void*>(dMeshTriangles));
         dMeshTriangles = 0;
     }
-    if (dMeshIndices != 0)
+    for (CUdeviceptr buffer : dMeshIndexBuffers)
     {
-        cudaFree(reinterpret_cast<void*>(dMeshIndices));
-        dMeshIndices = 0;
+        if (buffer != 0)
+        {
+            cudaFree(reinterpret_cast<void*>(buffer));
+        }
     }
+    dMeshIndexBuffers.clear();
     if (dMeshVertices != 0)
     {
         cudaFree(reinterpret_cast<void*>(dMeshVertices));

@@ -22,6 +22,7 @@ RUN test -f README.md \
     && test -f RayTracerRTX/assets/scenes/demo_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_cube_scene.json \
+    && test -f RayTracerRTX/assets/scenes/multi_mesh_scene.json \
     && test -f RayTracerRTX/src/app/mesh.cpp \
     && test -f RayTracerRTX/src/app/mesh.h \
     && test -f RayTracerRTX/src/app/obj_loader.cpp \
