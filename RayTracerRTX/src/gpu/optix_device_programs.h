@@ -238,9 +238,9 @@ extern "C" __global__ void __closesthit__radiance()
         lightDistance - 0.01f);
     const float visibility = visible ? 1.0f : 0.0f;
 
-    const float ambient = 0.22f;
-    const float diffuseShadowFloor = 0.48f;
-    const float mirrorShadowFloor = 0.62f;
+    const float ambient = 0.18f;
+    const float diffuseShadowFloor = 0.34f;
+    const float mirrorShadowFloor = 0.50f;
     const float shadowFloor = material.materialType == MaterialMirror ? mirrorShadowFloor : diffuseShadowFloor;
     const float shadowFactor = shadowFloor + (1.0f - shadowFloor) * visibility;
     const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
@@ -309,8 +309,8 @@ extern "C" __global__ void __closesthit__radiance_plane()
         lightDistance - 0.01f);
     const float visibility = visible ? 1.0f : 0.0f;
 
-    const float ambient = 0.22f;
-    const float planeShadowFloor = 0.55f;
+    const float ambient = 0.18f;
+    const float planeShadowFloor = 0.32f;
     const float shadowFactor = planeShadowFloor + (1.0f - planeShadowFloor) * visibility;
     const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
     const float diffuse = ndotl * shadowFactor;
