@@ -15,7 +15,8 @@ Date: 2026-05-21
 ## Method
 
 Measurements were collected with the test executable benchmark mode. The
-benchmark explicitly uses the default real-time direct lighting mode:
+benchmark explicitly reports the default real-time direct lighting mode and one
+small progressive denoiser scenario:
 
 ```powershell
 RayTracerRTX\tests\x64\Debug\RayTracerRTX.Tests.exe --benchmark
@@ -36,7 +37,8 @@ objects are stored separately and placed in the IAS with per-object transforms.
 Direct lighting uses a physically motivated GGX microfacet BRDF for diffuse,
 mirror, and metal materials.
 Progressive path tracing accumulation is available as an interactive quality
-mode but is not included in the main FPS table below.
+mode. Optional OptiX denoising is measured separately because it is a quality
+feature and much heavier than the direct real-time mode.
 
 The benchmark is headless and does not include GLFW window presentation, HUD
 drawing, or user input processing. Interactive FPS in the desktop app may differ
@@ -46,14 +48,15 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low | 640x360 | 666.56 | 1.50 | 1.48 |
-| HD | 1280x720 | 227.93 | 4.39 | 4.36 |
-| Full HD | 1920x1080 | 105.15 | 9.51 | 9.48 |
+| Low | 640x360 | 499.41 | 2.00 | 1.98 |
+| HD | 1280x720 | 216.71 | 4.61 | 4.58 |
+| Full HD | 1920x1080 | 102.74 | 9.73 | 9.69 |
+| Progressive + optional OptiX denoiser | 640x360 | 21.08 | 47.44 | 47.31 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD averages about 105 FPS, so the current
+with the OBJ mesh scene enabled. Full HD averages about 103 FPS, so the current
 scene remains above the 60 FPS target. The extra material, diffuse texture,
 normal-map shading state, and per-object Triangle GAS/IAS layout remain within
 the real-time budget: average GPU time is below 10 ms at 1920x1080, under the
@@ -62,6 +65,11 @@ the real-time budget: average GPU time is below 10 ms at 1920x1080, under the
 Progressive mode trades immediate stability for convergence over multiple
 samples. Moving the camera, light, spheres, materials, or mesh scene resets the
 accumulation buffer so stale samples are not mixed with the new view.
+
+The optional OptiX denoiser greatly reduces progressive noise but is not a
+real-time default path in this Debug build. It is intentionally controlled by a
+HUD flag and only applies to progressive accumulation, not to the direct
+real-time mode.
 
 The close match between host frame time and GPU time indicates that the benchmark
 is dominated by GPU rendering and synchronization rather than CPU-side scene

@@ -306,6 +306,25 @@ int OptixRenderer::getRenderMode() const
     return renderMode;
 }
 
+void OptixRenderer::setDenoiserEnabled(const bool enabled)
+{
+    if (denoiserEnabled != enabled)
+    {
+        denoiserEnabled = enabled;
+        resetAccumulation();
+    }
+}
+
+bool OptixRenderer::isDenoiserEnabled() const
+{
+    return denoiserEnabled;
+}
+
+bool OptixRenderer::isDenoiserAvailable() const
+{
+    return denoiserAvailable;
+}
+
 void OptixRenderer::resetAccumulation()
 {
     accumulationSampleCount = 0;
@@ -319,6 +338,156 @@ void OptixRenderer::resetAccumulation()
 unsigned int OptixRenderer::getAccumulationSampleCount() const
 {
     return accumulationSampleCount;
+}
+
+void OptixRenderer::initializeDenoiser()
+{
+    releaseDenoiser();
+    try
+    {
+        OptixDenoiserOptions options{};
+        options.guideAlbedo = 0;
+        options.guideNormal = 0;
+        options.denoiseAlpha = OPTIX_DENOISER_ALPHA_MODE_COPY;
+
+        OptixResult result = optixDenoiserCreate(context, OPTIX_DENOISER_MODEL_KIND_HDR, &options, &denoiser);
+        if (result != OPTIX_SUCCESS || denoiser == nullptr)
+        {
+            denoiserAvailable = false;
+            denoiser = nullptr;
+            std::cerr << "OptiX denoiser unavailable; progressive mode will continue without denoising.\n";
+            return;
+        }
+
+        result = optixDenoiserComputeMemoryResources(denoiser, static_cast<unsigned int>(gWidth), static_cast<unsigned int>(gHeight), &denoiserSizes);
+        if (result != OPTIX_SUCCESS)
+        {
+            releaseDenoiser();
+            std::cerr << "OptiX denoiser memory query failed; progressive mode will continue without denoising.\n";
+            return;
+        }
+
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dDenoisedBuffer), static_cast<size_t>(gWidth) * static_cast<size_t>(gHeight) * sizeof(float4)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dDenoiserState), denoiserSizes.stateSizeInBytes));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dDenoiserScratch), denoiserSizes.withoutOverlapScratchSizeInBytes));
+
+        result = optixDenoiserSetup(
+            denoiser,
+            stream,
+            static_cast<unsigned int>(gWidth),
+            static_cast<unsigned int>(gHeight),
+            dDenoiserState,
+            denoiserSizes.stateSizeInBytes,
+            dDenoiserScratch,
+            denoiserSizes.withoutOverlapScratchSizeInBytes);
+        if (result != OPTIX_SUCCESS)
+        {
+            releaseDenoiser();
+            std::cerr << "OptiX denoiser setup failed; progressive mode will continue without denoising.\n";
+            return;
+        }
+
+        denoiserAvailable = true;
+    }
+    catch (const std::exception& ex)
+    {
+        releaseDenoiser();
+        std::cerr << "OptiX denoiser initialization failed: " << ex.what()
+                  << "\nProgressive mode will continue without denoising.\n";
+    }
+}
+
+void OptixRenderer::releaseDenoiser()
+{
+    denoiserAvailable = false;
+    if (dDenoiserScratch != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dDenoiserScratch));
+        dDenoiserScratch = 0;
+    }
+    if (dDenoiserState != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dDenoiserState));
+        dDenoiserState = 0;
+    }
+    if (dDenoisedBuffer != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dDenoisedBuffer));
+        dDenoisedBuffer = 0;
+    }
+    if (denoiser != nullptr)
+    {
+        optixDenoiserDestroy(denoiser);
+        denoiser = nullptr;
+    }
+    denoiserSizes = {};
+}
+
+bool OptixRenderer::applyDenoiser(std::vector<uchar4>& hostPixels)
+{
+    if (!denoiserEnabled || !denoiserAvailable || denoiser == nullptr || dDenoisedBuffer == 0)
+    {
+        return false;
+    }
+
+    OptixImage2D input{};
+    input.data = dAccumulationBuffer;
+    input.width = static_cast<unsigned int>(gWidth);
+    input.height = static_cast<unsigned int>(gHeight);
+    input.rowStrideInBytes = static_cast<unsigned int>(gWidth * sizeof(float4));
+    input.pixelStrideInBytes = sizeof(float4);
+    input.format = OPTIX_PIXEL_FORMAT_FLOAT4;
+
+    OptixImage2D output = input;
+    output.data = dDenoisedBuffer;
+
+    OptixDenoiserGuideLayer guideLayer{};
+    OptixDenoiserLayer layer{};
+    layer.input = input;
+    layer.output = output;
+
+    OptixDenoiserParams params{};
+    params.blendFactor = 0.0f;
+
+    const OptixResult result = optixDenoiserInvoke(
+        denoiser,
+        stream,
+        &params,
+        dDenoiserState,
+        denoiserSizes.stateSizeInBytes,
+        &guideLayer,
+        &layer,
+        1,
+        0,
+        0,
+        dDenoiserScratch,
+        denoiserSizes.withoutOverlapScratchSizeInBytes);
+    if (result != OPTIX_SUCCESS)
+    {
+        denoiserAvailable = false;
+        std::cerr << "OptiX denoiser invoke failed; disabling denoiser for this run.\n";
+        return false;
+    }
+
+    std::vector<float4> denoised(static_cast<size_t>(gWidth) * static_cast<size_t>(gHeight));
+    CUDA_CHECK(cudaMemcpyAsync(
+        denoised.data(),
+        reinterpret_cast<void*>(dDenoisedBuffer),
+        denoised.size() * sizeof(float4),
+        cudaMemcpyDeviceToHost,
+        stream));
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+
+    for (size_t i = 0; i < denoised.size(); ++i)
+    {
+        const float3 mapped = toneMapAndGammaCorrect(make_float3(denoised[i].x, denoised[i].y, denoised[i].z));
+        hostPixels[i] = make_uchar4(
+            static_cast<unsigned char>(clamp01(mapped.x) * 255.0f),
+            static_cast<unsigned char>(clamp01(mapped.y) * 255.0f),
+            static_cast<unsigned char>(clamp01(mapped.z) * 255.0f),
+            255u);
+    }
+    return true;
 }
 
 void OptixRenderer::initialize()
@@ -341,6 +510,7 @@ void OptixRenderer::initialize(const SceneState& initialScene)
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dAccumulationBuffer), gWidth * gHeight * sizeof(float4)));
     CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(dAccumulationBuffer), 0, gWidth * gHeight * sizeof(float4)));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dLaunchParams), sizeof(LaunchParams)));
+    initializeDenoiser();
 }
 
 void OptixRenderer::createContext()
@@ -985,7 +1155,11 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
 
     CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(dLaunchParams), &params, sizeof(LaunchParams), cudaMemcpyHostToDevice, stream));
     OPTIX_CHECK(optixLaunch(pipeline, stream, dLaunchParams, sizeof(LaunchParams), &sbt, gWidth, gHeight, 1));
-    CUDA_CHECK(cudaMemcpyAsync(hostPixels.data(), dFrameBuffer, hostPixels.size() * sizeof(uchar4), cudaMemcpyDeviceToHost, stream));
+    const bool usedDenoiser = renderMode == RenderModeProgressive && applyDenoiser(hostPixels);
+    if (!usedDenoiser)
+    {
+        CUDA_CHECK(cudaMemcpyAsync(hostPixels.data(), dFrameBuffer, hostPixels.size() * sizeof(uchar4), cudaMemcpyDeviceToHost, stream));
+    }
     CUDA_CHECK(cudaEventRecord(frameStop, stream));
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -1001,6 +1175,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
 
 void OptixRenderer::destroy()
 {
+    releaseDenoiser();
     if (dFrameBuffer != nullptr)
     {
         cudaFree(dFrameBuffer);

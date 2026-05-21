@@ -65,13 +65,15 @@ sequenceDiagram
     ObjLoader->>Scene: Load MeshObject list with OBJ data, tangents, materials, textures and transforms
     App->>Scene: Move sphere, light, or toggle material
     App->>Renderer: Optional P toggle for progressive accumulation
+    App->>Renderer: Optional N toggle for OptiX denoiser
     App->>Renderer: renderFrame(scene, camera)
     Renderer->>CUDA: Upload sphere materials, mesh buffers, diffuse/normal texture pixels, and LaunchParams
     Renderer->>OptiX: Build sphere GAS + one triangle GAS per mesh object + IAS transforms
     Renderer->>OptiX: optixLaunch
     OptiX->>GPU: Ray generation, sphere hit, mesh closest-hit, miss, shadow, reflection programs
-    GPU-->>CUDA: Write uchar4 framebuffer
-    Renderer->>CUDA: Copy framebuffer to host
+    GPU-->>CUDA: Write uchar4 framebuffer and progressive HDR accumulation
+    Renderer->>OptiX: Optional denoiser invoke for progressive color buffer
+    Renderer->>CUDA: Copy framebuffer or denoised pixels to host
     Renderer-->>App: hostPixels + gpuTimeMs
     App->>App: Present image in OpenGL window
 ```
@@ -122,7 +124,11 @@ flowchart LR
     Upload --> Params["LaunchParams"]
     Params --> Device["GPU device code"]
     Device -->|uchar4 pixels| Buffer["dFrameBuffer"]
+    Device -->|HDR average| Accum["float4 accumulation buffer"]
+    Accum --> Denoiser["Optional OptiX denoiser"]
+    Denoiser --> Denoised["float4 denoised output"]
     Buffer -->|cudaMemcpyAsync| HostPixels["std::vector<uchar4>"]
+    Denoised -->|tone map + gamma| HostPixels
 ```
 
 ## Responsibility Split
@@ -133,7 +139,7 @@ flowchart LR
 | Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*` | Spheres, OBJ mesh data, materials, selected object, light movement and clamping |
 | Camera | `src/app/camera.*` | Camera state and basis vectors for ray generation |
 | Shared GPU data | `src/common/rtx_shared.h` | Host/device structures used by CUDA and OptiX |
-| Renderer host side | `src/gpu/optix_renderer.*` | CUDA resources, OptiX context, sphere GAS, triangle GAS, IAS, SBT, pipeline and launch |
+| Renderer host side | `src/gpu/optix_renderer.*` | CUDA resources, OptiX context, sphere GAS, triangle GAS, IAS, SBT, pipeline, launch, progressive accumulation, and optional denoiser |
 | Renderer device side | `src/gpu/optix_device_programs.h` | Ray generation, sphere hit, mesh closest-hit shader, miss programs, shadow and reflection logic |
 | Tests | `tests/*` | CPU unit tests and native GPU smoke test |
 

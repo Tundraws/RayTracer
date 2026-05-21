@@ -25,7 +25,9 @@ config with `meshObjects`, `camera`, `light`, and mesh transform fields.
 Invalid input prints a diagnostic message and falls back to the default scene.
 The interactive app starts in `RenderModeRealtime`; pressing `P` toggles
 progressive path tracing accumulation and resets samples when the camera, light,
-scene, material, or mesh signature changes.
+scene, material, or mesh signature changes. Pressing `N` requests the optional
+OptiX denoiser for progressive mode. If denoiser initialization or invocation
+fails, the renderer keeps running without denoising.
 
 ## Scene API
 
@@ -202,6 +204,7 @@ Uploaded to the GPU before each OptiX launch.
 | `accumulation` | Progressive float accumulation buffer |
 | `renderMode` | `RenderModeRealtime` or `RenderModeProgressive` |
 | `accumulationSample` | Current progressive sample index |
+| `maxDepth` | Recursive reflection depth limit |
 
 ### Render Modes
 
@@ -215,7 +218,11 @@ then tone maps the running average. The renderer resets accumulation when the
 camera or scene signature changes, and the HUD displays the current sample
 count. This is a coursework-scale progressive path tracing mode, not a full
 offline path tracer.
-| `maxDepth` | Recursive reflection depth limit |
+
+When the denoiser flag is enabled, progressive mode sends the HDR accumulation
+buffer through the OptiX denoiser and displays the denoised result. The current
+integration uses the color buffer only; albedo and normal guide layers are not
+generated yet. Real-time direct mode does not apply the denoiser.
 
 ## Renderer API
 
@@ -226,6 +233,9 @@ Declared in `src/gpu/optix_renderer.h`.
 | Method | Responsibility |
 |---|---|
 | `setRenderSize(int, int)` | Sets framebuffer dimensions |
+| `setRenderMode(int)` | Selects real-time direct or progressive accumulation mode |
+| `setDenoiserEnabled(bool)` | Requests optional OptiX denoising for progressive mode |
+| `isDenoiserAvailable()` | Reports whether denoiser setup/invocation is currently available |
 | `initialize()` | Creates CUDA stream, OptiX context, modules, program groups, pipeline, SBT and acceleration structures |
 | `renderFrame(const SceneState&, const CameraState&, std::vector<uchar4>&, float*)` | Uploads frame data, launches OptiX, copies pixels to host, optionally returns GPU time |
 | `destroy()` | Releases CUDA and OptiX resources |

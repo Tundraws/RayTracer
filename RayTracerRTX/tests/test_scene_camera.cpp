@@ -969,6 +969,57 @@ bool runProgressiveGpuSmokeTest(TestContext& t)
 #endif
 }
 
+bool runDenoiserGpuSmokeTest(TestContext& t)
+{
+#if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
+    (void)t;
+    std::cout << "[SKIP] OptiX denoiser smoke test skipped: RAYTRACERRTX_ENABLE_GPU_TESTS is not enabled.\n";
+    return false;
+#else
+    try
+    {
+        OptixRenderer renderer;
+        renderer.setRenderSize(64, 64);
+        renderer.initialize();
+        renderer.setRenderMode(RenderModeProgressive);
+        renderer.setDenoiserEnabled(false);
+
+        SceneState scene = makeDefaultScene();
+        CameraState camera;
+        std::vector<uchar4> pixels(64u * 64u);
+        float gpuTimeMs = -1.0f;
+
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        t.expect(renderer.getAccumulationSampleCount() == 1u, "Denoiser disabled path should still accumulate samples.");
+
+        renderer.setDenoiserEnabled(true);
+        t.expect(renderer.isDenoiserEnabled(), "Denoiser request flag should be stored.");
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        t.expect(renderer.getAccumulationSampleCount() == 1u, "Enabling denoiser should reset progressive accumulation.");
+
+        bool hasNonZeroPixel = false;
+        for (const uchar4 px : pixels)
+        {
+            if (px.x != 0u || px.y != 0u || px.z != 0u || px.w != 0u)
+            {
+                hasNonZeroPixel = true;
+                break;
+            }
+        }
+        t.expect(hasNonZeroPixel, "Denoiser enabled or graceful fallback should render non-zero pixels.");
+        t.expect(gpuTimeMs >= 0.0f, "Denoiser smoke: GPU time must be non-negative.");
+
+        renderer.destroy();
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << "[SKIP] OptiX denoiser smoke test skipped: " << ex.what() << '\n';
+        return false;
+    }
+#endif
+}
+
 int runGpuBenchmark()
 {
 #if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
@@ -1032,6 +1083,40 @@ int runGpuBenchmark()
                   << " | " << avgGpuMs
                   << " |\n";
     }
+
+    OptixRenderer denoiserRenderer;
+    denoiserRenderer.setRenderSize(640, 360);
+    denoiserRenderer.initialize();
+    denoiserRenderer.setRenderMode(RenderModeProgressive);
+    denoiserRenderer.setDenoiserEnabled(true);
+
+    SceneState denoiserScene = makeDefaultScene();
+    CameraState denoiserCamera;
+    std::vector<uchar4> denoiserPixels(640u * 360u);
+
+    double denoiserHostTotalMs = 0.0;
+    double denoiserGpuTotalMs = 0.0;
+    constexpr int denoiserFrames = 12;
+    for (int frame = 0; frame < denoiserFrames; ++frame)
+    {
+        float gpuTimeMs = 0.0f;
+        const auto start = std::chrono::steady_clock::now();
+        denoiserRenderer.renderFrame(denoiserScene, denoiserCamera, denoiserPixels, &gpuTimeMs);
+        const auto stop = std::chrono::steady_clock::now();
+        denoiserHostTotalMs += std::chrono::duration<double, std::milli>(stop - start).count();
+        denoiserGpuTotalMs += static_cast<double>(gpuTimeMs);
+    }
+
+    const double avgDenoiserHostMs = denoiserHostTotalMs / static_cast<double>(denoiserFrames);
+    const double avgDenoiserGpuMs = denoiserGpuTotalMs / static_cast<double>(denoiserFrames);
+    const double denoiserFps = avgDenoiserHostMs > 0.0 ? 1000.0 / avgDenoiserHostMs : 0.0;
+    std::cout << "| Progressive + optional OptiX denoiser"
+              << " | 640x360"
+              << " | " << std::fixed << std::setprecision(2) << denoiserFps
+              << " | " << avgDenoiserHostMs
+              << " | " << avgDenoiserGpuMs
+              << " |\n";
+    denoiserRenderer.destroy();
 
     return 0;
 #endif
@@ -1123,6 +1208,15 @@ int main(int argc, char** argv)
     if (runProgressiveGpuSmokeTest(t))
     {
         std::cout << "[PASS] Progressive GPU smoke test (checks: 5)\n";
+    }
+    else
+    {
+        ++testsSkipped;
+    }
+    ++testsRun;
+    if (runDenoiserGpuSmokeTest(t))
+    {
+        std::cout << "[PASS] OptiX denoiser smoke test (checks: 5)\n";
     }
     else
     {

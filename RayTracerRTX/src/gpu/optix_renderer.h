@@ -28,6 +28,9 @@ public:
     void setRenderSize(int width, int height);
     void setRenderMode(int mode);
     int getRenderMode() const;
+    void setDenoiserEnabled(bool enabled);
+    bool isDenoiserEnabled() const;
+    bool isDenoiserAvailable() const;
     void resetAccumulation();
     unsigned int getAccumulationSampleCount() const;
     void initialize();
@@ -43,6 +46,9 @@ private:
     void createPipeline();
     void createSbt();
     void rebuildAccelerationStructure();
+    void initializeDenoiser();
+    void releaseDenoiser();
+    bool applyDenoiser(std::vector<uchar4>& hostPixels);
 
     OptixDeviceContext context = nullptr;
     OptixModule module = nullptr;
@@ -71,6 +77,9 @@ private:
     CUdeviceptr dIasInstances = 0;
     CUdeviceptr dLaunchParams = 0;
     CUdeviceptr dAccumulationBuffer = 0;
+    CUdeviceptr dDenoisedBuffer = 0;
+    CUdeviceptr dDenoiserState = 0;
+    CUdeviceptr dDenoiserScratch = 0;
     OptixTraversableHandle sphereGasHandle = 0;
     OptixTraversableHandle planeGasHandle = 0;
     std::vector<OptixTraversableHandle> meshGasHandles;
@@ -86,7 +95,11 @@ private:
     unsigned int meshObjectCount = 0;
     unsigned int accumulationSampleCount = 0;
     int renderMode = RenderModeRealtime;
+    bool denoiserEnabled = false;
+    bool denoiserAvailable = false;
     std::size_t lastAccumulationSignature = 0;
+    OptixDenoiser denoiser = nullptr;
+    OptixDenoiserSizes denoiserSizes = {};
     OptixBuildInput sphereBuildInput = {};
     OptixBuildInput planeBuildInput = {};
     OptixBuildInput iasBuildInput = {};

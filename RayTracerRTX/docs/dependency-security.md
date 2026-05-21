@@ -18,8 +18,10 @@ security limitations for the coursework project.
 
 The OBJ mesh path does not add external runtime dependencies. OBJ and MTL files
 are parsed by the local `src/app/obj_loader.*` implementation. Supported input
-is limited to vertices, normals, triangular faces, `mtllib`, `usemtl`, and MTL
-`Kd` values with a simple material-name mapping for mirror materials.
+is limited to vertices, normals, texture coordinates, triangular faces,
+`mtllib`, `usemtl`, and selected MTL fields: `Kd`, `Ks`, `Ns`, `Ni`, `d`,
+`map_Kd`, `bump`, `map_Bump`, and `norm`. The OptiX denoiser uses the already
+required NVIDIA OptiX SDK and does not add a new third-party dependency.
 
 ## Dependency Check Approach
 

@@ -24,7 +24,8 @@ geometry. Direct lighting uses a physically motivated GGX/Trowbridge-Reitz
 microfacet BRDF for diffuse, mirror and metal materials; glass remains a
 separate simplified dielectric approximation. The renderer has a default
 real-time direct lighting mode and an optional progressive path tracing mode
-with GPU accumulation.
+with GPU accumulation. Progressive mode can optionally run the OptiX denoiser;
+if denoiser initialization or invocation fails, rendering continues without it.
 
 ## Технологии
 
@@ -77,6 +78,7 @@ JSON scene config поддерживает `meshObjects`, `camera`, `light` и t
 - `J/L`, `I/K`, `U/O` - перемещение источника света
 - `M` - переключение материала выбранной сферы
 - `P` - переключение real-time direct / progressive path tracing mode
+- `N` - optional OptiX denoiser for progressive path tracing mode
 - `Esc` - выход
 
 ## Структура проекта
