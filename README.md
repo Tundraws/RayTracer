@@ -49,6 +49,7 @@ model; other OBJ materials use diffuse shading.
 RayTracerRTX.exe --mesh RayTracerRTX/assets/meshes/demo.obj
 RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
 RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/textured_scene.json
+RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/textured_cube_scene.json
 ```
 
 JSON scene config поддерживает `meshObjects`, `camera`, `light` и transform
@@ -75,8 +76,8 @@ JSON scene config поддерживает `meshObjects`, `camera`, `light` и t
 - `src/gpu` - OptiX renderer, pipeline, SBT, device-программы
 - `src/common` - общие структуры данных host/device
 - `assets/meshes/demo.obj` and `assets/meshes/demo.mtl` - demo OBJ mesh with diffuse and mirror materials
-- `assets/meshes/textured_demo.obj`, `textured_demo.mtl`, and `checker.ppm` - demo OBJ mesh with `map_Kd` diffuse texture
-- `assets/scenes/demo_scene.json` - documented JSON scene input example
+- `assets/meshes/textured_demo.obj`, `textured_cube.obj`, `textured_demo.mtl`, and `checker.ppm` - demo OBJ meshes with `map_Kd` diffuse texture
+- `assets/scenes/demo_scene.json`, `textured_scene.json`, and `textured_cube_scene.json` - documented JSON scene input examples
 
 ## Текущий статус
 

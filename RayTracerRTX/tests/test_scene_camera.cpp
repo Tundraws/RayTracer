@@ -70,6 +70,31 @@ std::filesystem::path findDemoObjAsset()
     return {};
 }
 
+std::filesystem::path findAssetMesh(const std::string& fileName)
+{
+    const std::filesystem::path sourceDir = RAYTRACERRTX_SOURCE_DIR;
+    const std::filesystem::path fromSource = sourceDir.empty()
+        ? std::filesystem::path{}
+        : sourceDir.parent_path() / "assets" / "meshes" / fileName;
+
+    const std::filesystem::path candidates[] = {
+        fromSource,
+        std::filesystem::path("RayTracerRTX") / "assets" / "meshes" / fileName,
+        std::filesystem::path("assets") / "meshes" / fileName,
+        std::filesystem::path("..") / "assets" / "meshes" / fileName
+    };
+
+    for (const std::filesystem::path& candidate : candidates)
+    {
+        if (!candidate.empty() && std::filesystem::exists(candidate))
+        {
+            return candidate;
+        }
+    }
+
+    return {};
+}
+
 void testObjLoaderTriangleWithNormals(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -422,6 +447,23 @@ void testDemoObjAssetLoads(TestContext& t)
     t.expect(result.mesh.triangles.size() > 0, "Demo OBJ should contain triangles.");
     t.expect(result.mesh.materials.size() >= 4, "Demo OBJ should load default plus named MTL materials.");
     t.expect(hasValidMeshMaterialIndices(result.mesh), "Demo OBJ material indices should be valid.");
+}
+
+void testTexturedCubeAssetLoads(TestContext& t)
+{
+    const std::filesystem::path objPath = findAssetMesh("textured_cube.obj");
+    t.expect(!objPath.empty(), "Textured cube OBJ asset must exist.");
+    if (objPath.empty())
+    {
+        return;
+    }
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "Textured cube OBJ asset should load.");
+    t.expect(result.mesh.vertices.size() == 36, "Textured cube should contain 12 triangulated faces.");
+    t.expect(result.mesh.triangles.size() == 12, "Textured cube should contain 12 triangles.");
+    t.expect(!result.mesh.textures.empty(), "Textured cube should load the shared checker texture.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Textured cube material indices should be valid.");
 }
 
 void testDefaultScene(TestContext& t)
@@ -834,6 +876,7 @@ int main(int argc, char** argv)
     runTest("OBJ loader material fallback when MTL missing", testObjLoaderMaterialFallbackWhenMtlMissing);
     runTest("OBJ loader single triangle boundary", testObjLoaderSingleTriangleBoundary);
     runTest("Demo OBJ asset loads", testDemoObjAssetLoads);
+    runTest("Textured cube asset loads", testTexturedCubeAssetLoads);
     runTest("Default scene mesh geometry", testDefaultSceneMeshGeometry);
     runTest("Scene config loads valid scene", testSceneConfigLoadsValidScene);
     runTest("Scene config missing file", testSceneConfigMissingFile);

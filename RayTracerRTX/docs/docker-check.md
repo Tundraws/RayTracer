@@ -26,10 +26,12 @@ driver integration. GPU execution is verified separately by the native
 - `RayTracerRTX/assets/meshes/demo.obj`
 - `RayTracerRTX/assets/meshes/demo.mtl`
 - `RayTracerRTX/assets/meshes/textured_demo.obj`
+- `RayTracerRTX/assets/meshes/textured_cube.obj`
 - `RayTracerRTX/assets/meshes/textured_demo.mtl`
 - `RayTracerRTX/assets/meshes/checker.ppm`
 - `RayTracerRTX/assets/scenes/demo_scene.json`
 - `RayTracerRTX/assets/scenes/textured_scene.json`
+- `RayTracerRTX/assets/scenes/textured_cube_scene.json`
 - `RayTracerRTX/src/app/obj_loader.*`
 - `RayTracerRTX/src/app/scene_config.*`
 - `RayTracerRTX/src/app/mesh.*`

@@ -23,10 +23,12 @@ REQUIRED_PATHS = [
     "RayTracerRTX/assets/meshes/demo.obj",
     "RayTracerRTX/assets/meshes/demo.mtl",
     "RayTracerRTX/assets/meshes/textured_demo.obj",
+    "RayTracerRTX/assets/meshes/textured_cube.obj",
     "RayTracerRTX/assets/meshes/textured_demo.mtl",
     "RayTracerRTX/assets/meshes/checker.ppm",
     "RayTracerRTX/assets/scenes/demo_scene.json",
     "RayTracerRTX/assets/scenes/textured_scene.json",
+    "RayTracerRTX/assets/scenes/textured_cube_scene.json",
     "RayTracerRTX/tests/test_scene_camera.cpp",
     "RayTracerRTX/docs/coursework-checklist.md",
     "RayTracerRTX/docs/docker-check.md",
@@ -76,6 +78,10 @@ def main() -> None:
         fail("Textured demo OBJ misses texture coordinates.")
     if "map_Kd checker.ppm" not in textured_mtl:
         fail("Textured demo MTL misses map_Kd checker.ppm.")
+
+    textured_cube_obj = (ROOT / "RayTracerRTX/assets/meshes/textured_cube.obj").read_text(encoding="utf-8", errors="ignore")
+    if "TexturedCourseworkCube" not in textured_cube_obj or "vt " not in textured_cube_obj:
+        fail("Textured cube OBJ misses cube marker or texture coordinates.")
 
     docker_doc = (ROOT / "RayTracerRTX/docs/docker-check.md").read_text(encoding="utf-8", errors="ignore")
     if "OBJ mesh" not in docker_doc:

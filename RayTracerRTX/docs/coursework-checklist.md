@@ -65,7 +65,7 @@
 | Unit tests | `tests/test_scene_camera.cpp` |
 | GPU smoke test | `tests/RayTracerRTX.Tests.vcxproj` |
 | Demo OBJ mesh | `assets/meshes/demo.obj`, `assets/meshes/demo.mtl` |
-| Demo textured OBJ mesh | `assets/meshes/textured_demo.obj`, `assets/meshes/textured_demo.mtl`, `assets/meshes/checker.ppm` |
+| Demo textured OBJ mesh | `assets/meshes/textured_demo.obj`, `assets/meshes/textured_cube.obj`, `assets/meshes/textured_demo.mtl`, `assets/meshes/checker.ppm` |
 | Docker / Compose | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
 | README | `README.md`, `RayTracerRTX/README.md` |
 | Architecture diagrams | `docs/architecture.md` |
