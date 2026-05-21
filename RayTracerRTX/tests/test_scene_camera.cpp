@@ -886,6 +886,64 @@ void testToggleMaterial(TestContext& t)
     t.expect(scene.materials[1].materialType == initial, "Material toggle should return to initial type.");
 }
 
+void testSphereMaterialPresetCycle(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 0;
+    scene.materials[0].materialType = MaterialDiffuse;
+
+    cycleSelectedSphereMaterialPreset(scene);
+    t.expect(scene.materials[0].materialType == MaterialMirror, "Sphere material preset should cycle diffuse to mirror.");
+    cycleSelectedSphereMaterialPreset(scene);
+    t.expect(scene.materials[0].materialType == MaterialMetal, "Sphere material preset should cycle mirror to metal.");
+    cycleSelectedSphereMaterialPreset(scene);
+    t.expect(scene.materials[0].materialType == MaterialDielectric, "Sphere material preset should cycle metal to dielectric.");
+}
+
+void testSelectedMeshChanges(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    MeshObject copy = scene.meshObjects[0];
+    copy.assetReference = "copy";
+    scene.meshObjects.push_back(copy);
+    scene.selectedMeshObject = 0;
+
+    selectNextMeshObject(scene);
+    t.expect(scene.selectedMeshObject == 1, "Selected mesh object should advance.");
+    selectNextMeshObject(scene);
+    t.expect(scene.selectedMeshObject == 0, "Selected mesh object should wrap.");
+}
+
+void testSelectedMeshMaterialPresetCycle(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+    scene.meshObjects[0].mesh.materials[0].materialType = MaterialDiffuse;
+
+    cycleSelectedMeshMaterialPreset(scene);
+    t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialMirror, "Mesh material preset should cycle diffuse to mirror.");
+    cycleSelectedMeshMaterialPreset(scene);
+    t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialMetal, "Mesh material preset should cycle mirror to metal.");
+    t.expect(hasValidMeshMaterialIndices(scene.meshObjects[0].mesh), "Mesh material preset changes should keep material indices valid.");
+}
+
+void testInvalidMeshSelectionSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedMeshObject = 100;
+    scene.selectedMeshMaterial = 100;
+
+    cycleSelectedMeshMaterialPreset(scene);
+    t.expect(scene.selectedMeshObject >= 0, "Invalid mesh object index should clamp safely.");
+    t.expect(scene.selectedMeshMaterial >= 0, "Invalid mesh material index should clamp safely.");
+
+    scene.meshObjects.clear();
+    selectNextMeshObject(scene);
+    cycleSelectedMeshMaterialPreset(scene);
+    t.expect(scene.selectedMeshObject == 0, "Empty mesh object list should keep selected mesh at zero.");
+}
+
 void testMoveSphereClamp(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -1304,6 +1362,10 @@ int main(int argc, char** argv)
 
     runTest("Default scene", testDefaultScene);
     runTest("Toggle material", testToggleMaterial);
+    runTest("Sphere material preset cycle", testSphereMaterialPresetCycle);
+    runTest("Selected mesh changes", testSelectedMeshChanges);
+    runTest("Selected mesh material preset cycle", testSelectedMeshMaterialPresetCycle);
+    runTest("Invalid mesh selection safe", testInvalidMeshSelectionSafe);
     runTest("Move sphere clamp", testMoveSphereClamp);
     runTest("Move light clamp", testMoveLightClamp);
     runTest("Clamp selected sphere index", testClampSceneSelectedSphereBounds);

@@ -34,10 +34,15 @@ struct SceneState
     MeshData mesh;
     float3 lightPosition;
     int selectedSphere = 0;
+    int selectedMeshObject = 0;
+    int selectedMeshMaterial = 0;
 };
 
 SceneState makeDefaultScene();
 void clampScene(SceneState& scene);
 void moveSelectedSphere(SceneState& scene, const float3 delta);
 void toggleSelectedMaterial(SceneState& scene);
+void cycleSelectedSphereMaterialPreset(SceneState& scene);
+void selectNextMeshObject(SceneState& scene);
+void cycleSelectedMeshMaterialPreset(SceneState& scene);
 void moveLight(SceneState& scene, const float3 delta);

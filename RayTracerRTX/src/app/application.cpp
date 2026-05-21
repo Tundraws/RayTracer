@@ -21,12 +21,18 @@
 #include <cmath>
 #include <cctype>
 #include <cwctype>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
+
+#ifndef RAYTRACERRTX_SOURCE_DIR
+#define RAYTRACERRTX_SOURCE_DIR ""
+#endif
 
 namespace
 {
@@ -43,6 +49,9 @@ struct AppState
     bool denoiserEnabled = false;
     bool denoiserAvailable = false;
     unsigned int progressiveSamples = 0;
+    std::vector<SceneBuildResult> scenePresets;
+    std::vector<std::string> scenePresetNames;
+    int scenePresetIndex = 0;
 };
 
 struct FrameStats
@@ -157,7 +166,8 @@ void drawHud(
     const int renderMode,
     const bool denoiserEnabled,
     const bool denoiserAvailable,
-    const unsigned int progressiveSamples)
+    const unsigned int progressiveSamples,
+    const std::string& presetName)
 {
     if (window == nullptr)
     {
@@ -207,21 +217,30 @@ void drawHud(
     line1 << L"FPS: " << std::fixed << std::setprecision(1) << stats.fps
           << L"   FRAME: " << stats.avgHostMs << L" MS   GPU: " << stats.avgGpuMs << L" MS";
 
+    const bool hasSphere = scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.materials.size());
+    const bool hasMesh = scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size());
+    const MeshObject* meshObject = hasMesh ? &scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)] : nullptr;
+    const bool hasMeshMaterial = meshObject != nullptr &&
+        scene.selectedMeshMaterial >= 0 &&
+        scene.selectedMeshMaterial < static_cast<int>(meshObject->mesh.materials.size());
+    const MeshMaterial* meshMaterial = hasMeshMaterial ? &meshObject->mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)] : nullptr;
+
     std::wostringstream line2;
     line2 << L"\u0421\u0424\u0415\u0420\u0410: " << (scene.selectedSphere + 1)
-          << L"   \u041c\u0410\u0422\u0415\u0420\u0418\u0410\u041b: " << materialNameW(scene.materials[scene.selectedSphere].materialType)
-          << L"   \u0421\u0412\u0415\u0422: " << std::fixed << std::setprecision(1)
-          << scene.lightPosition.x << L" " << scene.lightPosition.y << L" " << scene.lightPosition.z;
+          << L" MAT: " << (hasSphere ? materialNameW(scene.materials[scene.selectedSphere].materialType) : L"N/A")
+          << L"   MESH: " << (hasMesh ? scene.selectedMeshObject + 1 : 0) << L"/" << scene.meshObjects.size()
+          << L"   MMAT: " << (meshMaterial != nullptr ? materialNameW(meshMaterial->materialType) : L"N/A");
     std::wostringstream lineMode;
     lineMode << L"MODE: " << (renderMode == RenderModeProgressive ? L"PROGRESSIVE PATH" : L"REAL-TIME DIRECT")
              << L"   SAMPLES: " << progressiveSamples
              << L"   DENOISER: " << (denoiserEnabled ? (denoiserAvailable ? L"ON" : L"UNAVAILABLE") : L"OFF");
 
     const std::wstring line3 = lineMode.str();
-    const std::wstring line4 = L"\u0414\u0412\u0418\u0416\u0415\u041d\u0418\u0415 \u0421\u0424\u0415\u0420\u042b: \u0421\u0422\u0420\u0415\u041b\u041a\u0418 - X/Z";
-    const std::wstring line5 = L"R/F - Y";
-    const std::wstring line6 = L"\u0421\u0412\u0415\u0422: J/L-X, I/K-Z, U/O-Y";
-    const std::wstring line7 = L"\u041c\u0410\u0422\u0415\u0420\u0418\u0410\u041b: M   MODE: P   DENOISER: N   \u041a\u0410\u041c\u0415\u0420\u0410: WASD/SPACE + \u041c\u042b\u0428\u042c";
+    const std::wstring presetWide(presetName.begin(), presetName.end());
+    const std::wstring line4 = L"PRESET: " + presetWide;
+    const std::wstring line5 = L"SPHERE MOVE: ARROWS, R/F";
+    const std::wstring line6 = L"LIGHT: J/L-X, I/K-Z, U/O-Y";
+    const std::wstring line7 = L"PRESET: G   SPHERE MAT: M   MESH: B   MESH MAT: V   MODE: P   DENOISER: N";
 
     const std::wstring text1 = line1.str();
     const std::wstring text2 = line2.str();
@@ -412,9 +431,38 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool mIsDown = glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS;
     if (mIsDown && !mWasDown)
     {
-        toggleSelectedMaterial(scene);
+        cycleSelectedSphereMaterialPreset(scene);
     }
     mWasDown = mIsDown;
+
+    static bool bWasDown = false;
+    const bool bIsDown = glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS;
+    if (bIsDown && !bWasDown)
+    {
+        selectNextMeshObject(scene);
+        appState.progressiveSamples = 0;
+    }
+    bWasDown = bIsDown;
+
+    static bool vWasDown = false;
+    const bool vIsDown = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
+    if (vIsDown && !vWasDown)
+    {
+        cycleSelectedMeshMaterialPreset(scene);
+        appState.progressiveSamples = 0;
+    }
+    vWasDown = vIsDown;
+
+    static bool gWasDown = false;
+    const bool gIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
+    if (gIsDown && !gWasDown && !appState.scenePresets.empty())
+    {
+        appState.scenePresetIndex = (appState.scenePresetIndex + 1) % static_cast<int>(appState.scenePresets.size());
+        appState.scene = appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)].scene;
+        appState.camera = appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)].camera;
+        appState.progressiveSamples = 0;
+    }
+    gWasDown = gIsDown;
 
     static bool pWasDown = false;
     const bool pIsDown = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
@@ -434,6 +482,55 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     }
     nWasDown = nIsDown;
 
+}
+
+std::filesystem::path findSceneAsset(const std::string& fileName)
+{
+    const std::filesystem::path sourceDir = RAYTRACERRTX_SOURCE_DIR;
+    const std::filesystem::path fromSource = sourceDir.empty()
+        ? std::filesystem::path{}
+        : sourceDir.parent_path() / "assets" / "scenes" / fileName;
+    const std::filesystem::path candidates[] = {
+        fromSource,
+        std::filesystem::path("RayTracerRTX") / "assets" / "scenes" / fileName,
+        std::filesystem::path("assets") / "scenes" / fileName
+    };
+
+    for (const std::filesystem::path& candidate : candidates)
+    {
+        if (!candidate.empty() && std::filesystem::exists(candidate))
+        {
+            return candidate;
+        }
+    }
+    return {};
+}
+
+void addScenePreset(AppState& appState, SceneBuildResult preset, std::string name)
+{
+    if (!preset.ok)
+    {
+        return;
+    }
+    clampScene(preset.scene);
+    appState.scenePresets.push_back(std::move(preset));
+    appState.scenePresetNames.push_back(std::move(name));
+}
+
+void addSceneConfigPreset(AppState& appState, const std::string& fileName, const std::string& name)
+{
+    const std::filesystem::path path = findSceneAsset(fileName);
+    if (path.empty())
+    {
+        return;
+    }
+
+    const SceneConfigResult config = loadSceneConfigFile(path);
+    if (!config.ok)
+    {
+        return;
+    }
+    addScenePreset(appState, buildSceneFromConfig(config.config, path.parent_path()), name);
 }
 } // namespace
 
@@ -505,6 +602,11 @@ void run_optix_app(const ApplicationOptions& options)
     AppState appState;
     appState.camera = initial.camera;
     appState.scene = initial.scene;
+    addScenePreset(appState, initial, options.sceneConfigPath.empty() && options.meshPath.empty() ? "default" : "input");
+    addScenePreset(appState, buildDefaultSceneInput(), "default");
+    addSceneConfigPreset(appState, "textured_cube_scene.json", "textured cube");
+    addSceneConfigPreset(appState, "multi_mesh_scene.json", "multi mesh");
+    addSceneConfigPreset(appState, "gltf_scene.json", "gltf");
     glfwSetWindowUserPointer(window, &appState);
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
@@ -587,7 +689,10 @@ void run_optix_app(const ApplicationOptions& options)
             appState.renderMode,
             appState.denoiserEnabled,
             appState.denoiserAvailable,
-            appState.progressiveSamples);
+            appState.progressiveSamples,
+            appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(appState.scenePresetNames.size())
+                ? appState.scenePresetNames[static_cast<size_t>(appState.scenePresetIndex)]
+                : std::string{"custom"});
         glfwPollEvents();
     }
 

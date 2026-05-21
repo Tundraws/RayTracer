@@ -108,6 +108,8 @@ SceneState makeDefaultScene()
     scene.meshObjects = {std::move(defaultMeshObject)};
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
     scene.selectedSphere = 0;
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
     return scene;
 }
 
@@ -138,6 +140,30 @@ void clampScene(SceneState& scene)
     {
         scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
     }
+
+    if (scene.selectedMeshObject < 0)
+    {
+        scene.selectedMeshObject = 0;
+    }
+    if (scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
+    {
+        scene.selectedMeshObject = scene.meshObjects.empty() ? 0 : static_cast<int>(scene.meshObjects.size()) - 1;
+    }
+
+    const bool hasSelectedMesh = !scene.meshObjects.empty() &&
+        scene.selectedMeshObject >= 0 &&
+        scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size());
+    const int materialCount = hasSelectedMesh
+        ? static_cast<int>(scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)].mesh.materials.size())
+        : 0;
+    if (scene.selectedMeshMaterial < 0)
+    {
+        scene.selectedMeshMaterial = 0;
+    }
+    if (scene.selectedMeshMaterial >= materialCount)
+    {
+        scene.selectedMeshMaterial = materialCount > 0 ? materialCount - 1 : 0;
+    }
 }
 
 void moveSelectedSphere(SceneState& scene, const float3 delta)
@@ -162,6 +188,146 @@ void toggleSelectedMaterial(SceneState& scene)
 
     SphereMaterial& material = scene.materials[index];
     material.materialType = (material.materialType == MaterialDiffuse) ? MaterialMirror : MaterialDiffuse;
+}
+
+int nextMaterialPreset(const int materialType)
+{
+    switch (materialType)
+    {
+    case MaterialDiffuse:
+        return MaterialMirror;
+    case MaterialMirror:
+        return MaterialMetal;
+    case MaterialMetal:
+        return MaterialDielectric;
+    default:
+        return MaterialDiffuse;
+    }
+}
+
+void applyMaterialDefaults(SphereMaterial& material)
+{
+    switch (material.materialType)
+    {
+    case MaterialMirror:
+        material.specularColor = make_float3(1.0f, 1.0f, 1.0f);
+        material.roughness = 0.02f;
+        material.ior = 1.5f;
+        material.alpha = 1.0f;
+        break;
+    case MaterialMetal:
+        material.specularColor = make_float3(0.95f, 0.9f, 0.82f);
+        material.roughness = 0.18f;
+        material.ior = 1.5f;
+        material.alpha = 1.0f;
+        break;
+    case MaterialDielectric:
+        material.specularColor = make_float3(1.0f, 1.0f, 1.0f);
+        material.roughness = 0.02f;
+        material.ior = 1.45f;
+        material.alpha = 0.45f;
+        break;
+    default:
+        material.specularColor = make_float3(1.0f, 1.0f, 1.0f);
+        material.roughness = 0.4f;
+        material.ior = 1.5f;
+        material.alpha = 1.0f;
+        break;
+    }
+}
+
+void applyMaterialDefaults(MeshMaterial& material)
+{
+    switch (material.materialType)
+    {
+    case MaterialMirror:
+        material.specularColor = make_float3(1.0f, 1.0f, 1.0f);
+        material.roughness = 0.02f;
+        material.ior = 1.5f;
+        material.alpha = 1.0f;
+        break;
+    case MaterialMetal:
+        material.specularColor = make_float3(0.95f, 0.9f, 0.82f);
+        material.roughness = 0.18f;
+        material.ior = 1.5f;
+        material.alpha = 1.0f;
+        break;
+    case MaterialDielectric:
+        material.specularColor = make_float3(1.0f, 1.0f, 1.0f);
+        material.roughness = 0.02f;
+        material.ior = 1.45f;
+        material.alpha = 0.45f;
+        break;
+    default:
+        material.specularColor = make_float3(1.0f, 1.0f, 1.0f);
+        material.roughness = 0.4f;
+        material.ior = 1.5f;
+        material.alpha = 1.0f;
+        break;
+    }
+}
+
+void cycleSelectedSphereMaterialPreset(SceneState& scene)
+{
+    const int index = scene.selectedSphere;
+    if (index < 0 || index >= static_cast<int>(scene.materials.size()))
+    {
+        return;
+    }
+
+    SphereMaterial& material = scene.materials[static_cast<size_t>(index)];
+    material.materialType = nextMaterialPreset(material.materialType);
+    applyMaterialDefaults(material);
+}
+
+void selectNextMeshObject(SceneState& scene)
+{
+    if (scene.meshObjects.empty())
+    {
+        scene.selectedMeshObject = 0;
+        scene.selectedMeshMaterial = 0;
+        return;
+    }
+
+    scene.selectedMeshObject = (scene.selectedMeshObject + 1) % static_cast<int>(scene.meshObjects.size());
+    scene.selectedMeshMaterial = 0;
+    clampScene(scene);
+}
+
+void cycleSelectedMeshMaterialPreset(SceneState& scene)
+{
+    if (scene.meshObjects.empty())
+    {
+        return;
+    }
+    clampScene(scene);
+    MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+    if (object.mesh.materials.empty())
+    {
+        return;
+    }
+
+    MeshMaterial& objectMaterial = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+    objectMaterial.materialType = nextMaterialPreset(objectMaterial.materialType);
+    applyMaterialDefaults(objectMaterial);
+
+    if (!scene.mesh.materials.empty())
+    {
+        size_t combinedMaterialIndex = 0;
+        for (int i = 0; i < scene.selectedMeshObject && i < static_cast<int>(scene.meshObjects.size()); ++i)
+        {
+            combinedMaterialIndex += scene.meshObjects[static_cast<size_t>(i)].mesh.materials.size();
+        }
+        combinedMaterialIndex += static_cast<size_t>(scene.selectedMeshMaterial);
+        if (combinedMaterialIndex < scene.mesh.materials.size())
+        {
+            scene.mesh.materials[combinedMaterialIndex].materialType = objectMaterial.materialType;
+            scene.mesh.materials[combinedMaterialIndex].specularColor = objectMaterial.specularColor;
+            scene.mesh.materials[combinedMaterialIndex].roughness = objectMaterial.roughness;
+            scene.mesh.materials[combinedMaterialIndex].ior = objectMaterial.ior;
+            scene.mesh.materials[combinedMaterialIndex].alpha = objectMaterial.alpha;
+        }
+    }
 }
 
 void moveLight(SceneState& scene, const float3 delta)

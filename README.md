@@ -80,7 +80,10 @@ JSON scene config поддерживает `meshObjects`, `camera`, `light` и t
 - `Left/Right/Up/Down` - движение выбранной сферы
 - `R/F` - движение сферы по оси Y
 - `J/L`, `I/K`, `U/O` - перемещение источника света
-- `M` - переключение материала выбранной сферы
+- `G` - переключение demo scene/mesh preset
+- `M` - переключение material preset выбранной сферы
+- `B` - выбор следующего mesh object
+- `V` - переключение material preset выбранного mesh material
 - `P` - переключение real-time direct / progressive path tracing mode
 - `N` - optional OptiX denoiser for progressive path tracing mode
 - `Esc` - выход

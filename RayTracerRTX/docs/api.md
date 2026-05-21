@@ -28,6 +28,9 @@ progressive path tracing accumulation and resets samples when the camera, light,
 scene, material, or mesh signature changes. Pressing `N` requests the optional
 OptiX denoiser for progressive mode. If denoiser initialization or invocation
 fails, the renderer keeps running without denoising.
+The lightweight runtime controls also expose demo scene presets with `G`,
+selected mesh object cycling with `B`, selected mesh material preset cycling
+with `V`, and selected sphere material preset cycling with `M`.
 
 ## Scene API
 
@@ -52,6 +55,8 @@ Declared in `src/app/scene.h`.
 | `mesh` | `MeshData` | Compatibility combined mesh used by tests/docs and fallback paths |
 | `lightPosition` | `float3` | Point-light position used by hit programs |
 | `selectedSphere` | `int` | Index used by interactive controls |
+| `selectedMeshObject` | `int` | Mesh object index used by interactive controls |
+| `selectedMeshMaterial` | `int` | Material index inside the selected mesh object |
 
 ### Scene Functions
 
@@ -61,6 +66,9 @@ Declared in `src/app/scene.h`.
 | `clampScene(SceneState&)` | Keeps objects inside supported bounds |
 | `moveSelectedSphere(SceneState&, float3)` | Moves selected sphere and applies bounds |
 | `toggleSelectedMaterial(SceneState&)` | Switches selected sphere between diffuse and mirror material |
+| `cycleSelectedSphereMaterialPreset(SceneState&)` | Cycles selected sphere through diffuse, mirror, metal and dielectric presets |
+| `selectNextMeshObject(SceneState&)` | Selects the next mesh object for HUD/material editing |
+| `cycleSelectedMeshMaterialPreset(SceneState&)` | Cycles selected mesh material through diffuse, mirror, metal and dielectric presets |
 | `moveLight(SceneState&, float3)` | Moves the light and applies bounds |
 
 ## OBJ Mesh API
