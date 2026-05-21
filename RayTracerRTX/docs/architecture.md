@@ -66,6 +66,7 @@ sequenceDiagram
     App->>Scene: Move sphere, light, or toggle material
     App->>Renderer: Optional P toggle for progressive accumulation
     App->>Renderer: Optional N toggle for OptiX denoiser
+    App->>Renderer: Optional Q cycle for quality mode
     App->>Renderer: renderFrame(scene, camera)
     Renderer->>CUDA: Upload sphere materials, mesh buffers, diffuse/normal texture pixels, and LaunchParams
     Renderer->>OptiX: Build sphere GAS + one triangle GAS per mesh object + IAS transforms
@@ -139,7 +140,7 @@ flowchart LR
 | Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*`, `src/app/gltf_loader.*` | Spheres, OBJ/glTF mesh data, materials, selected object, light movement and clamping |
 | Camera | `src/app/camera.*` | Camera state and basis vectors for ray generation |
 | Shared GPU data | `src/common/rtx_shared.h` | Host/device structures used by CUDA and OptiX |
-| Renderer host side | `src/gpu/optix_renderer.*` | CUDA resources, OptiX context, sphere GAS, triangle GAS, IAS, SBT, pipeline, launch, progressive accumulation, and optional denoiser |
+| Renderer host side | `src/gpu/optix_renderer.*` | CUDA resources, OptiX context, sphere GAS, triangle GAS, IAS, SBT, pipeline, launch, quality settings, progressive accumulation, and optional denoiser |
 | Renderer device side | `src/gpu/optix_device_programs.h` | Ray generation, sphere hit, mesh closest-hit shader, miss programs, shadow and reflection logic |
 | Tests | `tests/*` | CPU unit tests and native GPU smoke test |
 

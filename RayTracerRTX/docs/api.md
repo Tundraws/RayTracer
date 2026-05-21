@@ -31,6 +31,9 @@ fails, the renderer keeps running without denoising.
 The lightweight runtime controls also expose demo scene presets with `G`,
 selected mesh object cycling with `B`, selected mesh material preset cycling
 with `V`, and selected sphere material preset cycling with `M`.
+Pressing `Q` cycles rendering quality modes: Low, Medium, High, and
+PathTracing. Quality controls max reflection depth, direct shadow rays,
+primary samples per pixel, progressive mode, and denoiser use.
 
 ## Scene API
 
@@ -195,6 +198,15 @@ Declared in `src/common/rtx_shared.h`.
 | `MaterialMetal` | Tinted reflective material with roughness-controlled reflection |
 | `MaterialDielectric` | Simple glass/dielectric approximation with Fresnel and refraction |
 
+### `RenderQuality`
+
+| Value | Meaning |
+|---|---|
+| `RenderQualityLow` | One primary sample, one reflection level, direct shadow rays disabled |
+| `RenderQualityMedium` | Two primary samples, medium reflection depth, direct shadow rays enabled |
+| `RenderQualityHigh` | Four primary samples, deeper reflections, direct shadow rays enabled |
+| `RenderQualityPathTracing` | Progressive mode with path-tracing accumulation and requested denoiser |
+
 Direct lighting for diffuse, mirror, and metal materials uses a physically
 motivated GGX/Trowbridge-Reitz microfacet BRDF. The shader evaluates the normal
 distribution term `D`, Smith geometry term `G`, and Schlick Fresnel `F`, with
@@ -232,6 +244,9 @@ Uploaded to the GPU before each OptiX launch.
 | `meshTexturePixels`, `meshTexturePixelCount` | Packed diffuse and normal texture pixels for mesh materials |
 | `accumulation` | Progressive float accumulation buffer |
 | `renderMode` | `RenderModeRealtime` or `RenderModeProgressive` |
+| `renderQuality` | Current `RenderQuality` mode |
+| `shadowEnabled` | Enables or disables direct shadow rays |
+| `samplesPerPixel` | Primary samples per pixel for the current quality mode |
 | `accumulationSample` | Current progressive sample index |
 | `maxDepth` | Recursive reflection depth limit |
 

@@ -446,12 +446,14 @@ static __forceinline__ __device__ float3 shadeMaterial(
     const float lightDistance = sqrtf(dot3(lightVector, lightVector));
     const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
 
-    const bool visible = traceShadow(
-        params.handle,
-        add3(hitPoint, mul3(normal, 0.002f)),
-        lightDir,
-        0.001f,
-        lightDistance - 0.01f);
+    const bool visible = params.shadowEnabled == 0
+        ? true
+        : traceShadow(
+            params.handle,
+            add3(hitPoint, mul3(normal, 0.002f)),
+            lightDir,
+            0.001f,
+            lightDistance - 0.01f);
     const float visibility = visible ? 1.0f : 0.0f;
     const float3 env = environmentColor(normal);
 
@@ -596,7 +598,9 @@ extern "C" __global__ void __raygen__rg()
         make_float2(0.25f, 0.75f),
         make_float2(0.75f, 0.75f)
     };
-    const int primarySampleCount = 4;
+    const int primarySampleCount = params.samplesPerPixel < 1
+        ? 1
+        : (params.samplesPerPixel > 8 ? 8 : params.samplesPerPixel);
 
     float3 color = make_vec(0.0f, 0.0f, 0.0f);
     for (int sample = 0; sample < primarySampleCount; ++sample)

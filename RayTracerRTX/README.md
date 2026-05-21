@@ -87,6 +87,7 @@ JSON scene config с `meshObjects`, `camera`, `light` и transform-полями
 - `B` — выбор следующего mesh object
 - `V` — переключение material preset выбранного mesh material
 - `P` — переключение real-time direct / progressive path tracing mode
+- `Q` — переключение quality mode: Low / Medium / High / PathTracing
 - `N` — optional OptiX denoiser for progressive path tracing mode
 - `Esc` — выход
 

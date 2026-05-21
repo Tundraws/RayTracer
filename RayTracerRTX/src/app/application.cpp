@@ -46,6 +46,7 @@ struct AppState
     SceneState scene;
     bool cursorCaptured = true;
     int renderMode = RenderModeRealtime;
+    int renderQuality = RenderQualityHigh;
     bool denoiserEnabled = false;
     bool denoiserAvailable = false;
     unsigned int progressiveSamples = 0;
@@ -109,6 +110,37 @@ float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
         clampf(value.z, minValue.z, maxValue.z));
 }
 
+const wchar_t* qualityNameW(const int quality)
+{
+    switch (clampRenderQuality(quality))
+    {
+    case RenderQualityLow:
+        return L"LOW";
+    case RenderQualityMedium:
+        return L"MEDIUM";
+    case RenderQualityPathTracing:
+        return L"PATH";
+    default:
+        return L"HIGH";
+    }
+}
+
+void applyQualityMode(AppState& appState)
+{
+    appState.renderQuality = clampRenderQuality(appState.renderQuality);
+    if (renderQualityUsesPathTracing(appState.renderQuality))
+    {
+        appState.renderMode = RenderModeProgressive;
+        appState.denoiserEnabled = renderQualityUsesDenoiser(appState.renderQuality);
+    }
+    else
+    {
+        appState.renderMode = RenderModeRealtime;
+        appState.denoiserEnabled = false;
+    }
+    appState.progressiveSamples = 0;
+}
+
 struct HudTextCache
 {
     HFONT font = nullptr;
@@ -164,6 +196,7 @@ void drawHud(
     const SceneState& scene,
     const FrameStats& stats,
     const int renderMode,
+    const int renderQuality,
     const bool denoiserEnabled,
     const bool denoiserAvailable,
     const unsigned int progressiveSamples,
@@ -232,6 +265,7 @@ void drawHud(
           << L"   MMAT: " << (meshMaterial != nullptr ? materialNameW(meshMaterial->materialType) : L"N/A");
     std::wostringstream lineMode;
     lineMode << L"MODE: " << (renderMode == RenderModeProgressive ? L"PROGRESSIVE PATH" : L"REAL-TIME DIRECT")
+             << L"   QUALITY: " << qualityNameW(renderQuality)
              << L"   SAMPLES: " << progressiveSamples
              << L"   DENOISER: " << (denoiserEnabled ? (denoiserAvailable ? L"ON" : L"UNAVAILABLE") : L"OFF");
 
@@ -240,7 +274,7 @@ void drawHud(
     const std::wstring line4 = L"PRESET: " + presetWide;
     const std::wstring line5 = L"SPHERE MOVE: ARROWS, R/F";
     const std::wstring line6 = L"LIGHT: J/L-X, I/K-Z, U/O-Y";
-    const std::wstring line7 = L"PRESET: G   SPHERE MAT: M   MESH: B   MESH MAT: V   MODE: P   DENOISER: N";
+    const std::wstring line7 = L"PRESET: G   SPHERE MAT: M   MESH: B/V   MODE: P   QUALITY: Q   DENOISER: N";
 
     const std::wstring text1 = line1.str();
     const std::wstring text2 = line2.str();
@@ -464,6 +498,15 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     }
     gWasDown = gIsDown;
 
+    static bool qWasDown = false;
+    const bool qIsDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
+    if (qIsDown && !qWasDown)
+    {
+        appState.renderQuality = nextRenderQuality(appState.renderQuality);
+        applyQualityMode(appState);
+    }
+    qWasDown = qIsDown;
+
     static bool pWasDown = false;
     const bool pIsDown = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
     if (pIsDown && !pWasDown)
@@ -635,6 +678,7 @@ void run_optix_app(const ApplicationOptions& options)
 
         const auto hostFrameStart = std::chrono::steady_clock::now();
         float gpuTimeMs = 0.0f;
+        renderer.setRenderQuality(appState.renderQuality);
         renderer.setRenderMode(appState.renderMode);
         renderer.setDenoiserEnabled(appState.denoiserEnabled);
         renderer.renderFrame(appState.scene, appState.camera, pixels, &gpuTimeMs);
@@ -687,6 +731,7 @@ void run_optix_app(const ApplicationOptions& options)
             appState.scene,
             stats,
             appState.renderMode,
+            appState.renderQuality,
             appState.denoiserEnabled,
             appState.denoiserAvailable,
             appState.progressiveSamples,

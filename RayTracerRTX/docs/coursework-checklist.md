@@ -47,6 +47,7 @@
   - progressive accumulation render
   - accumulation reset on camera change
   - optional denoiser enabled/disabled path
+  - rendering quality mode helpers
   - non-empty pixel buffer
   - valid GPU frame time
 
@@ -54,7 +55,7 @@
 
 - Test run log (console output with PASS/FAIL lines)
 - Screenshot of successful test run
-- Performance table (FPS / Frame ms / GPU ms) for real-time scenarios and optional denoiser scenario
+- Performance table (FPS / Frame ms / GPU ms) for real-time and quality-mode scenarios
 - Screenshot(s) of running renderer with HUD
 - Static analysis summary (tool + key warnings + fixes)
 - Architecture diagrams from `docs/architecture.md`

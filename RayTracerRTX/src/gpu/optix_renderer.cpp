@@ -306,6 +306,21 @@ int OptixRenderer::getRenderMode() const
     return renderMode;
 }
 
+void OptixRenderer::setRenderQuality(const int quality)
+{
+    const int nextQuality = clampRenderQuality(quality);
+    if (renderQuality != nextQuality)
+    {
+        renderQuality = nextQuality;
+        resetAccumulation();
+    }
+}
+
+int OptixRenderer::getRenderQuality() const
+{
+    return renderQuality;
+}
+
 void OptixRenderer::setDenoiserEnabled(const bool enabled)
 {
     if (denoiserEnabled != enabled)
@@ -1149,8 +1164,11 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     }
     params.meshObjectCount = meshObjectCount;
     params.meshTexturePixelCount = meshTexturePixelCount;
-    params.maxDepth = kMaxReflectionDepth;
+    params.maxDepth = renderQualityMaxDepth(renderQuality);
     params.renderMode = renderMode;
+    params.renderQuality = renderQuality;
+    params.shadowEnabled = renderQualityShadowsEnabled(renderQuality) ? 1 : 0;
+    params.samplesPerPixel = renderQualitySamplesPerPixel(renderQuality);
     params.accumulationSample = accumulationSampleCount;
 
     CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(dLaunchParams), &params, sizeof(LaunchParams), cudaMemcpyHostToDevice, stream));

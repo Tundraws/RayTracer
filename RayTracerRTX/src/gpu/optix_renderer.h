@@ -28,6 +28,8 @@ public:
     void setRenderSize(int width, int height);
     void setRenderMode(int mode);
     int getRenderMode() const;
+    void setRenderQuality(int quality);
+    int getRenderQuality() const;
     void setDenoiserEnabled(bool enabled);
     bool isDenoiserEnabled() const;
     bool isDenoiserAvailable() const;
@@ -95,6 +97,7 @@ private:
     unsigned int meshObjectCount = 0;
     unsigned int accumulationSampleCount = 0;
     int renderMode = RenderModeRealtime;
+    int renderQuality = RenderQualityHigh;
     bool denoiserEnabled = false;
     bool denoiserAvailable = false;
     std::size_t lastAccumulationSignature = 0;

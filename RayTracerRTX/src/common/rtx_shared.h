@@ -21,7 +21,73 @@ enum RenderMode
     RenderModeProgressive = 1
 };
 
+enum RenderQuality
+{
+    RenderQualityLow = 0,
+    RenderQualityMedium = 1,
+    RenderQualityHigh = 2,
+    RenderQualityPathTracing = 3
+};
+
 #if !defined(__CUDACC_RTC__)
+inline int clampRenderQuality(const int quality)
+{
+    return quality < RenderQualityLow || quality > RenderQualityPathTracing
+        ? RenderQualityMedium
+        : quality;
+}
+
+inline int nextRenderQuality(const int quality)
+{
+    const int current = clampRenderQuality(quality);
+    return current == RenderQualityPathTracing ? RenderQualityLow : current + 1;
+}
+
+inline int renderQualityMaxDepth(const int quality)
+{
+    switch (clampRenderQuality(quality))
+    {
+    case RenderQualityLow:
+        return 1;
+    case RenderQualityHigh:
+        return 5;
+    case RenderQualityPathTracing:
+        return 6;
+    default:
+        return 3;
+    }
+}
+
+inline int renderQualitySamplesPerPixel(const int quality)
+{
+    switch (clampRenderQuality(quality))
+    {
+    case RenderQualityLow:
+        return 1;
+    case RenderQualityHigh:
+        return 4;
+    case RenderQualityPathTracing:
+        return 2;
+    default:
+        return 2;
+    }
+}
+
+inline bool renderQualityShadowsEnabled(const int quality)
+{
+    return clampRenderQuality(quality) != RenderQualityLow;
+}
+
+inline bool renderQualityUsesPathTracing(const int quality)
+{
+    return clampRenderQuality(quality) == RenderQualityPathTracing;
+}
+
+inline bool renderQualityUsesDenoiser(const int quality)
+{
+    return clampRenderQuality(quality) == RenderQualityPathTracing;
+}
+
 inline float clamp01(const float value)
 {
     return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
@@ -171,5 +237,8 @@ struct LaunchParams
     unsigned int meshTexturePixelCount;
     int maxDepth;
     int renderMode;
+    int renderQuality;
+    int shadowEnabled;
+    int samplesPerPixel;
     unsigned int accumulationSample;
 };

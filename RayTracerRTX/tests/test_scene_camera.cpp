@@ -1082,6 +1082,36 @@ void testToneMappingAndGammaCorrection(TestContext& t)
     t.expect(almostEqual(clamped.x, 0.0f), "Tone mapping should clamp negative output before gamma.");
 }
 
+void testDefaultRenderQuality(TestContext& t)
+{
+    t.expect(clampRenderQuality(RenderQualityHigh) == RenderQualityHigh, "High quality should be valid.");
+    t.expect(renderQualityMaxDepth(RenderQualityHigh) > renderQualityMaxDepth(RenderQualityLow), "High quality should increase max depth.");
+    t.expect(renderQualitySamplesPerPixel(RenderQualityHigh) > renderQualitySamplesPerPixel(RenderQualityLow), "High quality should increase samples per pixel.");
+}
+
+void testRenderQualityCycles(TestContext& t)
+{
+    int quality = RenderQualityLow;
+    quality = nextRenderQuality(quality);
+    t.expect(quality == RenderQualityMedium, "Quality should cycle Low to Medium.");
+    quality = nextRenderQuality(quality);
+    t.expect(quality == RenderQualityHigh, "Quality should cycle Medium to High.");
+    quality = nextRenderQuality(quality);
+    t.expect(quality == RenderQualityPathTracing, "Quality should cycle High to PathTracing.");
+    quality = nextRenderQuality(quality);
+    t.expect(quality == RenderQualityLow, "Quality should wrap PathTracing to Low.");
+}
+
+void testRenderQualityDepthAndFallback(TestContext& t)
+{
+    t.expect(clampRenderQuality(-100) == RenderQualityMedium, "Invalid low quality should fall back to Medium.");
+    t.expect(clampRenderQuality(100) == RenderQualityMedium, "Invalid high quality should fall back to Medium.");
+    t.expect(!renderQualityShadowsEnabled(RenderQualityLow), "Low quality should disable direct shadow rays.");
+    t.expect(renderQualityShadowsEnabled(RenderQualityMedium), "Medium quality should enable direct shadow rays.");
+    t.expect(renderQualityUsesPathTracing(RenderQualityPathTracing), "PathTracing quality should request progressive rendering.");
+    t.expect(renderQualityUsesDenoiser(RenderQualityPathTracing), "PathTracing quality should request denoiser.");
+}
+
 bool runGpuSmokeTest(TestContext& t)
 {
 #if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
@@ -1250,23 +1280,25 @@ int runGpuBenchmark()
     std::cout << "| Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |\n";
     std::cout << "|---|---:|---:|---:|---:|\n";
 
-    for (const Scenario& scenario : scenarios)
+    const auto runBenchmarkRow = [](const char* name, const int width, const int height, const int frames, const int quality)
     {
         OptixRenderer renderer;
-        renderer.setRenderSize(scenario.width, scenario.height);
+        renderer.setRenderSize(width, height);
         renderer.initialize();
-        renderer.setRenderMode(RenderModeRealtime);
+        renderer.setRenderQuality(quality);
+        renderer.setRenderMode(renderQualityUsesPathTracing(quality) ? RenderModeProgressive : RenderModeRealtime);
+        renderer.setDenoiserEnabled(renderQualityUsesDenoiser(quality));
 
         SceneState scene = makeDefaultScene();
         CameraState camera;
-        std::vector<uchar4> pixels(static_cast<size_t>(scenario.width) * static_cast<size_t>(scenario.height));
+        std::vector<uchar4> pixels(static_cast<size_t>(width) * static_cast<size_t>(height));
 
         float warmupGpuTimeMs = 0.0f;
         renderer.renderFrame(scene, camera, pixels, &warmupGpuTimeMs);
 
         double hostTotalMs = 0.0;
         double gpuTotalMs = 0.0;
-        for (int frame = 0; frame < scenario.frames; ++frame)
+        for (int frame = 0; frame < frames; ++frame)
         {
             float gpuTimeMs = 0.0f;
             const auto start = std::chrono::steady_clock::now();
@@ -1279,51 +1311,28 @@ int runGpuBenchmark()
 
         renderer.destroy();
 
-        const double avgHostMs = hostTotalMs / static_cast<double>(scenario.frames);
-        const double avgGpuMs = gpuTotalMs / static_cast<double>(scenario.frames);
+        const double avgHostMs = hostTotalMs / static_cast<double>(frames);
+        const double avgGpuMs = gpuTotalMs / static_cast<double>(frames);
         const double fps = avgHostMs > 0.0 ? 1000.0 / avgHostMs : 0.0;
 
-        std::cout << "| " << scenario.name
-                  << " | " << scenario.width << "x" << scenario.height
+        std::cout << "| " << name
+                  << " | " << width << "x" << height
                   << " | " << std::fixed << std::setprecision(2) << fps
                   << " | " << avgHostMs
                   << " | " << avgGpuMs
                   << " |\n";
-    }
+    };
 
-    OptixRenderer denoiserRenderer;
-    denoiserRenderer.setRenderSize(640, 360);
-    denoiserRenderer.initialize();
-    denoiserRenderer.setRenderMode(RenderModeProgressive);
-    denoiserRenderer.setDenoiserEnabled(true);
-
-    SceneState denoiserScene = makeDefaultScene();
-    CameraState denoiserCamera;
-    std::vector<uchar4> denoiserPixels(640u * 360u);
-
-    double denoiserHostTotalMs = 0.0;
-    double denoiserGpuTotalMs = 0.0;
-    constexpr int denoiserFrames = 12;
-    for (int frame = 0; frame < denoiserFrames; ++frame)
+    for (const Scenario& scenario : scenarios)
     {
-        float gpuTimeMs = 0.0f;
-        const auto start = std::chrono::steady_clock::now();
-        denoiserRenderer.renderFrame(denoiserScene, denoiserCamera, denoiserPixels, &gpuTimeMs);
-        const auto stop = std::chrono::steady_clock::now();
-        denoiserHostTotalMs += std::chrono::duration<double, std::milli>(stop - start).count();
-        denoiserGpuTotalMs += static_cast<double>(gpuTimeMs);
+        std::string name = std::string(scenario.name) + " resolution / High quality";
+        runBenchmarkRow(name.c_str(), scenario.width, scenario.height, scenario.frames, RenderQualityHigh);
     }
 
-    const double avgDenoiserHostMs = denoiserHostTotalMs / static_cast<double>(denoiserFrames);
-    const double avgDenoiserGpuMs = denoiserGpuTotalMs / static_cast<double>(denoiserFrames);
-    const double denoiserFps = avgDenoiserHostMs > 0.0 ? 1000.0 / avgDenoiserHostMs : 0.0;
-    std::cout << "| Progressive + optional OptiX denoiser"
-              << " | 640x360"
-              << " | " << std::fixed << std::setprecision(2) << denoiserFps
-              << " | " << avgDenoiserHostMs
-              << " | " << avgDenoiserGpuMs
-              << " |\n";
-    denoiserRenderer.destroy();
+    runBenchmarkRow("Low quality", 640, 360, 30, RenderQualityLow);
+    runBenchmarkRow("Medium quality", 640, 360, 30, RenderQualityMedium);
+    runBenchmarkRow("High quality", 640, 360, 30, RenderQualityHigh);
+    runBenchmarkRow("PathTracing quality + denoiser", 640, 360, 12, RenderQualityPathTracing);
 
     return 0;
 #endif
@@ -1375,6 +1384,9 @@ int main(int argc, char** argv)
     runTest("Camera aspect fallback", testCameraAspectFallback);
     runTest("Camera scale vs FOV", testCameraScaleIncreasesWithFov);
     runTest("Tone mapping and gamma correction", testToneMappingAndGammaCorrection);
+    runTest("Default render quality", testDefaultRenderQuality);
+    runTest("Render quality cycles", testRenderQualityCycles);
+    runTest("Render quality depth and fallback", testRenderQualityDepthAndFallback);
     runTest("GGX math helpers", testGgxMathHelpers);
     runTest("OBJ loader triangle with normals", testObjLoaderTriangleWithNormals);
     runTest("OBJ loader multiple materials", testObjLoaderMultipleMaterials);
