@@ -1134,9 +1134,7 @@ void testAllDemoSceneConfigsLoad(TestContext& t)
         "textured_scene.json",
         "textured_cube_scene.json",
         "multi_mesh_scene.json",
-        "obj_shapes_scene.json",
         "gltf_scene.json",
-        "gltf_diamond_scene.json",
         "material_showcase_scene.json",
         "path_tracing_demo_scene.json"
     };

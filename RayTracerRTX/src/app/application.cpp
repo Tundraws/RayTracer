@@ -1432,10 +1432,8 @@ void run_optix_app(const ApplicationOptions& options)
     }
     addSceneConfigPreset(appState, "textured_cube_scene.json", L"\u0422\u0435\u043A\u0441\u0442\u0443\u0440\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0439 \u043A\u0443\u0431");
     addSceneConfigPreset(appState, "multi_mesh_scene.json", L"\u041D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432");
-    addSceneConfigPreset(appState, "obj_shapes_scene.json", L"OBJ \u0444\u0438\u0433\u0443\u0440\u044B");
     addSceneConfigPreset(appState, "material_showcase_scene.json", L"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B");
     addSceneConfigPreset(appState, "gltf_scene.json", L"glTF \u0434\u0435\u043C\u043E");
-    addSceneConfigPreset(appState, "gltf_diamond_scene.json", L"glTF \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B");
     addSceneConfigPreset(appState, "path_tracing_demo_scene.json", L"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F");
     glfwSetWindowUserPointer(window, &appState);
     glfwSetCursorPosCallback(window, mouseCallback);

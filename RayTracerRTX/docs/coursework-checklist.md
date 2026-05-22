@@ -75,9 +75,8 @@
 | Demo OBJ mesh | `assets/meshes/demo.obj`, `assets/meshes/demo.mtl` |
 | Demo textured OBJ mesh | `assets/meshes/textured_demo.obj`, `assets/meshes/textured_cube.obj`, `assets/meshes/textured_demo.mtl`, `assets/meshes/checker.ppm`, `assets/meshes/checker_normal.ppm` |
 | Demo material showcase mesh | `assets/meshes/material_showcase.obj`, `assets/meshes/material_showcase.mtl` |
-| Demo extra OBJ shapes | `assets/meshes/low_poly_crystal.obj`, `assets/meshes/simple_column.obj`, `assets/meshes/block_arch.obj`, `assets/meshes/demo_shapes.mtl` |
-| Demo glTF mesh | `assets/meshes/minimal_gltf.gltf`, `assets/meshes/minimal_gltf.bin`, `assets/meshes/gltf_diamond.gltf`, `assets/meshes/gltf_diamond.bin` |
-| Demo scene configs | `assets/scenes/demo_scene.json`, `assets/scenes/textured_scene.json`, `assets/scenes/textured_cube_scene.json`, `assets/scenes/multi_mesh_scene.json`, `assets/scenes/obj_shapes_scene.json`, `assets/scenes/material_showcase_scene.json`, `assets/scenes/path_tracing_demo_scene.json`, `assets/scenes/gltf_scene.json`, `assets/scenes/gltf_diamond_scene.json` |
+| Demo glTF mesh | `assets/meshes/minimal_gltf.gltf`, `assets/meshes/minimal_gltf.bin` |
+| Demo scene configs | `assets/scenes/demo_scene.json`, `assets/scenes/textured_scene.json`, `assets/scenes/textured_cube_scene.json`, `assets/scenes/multi_mesh_scene.json`, `assets/scenes/material_showcase_scene.json`, `assets/scenes/path_tracing_demo_scene.json`, `assets/scenes/gltf_scene.json` |
 | Docker / Compose | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
 | README | `README.md`, `RayTracerRTX/README.md` |
 | Architecture diagrams | `docs/architecture.md` |
