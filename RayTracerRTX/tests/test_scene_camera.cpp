@@ -1334,16 +1334,22 @@ void testSetSelectedMeshMaterialType(TestContext& t)
     SceneState scene = makeDefaultScene();
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
+    scene.meshObjects[0].mesh.materials.push_back(scene.meshObjects[0].mesh.materials[0]);
+    scene.mesh.materials.push_back(scene.mesh.materials[0]);
 
     setSelectedMeshMaterialType(scene, MaterialMetal);
 
     t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialMetal, "Mesh material type setter should select metal.");
+    t.expect(scene.meshObjects[0].mesh.materials[1].materialType == MaterialMetal, "Mesh material type setter should apply to the whole selected mesh.");
     t.expect(scene.mesh.materials[0].materialType == MaterialMetal, "Combined mesh material should stay in sync.");
+    t.expect(scene.mesh.materials[1].materialType == MaterialMetal, "Combined mesh material should sync every material slot of the selected mesh.");
     t.expect(almostEqual(scene.meshObjects[0].mesh.materials[0].roughness, 0.18f), "Metal preset should apply roughness default.");
 
     setSelectedMeshMaterialType(scene, 999);
     t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialDiffuse, "Invalid mesh material type should fall back to matte.");
+    t.expect(scene.meshObjects[0].mesh.materials[1].materialType == MaterialDiffuse, "Invalid mesh material type fallback should apply to the whole selected mesh.");
     t.expect(scene.mesh.materials[0].materialType == MaterialDiffuse, "Combined mesh material should sync fallback type.");
+    t.expect(scene.mesh.materials[1].materialType == MaterialDiffuse, "Combined mesh material should sync fallback type for every selected mesh material.");
 }
 
 void testSetSelectedMeshMaterialTypeInvalidSafe(TestContext& t)

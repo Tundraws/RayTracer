@@ -465,8 +465,7 @@ void syncSelectedMeshMaterialToCombined(SceneState& scene)
     }
 
     const MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
-    if (scene.selectedMeshMaterial < 0 ||
-        scene.selectedMeshMaterial >= static_cast<int>(object.mesh.materials.size()))
+    if (object.mesh.materials.empty())
     {
         return;
     }
@@ -476,15 +475,18 @@ void syncSelectedMeshMaterialToCombined(SceneState& scene)
     {
         combinedMaterialIndex += scene.meshObjects[static_cast<size_t>(i)].mesh.materials.size();
     }
-    combinedMaterialIndex += static_cast<size_t>(scene.selectedMeshMaterial);
     if (combinedMaterialIndex >= scene.mesh.materials.size())
     {
         return;
     }
 
-    const MeshMaterial& objectMaterial = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
-    MeshMaterial& combinedMaterial = scene.mesh.materials[combinedMaterialIndex];
-    combinedMaterial = objectMaterial;
+    const size_t materialCount = std::min(
+        object.mesh.materials.size(),
+        scene.mesh.materials.size() - combinedMaterialIndex);
+    for (size_t i = 0; i < materialCount; ++i)
+    {
+        scene.mesh.materials[combinedMaterialIndex + i] = object.mesh.materials[i];
+    }
 }
 
 void cycleSelectedSphereMaterialPreset(SceneState& scene)
@@ -540,9 +542,12 @@ void cycleSelectedMeshMaterialPreset(SceneState& scene)
         return;
     }
 
-    MeshMaterial& objectMaterial = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
-    objectMaterial.materialType = nextMaterialPreset(objectMaterial.materialType);
-    applyMaterialDefaults(objectMaterial);
+    const int nextType = nextMaterialPreset(object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)].materialType);
+    for (MeshMaterial& objectMaterial : object.mesh.materials)
+    {
+        objectMaterial.materialType = nextType;
+        applyMaterialDefaults(objectMaterial);
+    }
     syncSelectedMeshMaterialToCombined(scene);
 }
 
@@ -559,9 +564,12 @@ void setSelectedMeshMaterialType(SceneState& scene, const int materialType)
         return;
     }
 
-    MeshMaterial& objectMaterial = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
-    objectMaterial.materialType = sanitizeMaterialType(materialType);
-    applyMaterialDefaults(objectMaterial);
+    const int safeType = sanitizeMaterialType(materialType);
+    for (MeshMaterial& objectMaterial : object.mesh.materials)
+    {
+        objectMaterial.materialType = safeType;
+        applyMaterialDefaults(objectMaterial);
+    }
     syncSelectedMeshMaterialToCombined(scene);
 }
 

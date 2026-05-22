@@ -436,16 +436,42 @@ void syncSelectedMeshMaterialToCombined(SceneState& scene)
     {
         combinedMaterialIndex += scene.meshObjects[static_cast<size_t>(i)].mesh.materials.size();
     }
-    combinedMaterialIndex += static_cast<size_t>(scene.selectedMeshMaterial);
-
     MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
-    if (scene.selectedMeshMaterial >= static_cast<int>(object.mesh.materials.size()) ||
-        combinedMaterialIndex >= scene.mesh.materials.size())
+    if (object.mesh.materials.empty() || combinedMaterialIndex >= scene.mesh.materials.size())
     {
         return;
     }
 
-    scene.mesh.materials[combinedMaterialIndex] = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+    const size_t materialCount = std::min(
+        object.mesh.materials.size(),
+        scene.mesh.materials.size() - combinedMaterialIndex);
+    for (size_t i = 0; i < materialCount; ++i)
+    {
+        scene.mesh.materials[combinedMaterialIndex + i] = object.mesh.materials[i];
+    }
+}
+
+void applySelectedMeshMaterialToWholeObject(SceneState& scene)
+{
+    if (scene.selectedMeshObject < 0 ||
+        scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
+    {
+        return;
+    }
+
+    MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+    if (scene.selectedMeshMaterial < 0 ||
+        scene.selectedMeshMaterial >= static_cast<int>(object.mesh.materials.size()))
+    {
+        return;
+    }
+
+    const MeshMaterial material = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+    for (MeshMaterial& objectMaterial : object.mesh.materials)
+    {
+        objectMaterial = material;
+    }
+    syncSelectedMeshMaterialToCombined(scene);
 }
 
 bool hasPresetIndex(const AppState& appState, const int index)
@@ -823,7 +849,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             meshMaterial->roughness = clampf(meshMaterial->roughness, 0.02f, 1.0f);
             meshMaterial->ior = clampf(meshMaterial->ior, 1.01f, 2.8f);
             meshMaterial->alpha = clampf(meshMaterial->alpha, 0.0f, 1.0f);
-            syncSelectedMeshMaterialToCombined(scene);
+            applySelectedMeshMaterialToWholeObject(scene);
             appState.progressiveSamples = 0;
             appState.rendererSceneRebuildRequested = true;
         }
