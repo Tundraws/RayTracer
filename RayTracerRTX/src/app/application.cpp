@@ -702,6 +702,18 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     tuningChanged = ImGui::SliderFloat("##sky_intensity", &scene.skyIntensity, 0.0f, 3.0f, "%.2f") || tuningChanged;
     ImGui::TextUnformatted(u8c(u8"\u0421\u0438\u043B\u0430 \u0441\u0432\u0435\u0442\u0430"));
     tuningChanged = ImGui::SliderFloat("##light_intensity", &scene.lightIntensity, 0.0f, 5.0f, "%.2f") || tuningChanged;
+    ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0441\u0432\u0435\u0442\u0430"));
+    float lightPosition[3] = {scene.lightPosition.x, scene.lightPosition.y, scene.lightPosition.z};
+    bool lightPositionChanged = false;
+    lightPositionChanged = ImGui::DragFloat("X##light_pos_x", &lightPosition[0], 0.05f, -40.0f, 40.0f, "%.2f") || lightPositionChanged;
+    lightPositionChanged = ImGui::DragFloat("Y##light_pos_y", &lightPosition[1], 0.05f, 6.0f, 40.0f, "%.2f") || lightPositionChanged;
+    lightPositionChanged = ImGui::DragFloat("Z##light_pos_z", &lightPosition[2], 0.05f, -40.0f, 40.0f, "%.2f") || lightPositionChanged;
+    if (lightPositionChanged)
+    {
+        scene.lightPosition = make_float3(lightPosition[0], lightPosition[1], lightPosition[2]);
+        clampScene(scene);
+        tuningChanged = true;
+    }
     if (tuningChanged)
     {
         setSceneExposure(scene, scene.exposure);
