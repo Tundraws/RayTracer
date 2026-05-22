@@ -904,7 +904,8 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             }
         }
         ImGui::SameLine();
-        if (scene.spheres.size() <= 1)
+        const bool canRemoveSphere = scene.spheres.size() > 1;
+        if (!canRemoveSphere)
         {
             ImGui::BeginDisabled();
         }
@@ -915,7 +916,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 appState.progressiveSamples = 0;
             }
         }
-        if (scene.spheres.size() <= 1)
+        if (!canRemoveSphere)
         {
             ImGui::EndDisabled();
         }

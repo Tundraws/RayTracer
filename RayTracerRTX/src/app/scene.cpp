@@ -321,7 +321,10 @@ void setSelectedSphereRadius(SceneState& scene, const float radius)
         return;
     }
 
-    scene.spheres[static_cast<size_t>(index)].radius = clampScalar(radius, kMinSphereRadius, kMaxSphereRadius);
+    SphereGeometry& sphere = scene.spheres[static_cast<size_t>(index)];
+    const float bottomY = sphere.center.y - sphere.radius;
+    sphere.radius = clampScalar(radius, kMinSphereRadius, kMaxSphereRadius);
+    sphere.center.y = bottomY + sphere.radius;
     clampScene(scene);
 }
 

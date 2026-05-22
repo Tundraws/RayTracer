@@ -1760,6 +1760,21 @@ void testRemoveLastSphereSafe(TestContext& t)
     t.expect(scene.selectedSphere == 0, "Selected sphere should stay valid when removal is blocked.");
 }
 
+void testRemovePenultimateSphereKeepsSelectionValid(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.spheres.resize(2);
+    scene.materials.resize(2);
+    scene.selectedSphere = 1;
+
+    const bool removed = removeSelectedSphere(scene);
+
+    t.expect(removed, "Removing the penultimate sphere should succeed.");
+    t.expect(scene.spheres.size() == 1, "One sphere should remain after removing from two.");
+    t.expect(scene.materials.size() == 1, "Material list should match remaining sphere count.");
+    t.expect(scene.selectedSphere == 0, "Selection should clamp to the remaining sphere.");
+}
+
 void testSelectedSphereRadiusClamp(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -1771,6 +1786,20 @@ void testSelectedSphereRadiusClamp(TestContext& t)
 
     setSelectedSphereRadius(scene, 100.0f);
     t.expect(almostEqual(scene.spheres[0].radius, 5.0f), "Sphere radius should clamp to supported maximum.");
+}
+
+void testSelectedSphereRadiusKeepsBottomFixed(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 0;
+    const float bottomBefore = scene.spheres[0].center.y - scene.spheres[0].radius;
+
+    setSelectedSphereRadius(scene, 2.0f);
+
+    const float bottomAfter = scene.spheres[0].center.y - scene.spheres[0].radius;
+    t.expect(almostEqual(bottomAfter, bottomBefore), "Changing sphere radius should keep the bottom point fixed.");
+    t.expect(almostEqual(scene.spheres[0].center.x, 0.0f), "Changing sphere radius should not move sphere X.");
+    t.expect(almostEqual(scene.spheres[0].center.z, 0.0f), "Changing sphere radius should not move sphere Z.");
 }
 
 void testSelectedSphereColorClamp(TestContext& t)
@@ -2322,7 +2351,9 @@ int main(int argc, char** argv)
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
     runTest("Remove last sphere safe", testRemoveLastSphereSafe);
+    runTest("Remove penultimate sphere keeps selection valid", testRemovePenultimateSphereKeepsSelectionValid);
     runTest("Selected sphere radius clamp", testSelectedSphereRadiusClamp);
+    runTest("Selected sphere radius keeps bottom fixed", testSelectedSphereRadiusKeepsBottomFixed);
     runTest("Selected sphere color clamp", testSelectedSphereColorClamp);
     runTest("Move sphere clamp", testMoveSphereClamp);
     runTest("Move light clamp", testMoveLightClamp);
