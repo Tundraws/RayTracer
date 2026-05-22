@@ -6,6 +6,10 @@
 #include "scene.h"
 #include "scene_config.h"
 
+#include "../../third_party/imgui/backends/imgui_impl_glfw.h"
+#include "../../third_party/imgui/backends/imgui_impl_opengl2.h"
+#include "../../third_party/imgui/imgui.h"
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -50,6 +54,7 @@ struct AppState
     bool denoiserEnabled = false;
     bool denoiserAvailable = false;
     unsigned int progressiveSamples = 0;
+    bool imguiPanelVisible = true;
     std::vector<SceneBuildResult> scenePresets;
     std::vector<std::wstring> scenePresetNames;
     int scenePresetIndex = 0;
@@ -110,6 +115,29 @@ float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
         clampf(value.z, minValue.z, maxValue.z));
 }
 
+const char* u8c(const char8_t* text)
+{
+    return reinterpret_cast<const char*>(text);
+}
+
+std::string wideToUtf8(const std::wstring& text)
+{
+    if (text.empty())
+    {
+        return {};
+    }
+
+    const int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+    if (size <= 0)
+    {
+        return {};
+    }
+
+    std::string result(static_cast<size_t>(size), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), result.data(), size, nullptr, nullptr);
+    return result;
+}
+
 const wchar_t* qualityNameW(const int quality)
 {
     switch (clampRenderQuality(quality))
@@ -122,6 +150,21 @@ const wchar_t* qualityNameW(const int quality)
         return L"\u041D\u0410\u041A\u041E\u041F\u041B\u0415\u041D\u0418\u0415";
     default:
         return L"\u0412\u042B\u0421\u041E\u041A\u041E\u0415";
+    }
+}
+
+const char* qualityNameUtf8(const int quality)
+{
+    switch (clampRenderQuality(quality))
+    {
+    case RenderQualityLow:
+        return u8c(u8"\u041D\u0438\u0437\u043A\u043E\u0435");
+    case RenderQualityMedium:
+        return u8c(u8"\u0421\u0440\u0435\u0434\u043D\u0435\u0435");
+    case RenderQualityPathTracing:
+        return u8c(u8"\u041D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435");
+    default:
+        return u8c(u8"\u0412\u044B\u0441\u043E\u043A\u043E\u0435");
     }
 }
 
@@ -300,6 +343,204 @@ void drawHud(
     SetBkMode(dc, oldBkMode);
 }
 
+void syncSelectedMeshMaterialToCombined(SceneState& scene)
+{
+    if (scene.selectedMeshObject < 0 ||
+        scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()) ||
+        scene.selectedMeshMaterial < 0)
+    {
+        return;
+    }
+
+    size_t combinedMaterialIndex = 0;
+    for (int i = 0; i < scene.selectedMeshObject && i < static_cast<int>(scene.meshObjects.size()); ++i)
+    {
+        combinedMaterialIndex += scene.meshObjects[static_cast<size_t>(i)].mesh.materials.size();
+    }
+    combinedMaterialIndex += static_cast<size_t>(scene.selectedMeshMaterial);
+
+    MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+    if (scene.selectedMeshMaterial >= static_cast<int>(object.mesh.materials.size()) ||
+        combinedMaterialIndex >= scene.mesh.materials.size())
+    {
+        return;
+    }
+
+    scene.mesh.materials[combinedMaterialIndex] = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+}
+
+void drawImguiPanel(AppState& appState, const FrameStats& stats)
+{
+    if (!appState.imguiPanelVisible)
+    {
+        return;
+    }
+
+    SceneState& scene = appState.scene;
+    ImGui::SetNextWindowPos(ImVec2(static_cast<float>(gWidth) - 318.0f, 18.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(300.0f, 0.0f), ImGuiCond_Always);
+    ImGui::Begin(
+        u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C \u0441\u0446\u0435\u043D\u044B"),
+        &appState.imguiPanelVisible,
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::Text("FPS %.1f | GPU %.2f ms", stats.fps, stats.avgGpuMs);
+    ImGui::Text("%s: %s", u8c(u8"\u0420\u0435\u0436\u0438\u043C"), appState.renderMode == RenderModeProgressive ? u8c(u8"\u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435") : u8c(u8"\u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F"));
+    ImGui::Text("%s: %s", u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E"), qualityNameUtf8(appState.renderQuality));
+    ImGui::Text("%s: %s", u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), appState.denoiserEnabled ? u8c(u8"\u0432\u043A\u043B") : u8c(u8"\u0432\u044B\u043A\u043B"));
+
+    std::vector<std::string> presetNames;
+    presetNames.reserve(appState.scenePresetNames.size());
+    for (const std::wstring& name : appState.scenePresetNames)
+    {
+        presetNames.push_back(wideToUtf8(name));
+    }
+    const char* currentPreset = appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(presetNames.size())
+        ? presetNames[static_cast<size_t>(appState.scenePresetIndex)].c_str()
+        : u8c(u8"\u0421\u0432\u043E\u044F \u0441\u0446\u0435\u043D\u0430");
+    if (ImGui::BeginCombo(u8c(u8"\u0421\u0446\u0435\u043D\u0430"), currentPreset))
+    {
+        for (int i = 0; i < static_cast<int>(presetNames.size()); ++i)
+        {
+            const bool selected = i == appState.scenePresetIndex;
+            if (ImGui::Selectable(presetNames[static_cast<size_t>(i)].c_str(), selected))
+            {
+                if (applyScenePresetByIndex(appState.scenePresets, i, appState.scene, appState.camera))
+                {
+                    appState.scenePresetIndex = i;
+                    appState.progressiveSamples = 0;
+                }
+            }
+            if (selected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B \u0438 \u0441\u0432\u0435\u0442\u0430")) &&
+        appState.scenePresetIndex >= 0 &&
+        appState.scenePresetIndex < static_cast<int>(appState.scenePresets.size()) &&
+        resetSceneViewFromPreset(appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)], scene, appState.camera))
+    {
+        appState.progressiveSamples = 0;
+    }
+
+    ImGui::Separator();
+    bool tuningChanged = false;
+    tuningChanged = ImGui::SliderFloat(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"), &scene.exposure, 0.1f, 2.5f, "%.2f") || tuningChanged;
+    tuningChanged = ImGui::SliderFloat(u8c(u8"\u041D\u0435\u0431\u043E"), &scene.skyIntensity, 0.0f, 3.0f, "%.2f") || tuningChanged;
+    tuningChanged = ImGui::SliderFloat(u8c(u8"\u0421\u0432\u0435\u0442"), &scene.lightIntensity, 0.0f, 5.0f, "%.2f") || tuningChanged;
+    if (tuningChanged)
+    {
+        setSceneExposure(scene, scene.exposure);
+        setSceneSkyIntensity(scene, scene.skyIntensity);
+        setSceneLightIntensity(scene, scene.lightIntensity);
+        appState.progressiveSamples = 0;
+    }
+
+    ImGui::Separator();
+    if (ImGui::BeginCombo(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442"), std::to_string(scene.selectedMeshObject + 1).c_str()))
+    {
+        for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
+        {
+            const std::string label = std::string(u8c(u8"\u0421\u0435\u0442\u043A\u0430 ")) + std::to_string(i + 1);
+            const bool selected = i == scene.selectedMeshObject;
+            if (ImGui::Selectable(label.c_str(), selected))
+            {
+                scene.selectedMeshObject = i;
+                scene.selectedMeshMaterial = 0;
+                clampScene(scene);
+            }
+            if (selected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    MeshMaterial* meshMaterial = nullptr;
+    if (scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size()))
+    {
+        MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+        if (scene.selectedMeshMaterial >= 0 && scene.selectedMeshMaterial < static_cast<int>(object.mesh.materials.size()))
+        {
+            meshMaterial = &object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+        }
+    }
+
+    if (meshMaterial != nullptr)
+    {
+        ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B"), wideToUtf8(materialNameW(meshMaterial->materialType)).c_str());
+        if (ImGui::Button(u8c(u8"\u0421\u043C\u0435\u043D\u0438\u0442\u044C material mesh")))
+        {
+            cycleSelectedMeshMaterialPreset(scene);
+            appState.progressiveSamples = 0;
+        }
+        bool materialChanged = false;
+        materialChanged = ImGui::SliderFloat("Roughness", &meshMaterial->roughness, 0.02f, 1.0f, "%.2f") || materialChanged;
+        float metallic = meshMaterial->materialType == MaterialMetal ? 1.0f : 0.0f;
+        if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f, "%.2f"))
+        {
+            meshMaterial->materialType = metallic >= 0.5f ? MaterialMetal : MaterialDiffuse;
+            materialChanged = true;
+        }
+        if (materialChanged)
+        {
+            meshMaterial->roughness = clampf(meshMaterial->roughness, 0.02f, 1.0f);
+            syncSelectedMeshMaterialToCombined(scene);
+            appState.progressiveSamples = 0;
+        }
+    }
+
+    if (scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.materials.size()))
+    {
+        ImGui::Separator();
+        SphereMaterial& sphereMaterial = scene.materials[static_cast<size_t>(scene.selectedSphere)];
+        ImGui::Text("%s: %d", u8c(u8"\u0421\u0444\u0435\u0440\u0430"), scene.selectedSphere + 1);
+        if (ImGui::Button(u8c(u8"\u0421\u043C\u0435\u043D\u0438\u0442\u044C material \u0441\u0444\u0435\u0440\u044B")))
+        {
+            cycleSelectedSphereMaterialPreset(scene);
+            appState.progressiveSamples = 0;
+        }
+        bool sphereChanged = false;
+        sphereChanged = ImGui::SliderFloat("Sphere roughness", &sphereMaterial.roughness, 0.02f, 1.0f, "%.2f") || sphereChanged;
+        float sphereMetallic = sphereMaterial.materialType == MaterialMetal ? 1.0f : 0.0f;
+        if (ImGui::SliderFloat("Sphere metallic", &sphereMetallic, 0.0f, 1.0f, "%.2f"))
+        {
+            sphereMaterial.materialType = sphereMetallic >= 0.5f ? MaterialMetal : MaterialDiffuse;
+            sphereChanged = true;
+        }
+        if (sphereChanged)
+        {
+            sphereMaterial.roughness = clampf(sphereMaterial.roughness, 0.02f, 1.0f);
+            appState.progressiveSamples = 0;
+        }
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E")))
+    {
+        appState.renderQuality = nextRenderQuality(appState.renderQuality);
+        applyQualityMode(appState);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(appState.renderMode == RenderModeProgressive ? u8c(u8"\u0420\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F") : u8c(u8"\u041D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435")))
+    {
+        appState.renderMode = appState.renderMode == RenderModeProgressive ? RenderModeRealtime : RenderModeProgressive;
+        appState.progressiveSamples = 0;
+    }
+    if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), &appState.denoiserEnabled))
+    {
+        appState.progressiveSamples = 0;
+    }
+
+    ImGui::TextWrapped("%s", u8c(u8"\u041B\u041A\u041C \u043E\u0441\u0432\u043E\u0431\u043E\u0436\u0434\u0430\u0435\u0442 \u043A\u0443\u0440\u0441\u043E\u0440, \u041F\u041A\u041C \u0432\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u0442 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u043A\u0430\u043C\u0435\u0440\u043E\u0439. H \u0441\u043A\u0440\u044B\u0432\u0430\u0435\u0442 \u043F\u0430\u043D\u0435\u043B\u044C."));
+    ImGui::End();
+}
+
 void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
     auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
@@ -336,13 +577,36 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int)
 {
-    if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS)
+    if (action != GLFW_PRESS)
     {
         return;
     }
 
     auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
     if (state == nullptr)
+    {
+        return;
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && !state->cursorCaptured)
+    {
+        state->cursorCaptured = true;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        state->input.firstMouse = true;
+        return;
+    }
+
+    if (button != GLFW_MOUSE_BUTTON_LEFT)
+    {
+        return;
+    }
+
+    if (!state->cursorCaptured && state->imguiPanelVisible && ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantCaptureMouse)
+    {
+        return;
+    }
+
+    if (!state->cursorCaptured)
     {
         return;
     }
@@ -548,6 +812,14 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     }
     nWasDown = nIsDown;
 
+    static bool hWasDown = false;
+    const bool hIsDown = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS;
+    if (hIsDown && !hWasDown)
+    {
+        appState.imguiPanelVisible = !appState.imguiPanelVisible;
+    }
+    hWasDown = hIsDown;
+
     static bool key4WasDown = false;
     const bool key4IsDown = glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS;
     if (key4IsDown && !key4WasDown)
@@ -734,6 +1006,19 @@ void run_optix_app(const ApplicationOptions& options)
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& imguiIo = ImGui::GetIO();
+    imguiIo.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    imguiIo.Fonts->AddFontFromFileTTF(
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        16.0f,
+        nullptr,
+        imguiIo.Fonts->GetGlyphRangesCyrillic());
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL2_Init();
+
     OptixRenderer renderer;
     renderer.setRenderSize(gWidth, gHeight);
     renderer.initialize(appState.scene);
@@ -804,6 +1089,12 @@ void run_optix_app(const ApplicationOptions& options)
 
         glClear(GL_COLOR_BUFFER_BIT);
         glDrawPixels(gWidth, gHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+        ImGui_ImplOpenGL2_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        drawImguiPanel(appState, stats);
+        ImGui::Render();
+        ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
         drawHud(
             window,
@@ -821,6 +1112,9 @@ void run_optix_app(const ApplicationOptions& options)
     }
 
     renderer.destroy();
+    ImGui_ImplOpenGL2_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwDestroyWindow(window);
     glfwTerminate();
 }

@@ -13,6 +13,7 @@ security limitations for the coursework project.
 | NVIDIA OptiX SDK 9.1 | Hardware ray tracing API | Used for RTX pipeline, acceleration structures and device programs |
 | NVIDIA display driver | Runtime GPU driver | Required to launch OptiX on RTX hardware |
 | GLFW | Window and input handling | Stored in the repository as a local dependency |
+| Dear ImGui | Lightweight debug/control panel | Vendored in `third_party/imgui`; only core, GLFW backend and OpenGL2 backend are included |
 | OpenGL | Image presentation | Used to display the rendered framebuffer |
 | Docker / Docker Compose | Reproducible checks | Runs documentation/structure checks and CPU-only tests |
 
@@ -42,6 +43,7 @@ The practical dependency check is:
 4. Use Docker only for reproducible source, documentation and CPU-test checks.
 5. Verify demo OBJ/MTL assets and OBJ loader files as part of the coursework check.
 6. Keep vendored GLFW files limited to the required include/library paths.
+7. Keep vendored Dear ImGui files limited to the required core and backend files.
 
 ## Security Controls
 
