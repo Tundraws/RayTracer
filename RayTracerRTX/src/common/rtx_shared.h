@@ -291,6 +291,14 @@ struct MeshMaterialGpu
     unsigned int normalTextureOffset = 0;
     unsigned int normalTextureWidth = 0;
     unsigned int normalTextureHeight = 0;
+    int hasMetallicTexture = 0;
+    unsigned int metallicTextureOffset = 0;
+    unsigned int metallicTextureWidth = 0;
+    unsigned int metallicTextureHeight = 0;
+    int hasRoughnessTexture = 0;
+    unsigned int roughnessTextureOffset = 0;
+    unsigned int roughnessTextureWidth = 0;
+    unsigned int roughnessTextureHeight = 0;
 };
 
 struct MeshObjectGpu

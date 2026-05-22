@@ -1,5 +1,7 @@
 #include "obj_loader.h"
 
+#include "image_loader.h"
+
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -176,83 +178,6 @@ bool parseFaceVertex(const std::string& token, FaceVertex& vertex)
     return true;
 }
 
-bool readPpmToken(std::istream& input, std::string& token)
-{
-    token.clear();
-    while (input >> token)
-    {
-        if (!token.empty() && token[0] == '#')
-        {
-            std::string ignored;
-            std::getline(input, ignored);
-            continue;
-        }
-        return true;
-    }
-    return false;
-}
-
-bool loadPpmTexture(const std::filesystem::path& path, MeshTexture& texture)
-{
-    std::ifstream file(path, std::ios::binary);
-    if (!file)
-    {
-        return false;
-    }
-
-    std::string token;
-    if (!readPpmToken(file, token) || token != "P3")
-    {
-        return false;
-    }
-
-    std::string widthToken;
-    std::string heightToken;
-    std::string maxToken;
-    if (!readPpmToken(file, widthToken) || !readPpmToken(file, heightToken) || !readPpmToken(file, maxToken))
-    {
-        return false;
-    }
-
-    const int width = std::stoi(widthToken);
-    const int height = std::stoi(heightToken);
-    const int maxValue = std::stoi(maxToken);
-    if (width <= 0 || height <= 0 || maxValue <= 0)
-    {
-        return false;
-    }
-
-    std::vector<uchar4> pixels;
-    pixels.reserve(static_cast<size_t>(width) * static_cast<size_t>(height));
-    for (int i = 0; i < width * height; ++i)
-    {
-        std::string rToken;
-        std::string gToken;
-        std::string bToken;
-        if (!readPpmToken(file, rToken) || !readPpmToken(file, gToken) || !readPpmToken(file, bToken))
-        {
-            return false;
-        }
-
-        const auto toByte = [maxValue](const int value)
-        {
-            const int clamped = value < 0 ? 0 : (value > maxValue ? maxValue : value);
-            return static_cast<unsigned char>((clamped * 255) / maxValue);
-        };
-        pixels.push_back(make_uchar4(
-            toByte(std::stoi(rToken)),
-            toByte(std::stoi(gToken)),
-            toByte(std::stoi(bToken)),
-            255));
-    }
-
-    texture.path = path.string();
-    texture.width = static_cast<unsigned int>(width);
-    texture.height = static_cast<unsigned int>(height);
-    texture.pixels = std::move(pixels);
-    return true;
-}
-
 float clampf(const float value, const float minValue, const float maxValue)
 {
     return value < minValue ? minValue : (value > maxValue ? maxValue : value);
@@ -409,7 +334,7 @@ void loadMtl(
                 material.texturePath = textureName;
 
                 MeshTexture texture;
-                if (loadPpmTexture(path.parent_path() / textureName, texture))
+                if (loadImageTexture(path.parent_path() / textureName, texture, "baseColor"))
                 {
                     material.textureIndex = static_cast<int>(mesh.textures.size());
                     mesh.textures.push_back(std::move(texture));
@@ -426,9 +351,43 @@ void loadMtl(
                 material.normalTexturePath = textureName;
 
                 MeshTexture texture;
-                if (loadPpmTexture(path.parent_path() / textureName, texture))
+                if (loadImageTexture(path.parent_path() / textureName, texture, "normal"))
                 {
                     material.normalTextureIndex = static_cast<int>(mesh.textures.size());
+                    mesh.textures.push_back(std::move(texture));
+                }
+            }
+        }
+        else if ((command == "map_Pr" || command == "map_roughness" || command == "roughness") && currentMaterial >= 0)
+        {
+            std::string textureName;
+            input >> textureName;
+            if (!textureName.empty())
+            {
+                MeshMaterial& material = mesh.materials[static_cast<size_t>(currentMaterial)];
+                material.roughnessTexturePath = textureName;
+
+                MeshTexture texture;
+                if (loadImageTexture(path.parent_path() / textureName, texture, "roughness"))
+                {
+                    material.roughnessTextureIndex = static_cast<int>(mesh.textures.size());
+                    mesh.textures.push_back(std::move(texture));
+                }
+            }
+        }
+        else if ((command == "map_Pm" || command == "map_metallic" || command == "metallic") && currentMaterial >= 0)
+        {
+            std::string textureName;
+            input >> textureName;
+            if (!textureName.empty())
+            {
+                MeshMaterial& material = mesh.materials[static_cast<size_t>(currentMaterial)];
+                material.metallicTexturePath = textureName;
+
+                MeshTexture texture;
+                if (loadImageTexture(path.parent_path() / textureName, texture, "metallic"))
+                {
+                    material.metallicTextureIndex = static_cast<int>(mesh.textures.size());
                     mesh.textures.push_back(std::move(texture));
                 }
             }

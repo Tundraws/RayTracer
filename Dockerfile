@@ -35,11 +35,14 @@ RUN test -f README.md \
     && test -f RayTracerRTX/src/app/mesh.h \
     && test -f RayTracerRTX/src/app/gltf_loader.cpp \
     && test -f RayTracerRTX/src/app/gltf_loader.h \
+    && test -f RayTracerRTX/src/app/image_loader.cpp \
+    && test -f RayTracerRTX/src/app/image_loader.h \
     && test -f RayTracerRTX/src/app/obj_loader.cpp \
     && test -f RayTracerRTX/src/app/obj_loader.h \
     && test -f RayTracerRTX/src/app/scene_config.cpp \
     && test -f RayTracerRTX/src/app/scene_config.h \
     && test -f RayTracerRTX/src/gpu/optix_device_programs.h \
+    && test -f RayTracerRTX/third_party/stb/stb_image.h \
     && grep -q "OBJ mesh" RayTracerRTX/README.md \
     && grep -q "OBJ mesh" RayTracerRTX/docs/docker-check.md \
     && grep -q "usemtl mat_mirror" RayTracerRTX/assets/meshes/demo.obj \
@@ -60,6 +63,7 @@ RUN g++ -std=c++20 -Wall -Wextra -pedantic \
     RayTracerRTX/tests/test_scene_camera.cpp \
     RayTracerRTX/src/app/camera.cpp \
     RayTracerRTX/src/app/gltf_loader.cpp \
+    RayTracerRTX/src/app/image_loader.cpp \
     RayTracerRTX/src/app/material.cpp \
     RayTracerRTX/src/app/mesh.cpp \
     RayTracerRTX/src/app/obj_loader.cpp \

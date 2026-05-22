@@ -300,6 +300,54 @@ static __forceinline__ __device__ float3 sampleDiffuseTexture(const MeshMaterial
         static_cast<float>(pixel.z) / 255.0f);
 }
 
+static __forceinline__ __device__ float sampleTextureChannel(
+    const unsigned int textureOffset,
+    const unsigned int textureWidth,
+    const unsigned int textureHeight,
+    const float2 texcoord,
+    const int channel,
+    const float fallback)
+{
+    if (textureWidth == 0u || textureHeight == 0u || params.meshTexturePixels == nullptr)
+    {
+        return fallback;
+    }
+
+    float u = texcoord.x - floorf(texcoord.x);
+    float v = texcoord.y - floorf(texcoord.y);
+    if (u < 0.0f)
+    {
+        u += 1.0f;
+    }
+    if (v < 0.0f)
+    {
+        v += 1.0f;
+    }
+
+    const unsigned int x = static_cast<unsigned int>(fminf(u * static_cast<float>(textureWidth), static_cast<float>(textureWidth - 1u)));
+    const unsigned int y = static_cast<unsigned int>(fminf((1.0f - v) * static_cast<float>(textureHeight), static_cast<float>(textureHeight - 1u)));
+    const unsigned int offset = textureOffset + y * textureWidth + x;
+    if (offset >= params.meshTexturePixelCount)
+    {
+        return fallback;
+    }
+
+    const uchar4 pixel = params.meshTexturePixels[offset];
+    if (channel == 1)
+    {
+        return static_cast<float>(pixel.y) / 255.0f;
+    }
+    if (channel == 2)
+    {
+        return static_cast<float>(pixel.z) / 255.0f;
+    }
+    if (channel == 3)
+    {
+        return static_cast<float>(pixel.w) / 255.0f;
+    }
+    return static_cast<float>(pixel.x) / 255.0f;
+}
+
 static __forceinline__ __device__ float3 sampleNormalTexture(
     const MeshMaterialGpu material,
     const float2 texcoord,
@@ -613,7 +661,20 @@ static __forceinline__ __device__ float3 shadeMaterial(
     const float ambient = 0.14f;
     const float diffuseShadowFloor = 0.34f;
     const float mirrorShadowFloor = 0.50f;
-    const float roughness = safeMaterialRoughness(material.roughness);
+    const bool packedMetallicRoughness =
+        material.hasMetallicTexture != 0 &&
+        material.hasRoughnessTexture != 0 &&
+        material.metallicTextureOffset == material.roughnessTextureOffset;
+    const float roughnessMap = material.hasRoughnessTexture != 0
+        ? sampleTextureChannel(
+            material.roughnessTextureOffset,
+            material.roughnessTextureWidth,
+            material.roughnessTextureHeight,
+            texcoord,
+            packedMetallicRoughness ? 1 : 0,
+            material.roughness)
+        : material.roughness;
+    const float roughness = safeMaterialRoughness(roughnessMap);
     const float shadowFloor = material.materialType == MaterialMirror || material.materialType == MaterialMetal || material.materialType == MaterialDielectric
         ? mirrorShadowFloor
         : diffuseShadowFloor;
@@ -630,7 +691,15 @@ static __forceinline__ __device__ float3 shadeMaterial(
     const float3 diffuseColor = reflectiveMaterial
         ? baseColor
         : clamp3(baseColor, 0.0f, 0.96f);
-    const float metallic = material.materialType == MaterialMetal ? 1.0f : 0.0f;
+    const float metallic = material.hasMetallicTexture != 0
+        ? sampleTextureChannel(
+            material.metallicTextureOffset,
+            material.metallicTextureWidth,
+            material.metallicTextureHeight,
+            texcoord,
+            packedMetallicRoughness ? 2 : 0,
+            material.materialType == MaterialMetal ? 1.0f : 0.0f)
+        : (material.materialType == MaterialMetal ? 1.0f : 0.0f);
     const float mirrorGgxBoost = material.materialType == MaterialMirror ? 1.35f : 1.0f;
     const float3 ggxLight = mul3(
         ggxDirectLight(diffuseColor, material.specularColor, normal, viewDir, lightDir, roughness, metallic),

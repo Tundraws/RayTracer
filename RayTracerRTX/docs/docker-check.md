@@ -10,6 +10,7 @@ The Docker setup provides a reproducible coursework verification environment for
 - documentation marker checks;
 - demo OBJ mesh and MTL asset checks;
 - demo textured OBJ, `map_Kd` PPM, and normal-map PPM asset checks;
+- vendored `stb_image.h` presence check for PNG/JPG texture loading;
 - demo PPM environment-map asset checks;
 - demo material showcase OBJ/MTL asset checks;
 - demo glTF `.gltf/.bin` asset checks;

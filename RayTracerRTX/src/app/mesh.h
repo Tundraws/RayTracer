@@ -37,13 +37,19 @@ struct MeshMaterial
     int textureEnabled = 1;
     std::string normalTexturePath;
     int normalTextureIndex = -1;
+    std::string metallicTexturePath;
+    int metallicTextureIndex = -1;
+    std::string roughnessTexturePath;
+    int roughnessTextureIndex = -1;
 };
 
 struct MeshTexture
 {
     std::string path;
+    std::string type;
     unsigned int width = 0;
     unsigned int height = 0;
+    unsigned int channels = 0;
     std::vector<uchar4> pixels;
 };
 

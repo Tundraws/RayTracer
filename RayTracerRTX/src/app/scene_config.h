@@ -27,6 +27,8 @@ struct SceneMaterialConfig
     float alpha = 1.0f;
     std::string texturePath;
     std::string normalTexturePath;
+    std::string metallicTexturePath;
+    std::string roughnessTexturePath;
 };
 
 struct MeshObjectConfig

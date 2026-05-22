@@ -30,6 +30,12 @@
     <ClInclude Include="src\app\camera.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="src\app\gltf_loader.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\image_loader.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
     <ClInclude Include="src\app\material.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -78,6 +84,9 @@
     <ClInclude Include="third_party\imgui\imstb_truetype.h">
       <Filter>Third Party</Filter>
     </ClInclude>
+    <ClInclude Include="third_party\stb\stb_image.h">
+      <Filter>Third Party</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="x64\Debug\glfw3.dll" />
@@ -92,6 +101,12 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="src\app\camera.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\gltf_loader.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\image_loader.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="src\app\material.cpp">

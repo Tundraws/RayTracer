@@ -1,5 +1,6 @@
 #include "../src/app/camera.h"
 #include "../src/app/gltf_loader.h"
+#include "../src/app/image_loader.h"
 #include "../src/app/material.h"
 #include "../src/app/obj_loader.h"
 #include "../src/app/scene.h"
@@ -56,6 +57,21 @@ std::filesystem::path writeFixtureBinaryFile(const std::string& name, const std:
     std::ofstream file(path, std::ios::binary);
     file.write(reinterpret_cast<const char*>(content.data()), static_cast<std::streamsize>(content.size()));
     return path;
+}
+
+std::vector<unsigned char> tinyPngBytes()
+{
+    return {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x04, 0x00, 0x00, 0x00, 0xb5, 0x1c, 0x0c,
+        0x02, 0x00, 0x00, 0x00, 0x0b, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0xda, 0x63, 0xfc, 0xff, 0x1f, 0x00,
+        0x03, 0x03, 0x02, 0x00, 0xef, 0xbf, 0xa7, 0xdb,
+        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
+        0xae, 0x42, 0x60, 0x82
+    };
 }
 
 std::filesystem::path findDemoObjAsset()
@@ -480,6 +496,87 @@ void testObjLoaderMapKdTexture(TestContext& t)
     t.expect(result.mesh.textures.size() == 1, "Loaded map_Kd texture should be stored in mesh textures.");
     t.expect(result.mesh.textures[0].pixels.size() == 2, "PPM texture pixels should be loaded.");
     t.expect(hasValidMeshMaterialIndices(result.mesh), "Textured material indices should remain valid.");
+}
+
+void testImageLoaderPngTexture(TestContext& t)
+{
+    const std::filesystem::path pngPath = writeFixtureBinaryFile("tiny_png_texture.png", tinyPngBytes());
+
+    MeshTexture texture;
+    const bool loaded = loadImageTexture(pngPath, texture, "baseColor");
+
+    t.expect(loaded, "PNG texture should load through stb_image.");
+    t.expect(texture.width == 1 && texture.height == 1, "PNG texture metadata should include dimensions.");
+    t.expect(texture.channels >= 1, "PNG texture metadata should include source channel count.");
+    t.expect(texture.type == "baseColor", "PNG texture metadata should keep texture type.");
+    t.expect(texture.pixels.size() == 1, "PNG texture should decode one pixel.");
+}
+
+void testObjLoaderCommonTextureMaps(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "common_texture_maps.obj",
+        "mtllib common_texture_maps.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "usemtl textured\n"
+        "f 1/1 2/2 3/3\n");
+
+    writeFixtureFile(
+        "common_texture_maps.mtl",
+        "newmtl textured\n"
+        "Kd 1 1 1\n"
+        "map_Kd albedo.png\n"
+        "norm normal.png\n"
+        "map_Pm metallic.png\n"
+        "map_Pr roughness.png\n");
+    writeFixtureBinaryFile("albedo.png", tinyPngBytes());
+    writeFixtureBinaryFile("normal.png", tinyPngBytes());
+    writeFixtureBinaryFile("metallic.png", tinyPngBytes());
+    writeFixtureBinaryFile("roughness.png", tinyPngBytes());
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "OBJ with PNG texture maps should load.");
+    t.expect(result.mesh.materials[1].textureIndex >= 0, "PNG base color texture should be assigned.");
+    t.expect(result.mesh.materials[1].normalTextureIndex >= 0, "PNG normal texture should be assigned.");
+    t.expect(result.mesh.materials[1].metallicTextureIndex >= 0, "PNG metallic texture should be assigned.");
+    t.expect(result.mesh.materials[1].roughnessTextureIndex >= 0, "PNG roughness texture should be assigned.");
+    t.expect(result.mesh.textures.size() == 4, "All PNG texture maps should be stored.");
+    t.expect(result.mesh.textures[0].type == "baseColor", "Base color texture type metadata should be stored.");
+    t.expect(result.mesh.textures[1].type == "normal", "Normal texture type metadata should be stored.");
+    t.expect(result.mesh.textures[2].type == "metallic", "Metallic texture type metadata should be stored.");
+    t.expect(result.mesh.textures[3].type == "roughness", "Roughness texture type metadata should be stored.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Common texture map material indices should remain valid.");
+}
+
+void testObjLoaderUnsupportedTextureFallback(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "unsupported_texture.obj",
+        "mtllib unsupported_texture.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl unsupported_tex\n"
+        "f 1 2 3\n");
+
+    writeFixtureFile(
+        "unsupported_texture.mtl",
+        "newmtl unsupported_tex\n"
+        "Kd 0.4 0.5 0.6\n"
+        "map_Kd unsupported.txt\n");
+    writeFixtureFile("unsupported.txt", "not an image");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+    t.expect(result.ok, "Unsupported texture should not fail OBJ loading.");
+    t.expect(result.mesh.materials[1].texturePath == "unsupported.txt", "Unsupported texture path should still be stored.");
+    t.expect(result.mesh.materials[1].textureIndex < 0, "Unsupported texture should fall back to material color.");
+    t.expect(result.mesh.textures.empty(), "Unsupported texture should not create texture pixels.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Unsupported texture fallback should keep material indices valid.");
 }
 
 void testObjLoaderNormalMapTexture(TestContext& t)
@@ -2053,8 +2150,11 @@ int main(int argc, char** argv)
     runTest("OBJ loader textured face with normals", testObjLoaderTexturedFaceWithNormals);
     runTest("OBJ loader computes tangents for textured triangle", testObjLoaderComputesTangentsForTexturedTriangle);
     runTest("OBJ loader map_Kd texture", testObjLoaderMapKdTexture);
+    runTest("Image loader PNG texture", testImageLoaderPngTexture);
+    runTest("OBJ loader common texture maps", testObjLoaderCommonTextureMaps);
     runTest("OBJ loader normal map texture", testObjLoaderNormalMapTexture);
     runTest("OBJ loader missing texture fallback", testObjLoaderMissingTextureFallback);
+    runTest("OBJ loader unsupported texture fallback", testObjLoaderUnsupportedTextureFallback);
     runTest("OBJ loader missing UV disables normal map", testObjLoaderMissingUvDisablesNormalMap);
     runTest("OBJ loader invalid normal map fallback", testObjLoaderInvalidNormalMapFallback);
     runTest("OBJ loader missing normals fallback", testObjLoaderMissingNormalsFallback);

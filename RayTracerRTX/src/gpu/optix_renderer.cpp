@@ -653,6 +653,30 @@ void OptixRenderer::createScene(const SceneState& scene)
                     meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
                 }
             }
+            if (material.metallicTextureIndex >= 0 && static_cast<size_t>(material.metallicTextureIndex) < object.mesh.textures.size())
+            {
+                const MeshTexture& texture = object.mesh.textures[static_cast<size_t>(material.metallicTextureIndex)];
+                if (!texture.pixels.empty() && texture.width > 0 && texture.height > 0)
+                {
+                    materialGpu.hasMetallicTexture = 1;
+                    materialGpu.metallicTextureOffset = static_cast<unsigned int>(meshTexturePixels.size());
+                    materialGpu.metallicTextureWidth = texture.width;
+                    materialGpu.metallicTextureHeight = texture.height;
+                    meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
+                }
+            }
+            if (material.roughnessTextureIndex >= 0 && static_cast<size_t>(material.roughnessTextureIndex) < object.mesh.textures.size())
+            {
+                const MeshTexture& texture = object.mesh.textures[static_cast<size_t>(material.roughnessTextureIndex)];
+                if (!texture.pixels.empty() && texture.width > 0 && texture.height > 0)
+                {
+                    materialGpu.hasRoughnessTexture = 1;
+                    materialGpu.roughnessTextureOffset = static_cast<unsigned int>(meshTexturePixels.size());
+                    materialGpu.roughnessTextureWidth = texture.width;
+                    materialGpu.roughnessTextureHeight = texture.height;
+                    meshTexturePixels.insert(meshTexturePixels.end(), texture.pixels.begin(), texture.pixels.end());
+                }
+            }
             meshMaterials.push_back(materialGpu);
         }
 

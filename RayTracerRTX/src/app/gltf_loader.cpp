@@ -1,5 +1,7 @@
 #include "gltf_loader.h"
 
+#include "image_loader.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cctype>
@@ -383,70 +385,6 @@ float3 computeTriangleTangent(const MeshVertex& a, const MeshVertex& b, const Me
         (edge1.z * dv2 - edge2.z * dv1) * inv));
 }
 
-bool readPpmToken(std::istream& input, std::string& token)
-{
-    token.clear();
-    while (input >> token)
-    {
-        if (!token.empty() && token[0] == '#')
-        {
-            std::string ignored;
-            std::getline(input, ignored);
-            continue;
-        }
-        return true;
-    }
-    return false;
-}
-
-bool loadPpmTexture(const std::filesystem::path& path, MeshTexture& texture)
-{
-    std::ifstream file(path, std::ios::binary);
-    if (!file)
-    {
-        return false;
-    }
-    std::string token;
-    std::string widthToken;
-    std::string heightToken;
-    std::string maxToken;
-    if (!readPpmToken(file, token) || token != "P3" ||
-        !readPpmToken(file, widthToken) || !readPpmToken(file, heightToken) || !readPpmToken(file, maxToken))
-    {
-        return false;
-    }
-    const int width = std::stoi(widthToken);
-    const int height = std::stoi(heightToken);
-    const int maxValue = std::stoi(maxToken);
-    if (width <= 0 || height <= 0 || maxValue <= 0)
-    {
-        return false;
-    }
-    std::vector<uchar4> pixels;
-    pixels.reserve(static_cast<size_t>(width) * static_cast<size_t>(height));
-    for (int i = 0; i < width * height; ++i)
-    {
-        std::string r;
-        std::string g;
-        std::string b;
-        if (!readPpmToken(file, r) || !readPpmToken(file, g) || !readPpmToken(file, b))
-        {
-            return false;
-        }
-        const auto convert = [maxValue](const std::string& value)
-        {
-            const int parsed = std::clamp(std::stoi(value), 0, maxValue);
-            return static_cast<unsigned char>((parsed * 255) / maxValue);
-        };
-        pixels.push_back(make_uchar4(convert(r), convert(g), convert(b), 255u));
-    }
-    texture.path = path.string();
-    texture.width = static_cast<unsigned int>(width);
-    texture.height = static_cast<unsigned int>(height);
-    texture.pixels = std::move(pixels);
-    return true;
-}
-
 struct BufferView
 {
     int buffer = 0;
@@ -706,35 +644,103 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
                         const float metallic = numberField(*pbr, "metallicFactor", 0.0f);
                         material.roughness = std::clamp(numberField(*pbr, "roughnessFactor", 0.5f), 0.045f, 1.0f);
                         material.materialType = metallic >= 0.5f ? MaterialMetal : MaterialDiffuse;
-                        const JsonValue* textureInfoField = findField(*pbr, "baseColorTexture");
-                        if (const JsonObject* textureInfo = textureInfoField != nullptr ? asObject(*textureInfoField) : nullptr)
+                        const auto loadTextureFromInfo = [&](const JsonObject& owner, const char* fieldName, const std::string& type)
                         {
+                            const JsonValue* textureInfoField = findField(owner, fieldName);
+                            const JsonObject* textureInfo = textureInfoField != nullptr ? asObject(*textureInfoField) : nullptr;
+                            if (textureInfo == nullptr)
+                            {
+                                return -1;
+                            }
                             const int textureIndex = intField(*textureInfo, "index", -1);
                             const JsonValue* texturesField = findField(*root, "textures");
                             const JsonValue* imagesField = findField(*root, "images");
                             const JsonArray* textures = texturesField != nullptr ? asArray(*texturesField) : nullptr;
                             const JsonArray* images = imagesField != nullptr ? asArray(*imagesField) : nullptr;
-                            if (textures != nullptr && images != nullptr && textureIndex >= 0 && static_cast<size_t>(textureIndex) < textures->size())
+                            if (textures == nullptr || images == nullptr || textureIndex < 0 || static_cast<size_t>(textureIndex) >= textures->size())
                             {
-                                const JsonObject* texture = asObject((*textures)[static_cast<size_t>(textureIndex)]);
-                                const int source = texture != nullptr ? intField(*texture, "source", -1) : -1;
-                                if (source >= 0 && static_cast<size_t>(source) < images->size())
-                                {
-                                    const JsonObject* image = asObject((*images)[static_cast<size_t>(source)]);
-                                    const std::string uri = image != nullptr ? stringField(*image, "uri") : std::string{};
-                                    if (!uri.empty())
-                                    {
-                                        material.texturePath = uri;
-                                        MeshTexture loadedTexture;
-                                        if (loadPpmTexture(path.parent_path() / uri, loadedTexture))
-                                        {
-                                            material.textureIndex = static_cast<int>(mesh.textures.size());
-                                            mesh.textures.push_back(std::move(loadedTexture));
-                                        }
-                                    }
-                                }
+                                return -1;
                             }
+                            const JsonObject* texture = asObject((*textures)[static_cast<size_t>(textureIndex)]);
+                            const int source = texture != nullptr ? intField(*texture, "source", -1) : -1;
+                            if (source < 0 || static_cast<size_t>(source) >= images->size())
+                            {
+                                return -1;
+                            }
+                            const JsonObject* image = asObject((*images)[static_cast<size_t>(source)]);
+                            const std::string uri = image != nullptr ? stringField(*image, "uri") : std::string{};
+                            if (uri.empty())
+                            {
+                                return -1;
+                            }
+                            MeshTexture loadedTexture;
+                            if (!loadImageTexture(path.parent_path() / uri, loadedTexture, type))
+                            {
+                                return -1;
+                            }
+                            const int loadedIndex = static_cast<int>(mesh.textures.size());
+                            mesh.textures.push_back(std::move(loadedTexture));
+                            return loadedIndex;
+                        };
+
+                        material.textureIndex = loadTextureFromInfo(*pbr, "baseColorTexture", "baseColor");
+                        if (material.textureIndex >= 0)
+                        {
+                            const MeshTexture& texture = mesh.textures[static_cast<size_t>(material.textureIndex)];
+                            material.texturePath = texture.path;
                         }
+                        const int metallicRoughnessIndex = loadTextureFromInfo(*pbr, "metallicRoughnessTexture", "metallicRoughness");
+                        if (metallicRoughnessIndex >= 0)
+                        {
+                            const MeshTexture& texture = mesh.textures[static_cast<size_t>(metallicRoughnessIndex)];
+                            material.metallicTextureIndex = metallicRoughnessIndex;
+                            material.roughnessTextureIndex = metallicRoughnessIndex;
+                            material.metallicTexturePath = texture.path;
+                            material.roughnessTexturePath = texture.path;
+                        }
+                    }
+                    const auto loadObjectTextureFromInfo = [&](const JsonObject& owner, const char* fieldName, const std::string& type)
+                    {
+                        const JsonValue* textureInfoField = findField(owner, fieldName);
+                        const JsonObject* textureInfo = textureInfoField != nullptr ? asObject(*textureInfoField) : nullptr;
+                        if (textureInfo == nullptr)
+                        {
+                            return -1;
+                        }
+                        const int textureIndex = intField(*textureInfo, "index", -1);
+                        const JsonValue* texturesField = findField(*root, "textures");
+                        const JsonValue* imagesField = findField(*root, "images");
+                        const JsonArray* textures = texturesField != nullptr ? asArray(*texturesField) : nullptr;
+                        const JsonArray* images = imagesField != nullptr ? asArray(*imagesField) : nullptr;
+                        if (textures == nullptr || images == nullptr || textureIndex < 0 || static_cast<size_t>(textureIndex) >= textures->size())
+                        {
+                            return -1;
+                        }
+                        const JsonObject* texture = asObject((*textures)[static_cast<size_t>(textureIndex)]);
+                        const int source = texture != nullptr ? intField(*texture, "source", -1) : -1;
+                        if (source < 0 || static_cast<size_t>(source) >= images->size())
+                        {
+                            return -1;
+                        }
+                        const JsonObject* image = asObject((*images)[static_cast<size_t>(source)]);
+                        const std::string uri = image != nullptr ? stringField(*image, "uri") : std::string{};
+                        if (uri.empty())
+                        {
+                            return -1;
+                        }
+                        MeshTexture loadedTexture;
+                        if (!loadImageTexture(path.parent_path() / uri, loadedTexture, type))
+                        {
+                            return -1;
+                        }
+                        const int loadedIndex = static_cast<int>(mesh.textures.size());
+                        mesh.textures.push_back(std::move(loadedTexture));
+                        return loadedIndex;
+                    };
+                    material.normalTextureIndex = loadObjectTextureFromInfo(*object, "normalTexture", "normal");
+                    if (material.normalTextureIndex >= 0)
+                    {
+                        material.normalTexturePath = mesh.textures[static_cast<size_t>(material.normalTextureIndex)].path;
                     }
                 }
                 mesh.materials.push_back(std::move(material));

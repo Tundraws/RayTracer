@@ -586,7 +586,11 @@ bool parseMaterialObject(
     if (!readStringField(object, "texture", material.texturePath, error) ||
         !readStringField(object, "map_Kd", material.texturePath, error) ||
         !readStringField(object, "normalMap", material.normalTexturePath, error) ||
-        !readStringField(object, "normal", material.normalTexturePath, error))
+        !readStringField(object, "normal", material.normalTexturePath, error) ||
+        !readStringField(object, "metallicMap", material.metallicTexturePath, error) ||
+        !readStringField(object, "metallicTexture", material.metallicTexturePath, error) ||
+        !readStringField(object, "roughnessMap", material.roughnessTexturePath, error) ||
+        !readStringField(object, "roughnessTexture", material.roughnessTexturePath, error))
     {
         return false;
     }
@@ -733,6 +737,14 @@ void appendMesh(MeshData& target, const MeshData& source)
         {
             material.normalTextureIndex += textureOffset;
         }
+        if (material.metallicTextureIndex >= 0)
+        {
+            material.metallicTextureIndex += textureOffset;
+        }
+        if (material.roughnessTextureIndex >= 0)
+        {
+            material.roughnessTextureIndex += textureOffset;
+        }
         target.materials.push_back(std::move(material));
     }
     for (MeshTriangle triangle : source.triangles)
@@ -813,6 +825,10 @@ MeshMaterial toMeshMaterial(const SceneMaterialConfig& config, MeshMaterial base
     base.textureIndex = -1;
     base.normalTexturePath = config.normalTexturePath;
     base.normalTextureIndex = -1;
+    base.metallicTexturePath = config.metallicTexturePath;
+    base.metallicTextureIndex = -1;
+    base.roughnessTexturePath = config.roughnessTexturePath;
+    base.roughnessTextureIndex = -1;
     return base;
 }
 

@@ -14,6 +14,7 @@ security limitations for the coursework project.
 | NVIDIA display driver | Runtime GPU driver | Required to launch OptiX on RTX hardware |
 | GLFW | Window and input handling | Stored in the repository as a local dependency |
 | Dear ImGui | Lightweight debug/control panel | Vendored in `third_party/imgui`; only core, GLFW backend and OpenGL2 backend are included |
+| stb_image | PNG/JPG image loading | Vendored as `third_party/stb/stb_image.h`; official `nothings/stb` single-header library, public domain or MIT |
 | OpenGL | Image presentation | Used to display the rendered framebuffer |
 | Docker / Docker Compose | Reproducible checks | Runs documentation/structure checks and CPU-only tests |
 
@@ -21,8 +22,10 @@ The OBJ mesh path does not add external runtime dependencies. OBJ and MTL files
 are parsed by the local `src/app/obj_loader.*` implementation. Supported input
 is limited to vertices, normals, texture coordinates, triangular faces,
 `mtllib`, `usemtl`, and selected MTL fields: `Kd`, `Ks`, `Ns`, `Ni`, `d`,
-`map_Kd`, `bump`, `map_Bump`, and `norm`. The OptiX denoiser uses the already
-required NVIDIA OptiX SDK and does not add a new third-party dependency.
+`map_Kd`, `bump`, `map_Bump`, `norm`, `map_Pr`/`map_roughness`, and
+`map_Pm`/`map_metallic`. PPM parsing is local; PNG and JPG/JPEG decoding uses
+vendored `stb_image.h`. The OptiX denoiser uses the already required NVIDIA
+OptiX SDK and does not add a new third-party dependency.
 The basic glTF path also uses local parsing code and adds no new package. Its
 supported subset is limited to `.gltf` JSON files with external `.bin` buffers
 and selected mesh/material fields.
@@ -44,6 +47,7 @@ The practical dependency check is:
 5. Verify demo OBJ/MTL assets and OBJ loader files as part of the coursework check.
 6. Keep vendored GLFW files limited to the required include/library paths.
 7. Keep vendored Dear ImGui files limited to the required core and backend files.
+8. Keep vendored stb usage limited to `stb_image.h` for image decoding.
 
 ## Security Controls
 

@@ -95,6 +95,7 @@
     <ClInclude Include="src\app\application.h" />
     <ClInclude Include="src\app\camera.h" />
     <ClInclude Include="src\app\gltf_loader.h" />
+    <ClInclude Include="src\app\image_loader.h" />
     <ClInclude Include="src\app\material.h" />
     <ClInclude Include="src\app\mesh.h" />
     <ClInclude Include="src\app\obj_loader.h" />
@@ -111,6 +112,7 @@
     <ClInclude Include="third_party\imgui\imstb_rectpack.h" />
     <ClInclude Include="third_party\imgui\imstb_textedit.h" />
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
+    <ClInclude Include="third_party\stb\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>
@@ -121,6 +123,7 @@
     <ClCompile Include="src\app\application.cpp" />
     <ClCompile Include="src\app\camera.cpp" />
     <ClCompile Include="src\app\gltf_loader.cpp" />
+    <ClCompile Include="src\app\image_loader.cpp" />
     <ClCompile Include="src\app\material.cpp" />
     <ClCompile Include="src\app\mesh.cpp" />
     <ClCompile Include="src\app\obj_loader.cpp" />

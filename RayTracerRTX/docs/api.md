@@ -173,9 +173,11 @@ Loads a simple OBJ mesh description into `MeshData`. The loader supports:
 - triangular `f` faces;
 - `mtllib` and `usemtl` material references;
 - MTL `Kd`, `Ks`, `Ns`, `Ni`, and `d` material values;
-- MTL `map_Kd` diffuse texture references for ASCII PPM (`P3`) images;
-- MTL `bump`, `map_Bump`, and `norm` normal map references for ASCII PPM
-  (`P3`) images;
+- MTL `map_Kd` diffuse texture references for PPM (`P3`), PNG, and JPG/JPEG images;
+- MTL `bump`, `map_Bump`, and `norm` normal map references for PPM (`P3`),
+  PNG, and JPG/JPEG images;
+- MTL `map_Pr`/`map_roughness` roughness maps and `map_Pm`/`map_metallic`
+  metallic maps for the same image formats;
 - multiple named materials.
 
 Material names containing `mirror` are mapped to `MaterialMirror`; all other
@@ -185,13 +187,10 @@ OBJ materials are mapped by name: `metal` to `MaterialMetal`, `glass` or
 index of refraction, `d` stores alpha, and `Ks` stores specular color. The
 loader is intentionally limited to the listed OBJ and MTL records.
 
-If `map_Kd` points to a missing or unsupported texture file, the loader keeps
-the texture path for diagnostics and falls back to the material `Kd` color.
-If a normal map points to a missing or unsupported texture file, the loader
-keeps the path for diagnostics and the shader falls back to the interpolated
-geometric normal. Basic normal mapping requires OBJ `vt` coordinates and a
-valid computed tangent basis; it perturbs shading normals only and does not
-perform displacement mapping.
+If a texture map points to a missing or unsupported file, the loader keeps the
+path for diagnostics and falls back to the numeric material values. Basic normal
+mapping requires OBJ `vt` coordinates and a valid computed tangent basis; it
+perturbs shading normals only and does not perform displacement mapping.
 
 ## glTF Mesh API
 
@@ -206,13 +205,14 @@ It supports `.gltf` JSON files with external `.bin` buffers, `bufferViews`,
 `accessors`, mesh primitives, triangle indices, `POSITION`, `NORMAL`,
 `TEXCOORD_0`, and simple node `translation`/`scale`. Material import reads
 `pbrMetallicRoughness.baseColorFactor`, `metallicFactor`, `roughnessFactor`,
-and optionally `baseColorTexture` when the referenced image is a simple PPM
-file compatible with the existing texture path.
+and optionally `baseColorTexture` when the referenced image is PPM, PNG, or
+JPG/JPEG. Metallic/roughness and normal texture fields are described in the
+glTF section below as part of the extended texture pipeline.
 
 Unsupported glTF features include `.glb`, embedded base64 buffers, animations,
 skins, morph targets, cameras, lights, sparse accessors, sampler state,
-normal/metallic/roughness texture maps, and full node rotation matrices. This
-is an additional mesh input path; OBJ/MTL remains supported separately.
+full node rotation matrices. This is an additional mesh input path; OBJ/MTL
+remains supported separately.
 
 ### `MeshData`
 
@@ -223,7 +223,7 @@ Declared in `src/app/mesh.h`.
 | `vertices` | `std::vector<MeshVertex>` | Packed mesh vertices with position, normal, UV, tangent and UV availability flag |
 | `triangles` | `std::vector<MeshTriangle>` | Triangle indices plus material index |
 | `materials` | `std::vector<MeshMaterial>` | OBJ/MTL materials used by mesh triangles |
-| `textures` | `std::vector<MeshTexture>` | Loaded diffuse and normal texture pixels referenced by MTL texture maps |
+| `textures` | `std::vector<MeshTexture>` | Loaded color, normal, roughness, and metallic texture pixels referenced by material maps |
 
 `hasValidMeshMaterialIndices(const MeshData&)` validates that every triangle
 material index is inside the material array.
