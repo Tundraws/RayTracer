@@ -538,9 +538,9 @@ std::optional<std::filesystem::path> openMeshFileDialog(GLFWwindow* window)
     ofn.hwndOwner = window != nullptr ? glfwGetWin32Window(window) : nullptr;
     ofn.lpstrTitle = L"\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 OBJ \u0438\u043B\u0438 glTF \u043C\u043E\u0434\u0435\u043B\u044C";
     ofn.lpstrFilter =
-        L"3D \u043C\u043E\u0434\u0435\u043B\u0438 (*.obj;*.gltf)\0*.obj;*.gltf\0"
+        L"3D \u043C\u043E\u0434\u0435\u043B\u0438 (*.obj;*.gltf;*.glb)\0*.obj;*.gltf;*.glb\0"
         L"OBJ (*.obj)\0*.obj\0"
-        L"glTF (*.gltf)\0*.gltf\0"
+        L"glTF (*.gltf;*.glb)\0*.gltf;*.glb\0"
         L"\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B (*.*)\0*.*\0";
     ofn.lpstrFile = fileName;
     ofn.nMaxFile = MAX_PATH;

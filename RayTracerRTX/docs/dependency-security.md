@@ -28,7 +28,8 @@ vendored `stb_image.h`. The OptiX denoiser uses the already required NVIDIA
 OptiX SDK and does not add a new third-party dependency.
 The basic glTF path also uses local parsing code and adds no new package. Its
 supported subset is limited to `.gltf` JSON files with external `.bin` buffers
-and selected mesh/material fields.
+or `.glb` JSON/BIN chunks, selected mesh/material fields, node TRS transforms,
+and image textures decoded through the same local image loader.
 
 ## Dependency Check Approach
 

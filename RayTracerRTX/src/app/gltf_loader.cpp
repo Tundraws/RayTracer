@@ -3,6 +3,7 @@
 #include "image_loader.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cctype>
 #include <cstdint>
@@ -345,6 +346,7 @@ float4 readFloat4Array(const JsonObject& object, const std::string& name, const 
 float3 add3(const float3 a, const float3 b) { return make_float3(a.x + b.x, a.y + b.y, a.z + b.z); }
 float3 sub3(const float3 a, const float3 b) { return make_float3(a.x - b.x, a.y - b.y, a.z - b.z); }
 float dot3(const float3 a, const float3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+using Mat4 = std::array<float, 16>;
 
 float3 normalize3(const float3 value)
 {
@@ -356,9 +358,86 @@ float3 normalize3(const float3 value)
     return make_float3(value.x / length, value.y / length, value.z / length);
 }
 
-float3 applyNodeTransform(const float3 value, const float3 translation, const float3 scale)
+Mat4 identityMatrix()
 {
-    return make_float3(value.x * scale.x + translation.x, value.y * scale.y + translation.y, value.z * scale.z + translation.z);
+    return Mat4{
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f};
+}
+
+Mat4 multiplyMatrix(const Mat4& a, const Mat4& b)
+{
+    Mat4 result{};
+    for (int row = 0; row < 4; ++row)
+    {
+        for (int col = 0; col < 4; ++col)
+        {
+            float value = 0.0f;
+            for (int k = 0; k < 4; ++k)
+            {
+                value += a[static_cast<size_t>(row * 4 + k)] * b[static_cast<size_t>(k * 4 + col)];
+            }
+            result[static_cast<size_t>(row * 4 + col)] = value;
+        }
+    }
+    return result;
+}
+
+Mat4 composeTrsMatrix(const float3 translation, const float4 rotation, const float3 scale)
+{
+    float qx = rotation.x;
+    float qy = rotation.y;
+    float qz = rotation.z;
+    float qw = rotation.w;
+    const float qLength = std::sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
+    if (qLength > 1e-8f)
+    {
+        qx /= qLength;
+        qy /= qLength;
+        qz /= qLength;
+        qw /= qLength;
+    }
+    else
+    {
+        qx = 0.0f;
+        qy = 0.0f;
+        qz = 0.0f;
+        qw = 1.0f;
+    }
+
+    const float xx = qx * qx;
+    const float yy = qy * qy;
+    const float zz = qz * qz;
+    const float xy = qx * qy;
+    const float xz = qx * qz;
+    const float yz = qy * qz;
+    const float wx = qw * qx;
+    const float wy = qw * qy;
+    const float wz = qw * qz;
+
+    return Mat4{
+        (1.0f - 2.0f * (yy + zz)) * scale.x, (2.0f * (xy - wz)) * scale.y, (2.0f * (xz + wy)) * scale.z, translation.x,
+        (2.0f * (xy + wz)) * scale.x, (1.0f - 2.0f * (xx + zz)) * scale.y, (2.0f * (yz - wx)) * scale.z, translation.y,
+        (2.0f * (xz - wy)) * scale.x, (2.0f * (yz + wx)) * scale.y, (1.0f - 2.0f * (xx + yy)) * scale.z, translation.z,
+        0.0f, 0.0f, 0.0f, 1.0f};
+}
+
+float3 transformPoint(const Mat4& matrix, const float3 value)
+{
+    return make_float3(
+        matrix[0] * value.x + matrix[1] * value.y + matrix[2] * value.z + matrix[3],
+        matrix[4] * value.x + matrix[5] * value.y + matrix[6] * value.z + matrix[7],
+        matrix[8] * value.x + matrix[9] * value.y + matrix[10] * value.z + matrix[11]);
+}
+
+float3 transformVector(const Mat4& matrix, const float3 value)
+{
+    return make_float3(
+        matrix[0] * value.x + matrix[1] * value.y + matrix[2] * value.z,
+        matrix[4] * value.x + matrix[5] * value.y + matrix[6] * value.z,
+        matrix[8] * value.x + matrix[9] * value.y + matrix[10] * value.z);
 }
 
 float3 computeTriangleTangent(const MeshVertex& a, const MeshVertex& b, const MeshVertex& c)
@@ -544,23 +623,133 @@ int attributeAccessor(const JsonObject& attributes, const std::string& name)
     const double* value = field != nullptr ? asNumber(*field) : nullptr;
     return value == nullptr ? -1 : static_cast<int>(*value);
 }
+
+std::uint32_t readU32Le(const std::vector<unsigned char>& bytes, const size_t offset)
+{
+    if (offset + 4 > bytes.size())
+    {
+        throw std::runtime_error("Unexpected end of GLB data");
+    }
+    return static_cast<std::uint32_t>(bytes[offset]) |
+        (static_cast<std::uint32_t>(bytes[offset + 1]) << 8u) |
+        (static_cast<std::uint32_t>(bytes[offset + 2]) << 16u) |
+        (static_cast<std::uint32_t>(bytes[offset + 3]) << 24u);
+}
+
+struct GltfSource
+{
+    std::string json;
+    std::vector<unsigned char> binaryChunk;
+};
+
+GltfSource readGltfSource(const std::filesystem::path& path)
+{
+    const std::vector<unsigned char> bytes = readBinaryFile(path);
+    std::string extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](const unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (extension != ".glb")
+    {
+        return GltfSource{std::string(bytes.begin(), bytes.end()), {}};
+    }
+
+    if (bytes.size() < 20 || readU32Le(bytes, 0) != 0x46546C67u || readU32Le(bytes, 4) != 2u)
+    {
+        throw std::runtime_error("Invalid GLB header");
+    }
+    const std::uint32_t totalLength = readU32Le(bytes, 8);
+    if (totalLength > bytes.size())
+    {
+        throw std::runtime_error("Invalid GLB length");
+    }
+
+    GltfSource source;
+    size_t offset = 12;
+    while (offset + 8 <= totalLength)
+    {
+        const std::uint32_t chunkLength = readU32Le(bytes, offset);
+        const std::uint32_t chunkType = readU32Le(bytes, offset + 4);
+        offset += 8;
+        if (offset + chunkLength > totalLength)
+        {
+            throw std::runtime_error("Invalid GLB chunk length");
+        }
+        if (chunkType == 0x4E4F534Au)
+        {
+            source.json.assign(
+                reinterpret_cast<const char*>(bytes.data() + offset),
+                reinterpret_cast<const char*>(bytes.data() + offset + chunkLength));
+        }
+        else if (chunkType == 0x004E4942u)
+        {
+            source.binaryChunk.assign(bytes.begin() + static_cast<std::ptrdiff_t>(offset), bytes.begin() + static_cast<std::ptrdiff_t>(offset + chunkLength));
+        }
+        offset += chunkLength;
+    }
+    if (source.json.empty())
+    {
+        throw std::runtime_error("GLB file has no JSON chunk");
+    }
+    return source;
+}
+
+std::vector<int> readIntArray(const JsonObject& object, const std::string& name)
+{
+    std::vector<int> values;
+    const JsonValue* field = findField(object, name);
+    const JsonArray* array = field != nullptr ? asArray(*field) : nullptr;
+    if (array == nullptr)
+    {
+        return values;
+    }
+    for (const JsonValue& item : *array)
+    {
+        const double* value = asNumber(item);
+        if (value != nullptr)
+        {
+            values.push_back(static_cast<int>(*value));
+        }
+    }
+    return values;
+}
+
+struct NodeInfo
+{
+    int mesh = -1;
+    std::vector<int> children;
+    Mat4 localTransform = identityMatrix();
+};
+
+void collectNodeMeshes(
+    const std::vector<NodeInfo>& nodes,
+    const int nodeIndex,
+    const Mat4& parentTransform,
+    std::vector<std::pair<int, Mat4>>& output)
+{
+    if (nodeIndex < 0 || static_cast<size_t>(nodeIndex) >= nodes.size())
+    {
+        return;
+    }
+    const NodeInfo& node = nodes[static_cast<size_t>(nodeIndex)];
+    const Mat4 worldTransform = multiplyMatrix(parentTransform, node.localTransform);
+    if (node.mesh >= 0)
+    {
+        output.push_back({node.mesh, worldTransform});
+    }
+    for (const int child : node.children)
+    {
+        collectNodeMeshes(nodes, child, worldTransform, output);
+    }
+}
 } // namespace
 
 GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
 {
-    std::ifstream file(path, std::ios::binary);
-    if (!file)
-    {
-        return GltfLoadResult{false, {}, "glTF file could not be opened: " + path.string()};
-    }
-
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-
     try
     {
-        const std::string text = buffer.str();
-        JsonParser parser(text);
+        const GltfSource source = readGltfSource(path);
+        JsonParser parser(source.json);
         const JsonValue rootValue = parser.parse();
         const JsonObject* root = asObject(rootValue);
         if (root == nullptr)
@@ -576,7 +765,16 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
             {
                 const JsonObject* object = asObject(item);
                 const std::string uri = object != nullptr ? stringField(*object, "uri") : std::string{};
-                if (uri.empty() || uri.find("data:") == 0)
+                if (uri.empty())
+                {
+                    if (source.binaryChunk.empty())
+                    {
+                        throw std::runtime_error("glTF buffer has no URI and no GLB BIN chunk");
+                    }
+                    buffers.push_back(source.binaryChunk);
+                    continue;
+                }
+                if (uri.find("data:") == 0)
                 {
                     throw std::runtime_error("Only external .bin glTF buffers are supported");
                 }
@@ -761,28 +959,59 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
             return GltfLoadResult{false, {}, "glTF file contains no meshes"};
         }
 
-        std::vector<std::pair<int, std::pair<float3, float3>>> nodeMeshes;
+        std::vector<std::pair<int, Mat4>> nodeMeshes;
         const JsonValue* nodesField = findField(*root, "nodes");
         if (const JsonArray* nodes = nodesField != nullptr ? asArray(*nodesField) : nullptr)
         {
+            std::vector<NodeInfo> parsedNodes;
+            parsedNodes.reserve(nodes->size());
             for (const JsonValue& item : *nodes)
             {
                 const JsonObject* node = asObject(item);
-                if (node == nullptr || findField(*node, "mesh") == nullptr)
+                if (node == nullptr)
                 {
+                    parsedNodes.push_back(NodeInfo{});
                     continue;
                 }
-                nodeMeshes.push_back({
-                    intField(*node, "mesh"),
+                NodeInfo info;
+                info.mesh = findField(*node, "mesh") != nullptr ? intField(*node, "mesh") : -1;
+                info.children = readIntArray(*node, "children");
+                info.localTransform = composeTrsMatrix(
+                    readFloat3Array(*node, "translation", make_float3(0.0f, 0.0f, 0.0f)),
+                    readFloat4Array(*node, "rotation", make_float4(0.0f, 0.0f, 0.0f, 1.0f)),
+                    readFloat3Array(*node, "scale", make_float3(1.0f, 1.0f, 1.0f)));
+                parsedNodes.push_back(std::move(info));
+            }
+
+            std::vector<int> sceneRoots;
+            const JsonValue* scenesField = findField(*root, "scenes");
+            const JsonArray* scenes = scenesField != nullptr ? asArray(*scenesField) : nullptr;
+            const int sceneIndex = intField(*root, "scene", 0);
+            if (scenes != nullptr && sceneIndex >= 0 && static_cast<size_t>(sceneIndex) < scenes->size())
+            {
+                if (const JsonObject* sceneObject = asObject((*scenes)[static_cast<size_t>(sceneIndex)]))
+                {
+                    sceneRoots = readIntArray(*sceneObject, "nodes");
+                }
+            }
+            if (sceneRoots.empty())
+            {
+                for (int i = 0; i < static_cast<int>(parsedNodes.size()); ++i)
+                {
+                    if (parsedNodes[static_cast<size_t>(i)].mesh >= 0)
                     {
-                        readFloat3Array(*node, "translation", make_float3(0.0f, 0.0f, 0.0f)),
-                        readFloat3Array(*node, "scale", make_float3(1.0f, 1.0f, 1.0f))
-                    }});
+                        sceneRoots.push_back(i);
+                    }
+                }
+            }
+            for (const int rootNode : sceneRoots)
+            {
+                collectNodeMeshes(parsedNodes, rootNode, identityMatrix(), nodeMeshes);
             }
         }
         if (nodeMeshes.empty())
         {
-            nodeMeshes.push_back({0, {make_float3(0.0f, 0.0f, 0.0f), make_float3(1.0f, 1.0f, 1.0f)}});
+            nodeMeshes.push_back({0, identityMatrix()});
         }
 
         for (const auto& nodeMesh : nodeMeshes)
@@ -799,8 +1028,7 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
             {
                 continue;
             }
-            const float3 translation = nodeMesh.second.first;
-            const float3 scale = nodeMesh.second.second;
+            const Mat4 transform = nodeMesh.second;
             for (const JsonValue& primitiveValue : *primitives)
             {
                 const JsonObject* primitive = asObject(primitiveValue);
@@ -822,8 +1050,8 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
                 for (size_t i = 0; i < positions.count; ++i)
                 {
                     MeshVertex vertex;
-                    vertex.position = applyNodeTransform(readVec3(buffers, views, accessors, positionAccessor, i), translation, scale);
-                    vertex.normal = normalize3(readVec3(buffers, views, accessors, normalAccessor, i));
+                    vertex.position = transformPoint(transform, readVec3(buffers, views, accessors, positionAccessor, i));
+                    vertex.normal = normalize3(transformVector(transform, readVec3(buffers, views, accessors, normalAccessor, i)));
                     if (texcoordAccessor >= 0)
                     {
                         vertex.texcoord = readVec2(buffers, views, accessors, texcoordAccessor, i);

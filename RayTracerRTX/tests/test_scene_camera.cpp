@@ -161,27 +161,40 @@ void appendUint16(std::vector<unsigned char>& data, const std::uint16_t value)
     data.insert(data.end(), bytes, bytes + sizeof(std::uint16_t));
 }
 
-std::filesystem::path writeMinimalGltfFixture()
+void appendUint32(std::vector<unsigned char>& data, const std::uint32_t value)
+{
+    data.push_back(static_cast<unsigned char>(value & 0xffu));
+    data.push_back(static_cast<unsigned char>((value >> 8u) & 0xffu));
+    data.push_back(static_cast<unsigned char>((value >> 16u) & 0xffu));
+    data.push_back(static_cast<unsigned char>((value >> 24u) & 0xffu));
+}
+
+void padToFourBytes(std::vector<unsigned char>& data, const unsigned char value)
+{
+    while (data.size() % 4 != 0)
+    {
+        data.push_back(value);
+    }
+}
+
+std::vector<unsigned char> minimalGltfBin()
 {
     std::vector<unsigned char> bin;
     const float positions[] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
     const float normals[] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f};
     const float texcoords[] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f};
-    for (const float value : positions)
-    {
-        appendFloat(bin, value);
-    }
-    for (const float value : normals)
-    {
-        appendFloat(bin, value);
-    }
-    for (const float value : texcoords)
-    {
-        appendFloat(bin, value);
-    }
+    for (const float value : positions) { appendFloat(bin, value); }
+    for (const float value : normals) { appendFloat(bin, value); }
+    for (const float value : texcoords) { appendFloat(bin, value); }
     appendUint16(bin, 0);
     appendUint16(bin, 1);
     appendUint16(bin, 2);
+    return bin;
+}
+
+std::filesystem::path writeMinimalGltfFixture()
+{
+    std::vector<unsigned char> bin = minimalGltfBin();
     writeFixtureBinaryFile("minimal_gltf.bin", bin);
 
     return writeFixtureFile(
@@ -214,6 +227,49 @@ std::filesystem::path writeMinimalGltfFixture()
         "  \"scenes\": [{\"nodes\": [0]}],\n"
         "  \"scene\": 0\n"
         "}\n");
+}
+
+std::filesystem::path writeMinimalGlbFixture()
+{
+    std::vector<unsigned char> bin = minimalGltfBin();
+    std::string json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":102}],"
+        "\"bufferViews\":["
+        "{\"buffer\":0,\"byteOffset\":0,\"byteLength\":36},"
+        "{\"buffer\":0,\"byteOffset\":36,\"byteLength\":36},"
+        "{\"buffer\":0,\"byteOffset\":72,\"byteLength\":24},"
+        "{\"buffer\":0,\"byteOffset\":96,\"byteLength\":6}"
+        "],"
+        "\"accessors\":["
+        "{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\"},"
+        "{\"bufferView\":1,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\"},"
+        "{\"bufferView\":2,\"componentType\":5126,\"count\":3,\"type\":\"VEC2\"},"
+        "{\"bufferView\":3,\"componentType\":5123,\"count\":3,\"type\":\"SCALAR\"}"
+        "],"
+        "\"materials\":[{\"pbrMetallicRoughness\":{\"baseColorFactor\":[0.7,0.4,0.2,1.0],\"metallicFactor\":0.0,\"roughnessFactor\":0.4}}],"
+        "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0,\"NORMAL\":1,\"TEXCOORD_0\":2},\"indices\":3,\"material\":0}]}],"
+        "\"nodes\":[{\"mesh\":0,\"translation\":[0.0,1.0,0.0],\"rotation\":[0.0,0.0,0.7071068,0.7071068],\"scale\":[2.0,2.0,2.0]}],"
+        "\"scenes\":[{\"nodes\":[0]}],"
+        "\"scene\":0"
+        "}";
+
+    std::vector<unsigned char> jsonChunk(json.begin(), json.end());
+    padToFourBytes(jsonChunk, 0x20);
+    padToFourBytes(bin, 0x00);
+
+    std::vector<unsigned char> glb;
+    appendUint32(glb, 0x46546c67u);
+    appendUint32(glb, 2u);
+    appendUint32(glb, static_cast<std::uint32_t>(12u + 8u + jsonChunk.size() + 8u + bin.size()));
+    appendUint32(glb, static_cast<std::uint32_t>(jsonChunk.size()));
+    appendUint32(glb, 0x4e4f534au);
+    glb.insert(glb.end(), jsonChunk.begin(), jsonChunk.end());
+    appendUint32(glb, static_cast<std::uint32_t>(bin.size()));
+    appendUint32(glb, 0x004e4942u);
+    glb.insert(glb.end(), bin.begin(), bin.end());
+    return writeFixtureBinaryFile("minimal_mesh.glb", glb);
 }
 
 void testObjLoaderTriangleWithNormals(TestContext& t)
@@ -815,6 +871,33 @@ void testGltfLoaderMissingFile(TestContext& t)
     t.expect(!result.error.empty(), "Missing glTF should include an error message.");
 }
 
+void testGltfLoaderMissingBuffer(TestContext& t)
+{
+    const std::filesystem::path path = writeFixtureFile(
+        "gltf_missing_buffer.gltf",
+        "{\n"
+        "  \"asset\": {\"version\": \"2.0\"},\n"
+        "  \"buffers\": [{\"uri\": \"missing_gltf_buffer.bin\", \"byteLength\": 102}],\n"
+        "  \"bufferViews\": [\n"
+        "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 36},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 72, \"byteLength\": 24},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 6}\n"
+        "  ],\n"
+        "  \"accessors\": [\n"
+        "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+        "    {\"bufferView\": 1, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+        "    {\"bufferView\": 2, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC2\"},\n"
+        "    {\"bufferView\": 3, \"componentType\": 5123, \"count\": 3, \"type\": \"SCALAR\"}\n"
+        "  ],\n"
+        "  \"meshes\": [{\"primitives\": [{\"attributes\": {\"POSITION\": 0, \"NORMAL\": 1, \"TEXCOORD_0\": 2}, \"indices\": 3}]}]\n"
+        "}\n");
+
+    const GltfLoadResult result = loadGltfMesh(path);
+    t.expect(!result.ok, "glTF with missing external buffer should fail cleanly.");
+    t.expect(!result.error.empty(), "Missing buffer failure should include an error message.");
+}
+
 void testGltfLoaderMaterialFactors(TestContext& t)
 {
     const std::filesystem::path path = writeMinimalGltfFixture();
@@ -830,6 +913,124 @@ void testGltfLoaderMaterialFactors(TestContext& t)
     t.expect(result.mesh.materials[0].materialType == MaterialMetal, "glTF metallicFactor should map to metal material.");
     t.expect(almostEqual(result.mesh.materials[0].roughness, 0.25f), "glTF roughnessFactor should be parsed.");
     t.expect(result.mesh.materials[0].color.z > result.mesh.materials[0].color.x, "glTF baseColorFactor should be parsed.");
+}
+
+void testGltfLoaderMinimalGlb(TestContext& t)
+{
+    const std::filesystem::path path = writeMinimalGlbFixture();
+    const GltfLoadResult result = loadGltfMesh(path);
+
+    t.expect(result.ok, "Minimal GLB should load.");
+    if (!result.ok)
+    {
+        std::cout << "GLB load error: " << result.error << '\n';
+        return;
+    }
+    t.expect(result.mesh.vertices.size() == 3, "Minimal GLB should produce three vertices.");
+    t.expect(result.mesh.triangles.size() == 1, "Minimal GLB should produce one triangle.");
+    t.expect(result.mesh.vertices[0].position.y > 0.9f, "GLB node translation should affect positions.");
+    t.expect(result.mesh.vertices[1].position.y > 2.9f, "GLB quaternion rotation and scale should affect positions.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Minimal GLB material indices should be valid.");
+}
+
+void testGltfLoaderTextureMaps(TestContext& t)
+{
+    std::vector<unsigned char> bin = minimalGltfBin();
+    writeFixtureBinaryFile("gltf_textures.bin", bin);
+    writeFixtureBinaryFile("gltf_albedo.png", tinyPngBytes());
+    writeFixtureBinaryFile("gltf_normal.png", tinyPngBytes());
+    writeFixtureBinaryFile("gltf_metal_rough.png", tinyPngBytes());
+    const std::filesystem::path path = writeFixtureFile(
+        "gltf_textures.gltf",
+        "{\n"
+        "  \"asset\": {\"version\": \"2.0\"},\n"
+        "  \"buffers\": [{\"uri\": \"gltf_textures.bin\", \"byteLength\": 102}],\n"
+        "  \"bufferViews\": [\n"
+        "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 36},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 72, \"byteLength\": 24},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 6}\n"
+        "  ],\n"
+        "  \"accessors\": [\n"
+        "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+        "    {\"bufferView\": 1, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+        "    {\"bufferView\": 2, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC2\"},\n"
+        "    {\"bufferView\": 3, \"componentType\": 5123, \"count\": 3, \"type\": \"SCALAR\"}\n"
+        "  ],\n"
+        "  \"images\": [\n"
+        "    {\"uri\": \"gltf_albedo.png\"},\n"
+        "    {\"uri\": \"gltf_normal.png\"},\n"
+        "    {\"uri\": \"gltf_metal_rough.png\"}\n"
+        "  ],\n"
+        "  \"textures\": [{\"source\": 0}, {\"source\": 1}, {\"source\": 2}],\n"
+        "  \"materials\": [{\n"
+        "    \"name\": \"textured_gltf_material\",\n"
+        "    \"normalTexture\": {\"index\": 1},\n"
+        "    \"pbrMetallicRoughness\": {\n"
+        "      \"baseColorTexture\": {\"index\": 0},\n"
+        "      \"metallicRoughnessTexture\": {\"index\": 2},\n"
+        "      \"metallicFactor\": 1.0,\n"
+        "      \"roughnessFactor\": 0.5\n"
+        "    }\n"
+        "  }],\n"
+        "  \"meshes\": [{\"primitives\": [{\"attributes\": {\"POSITION\": 0, \"NORMAL\": 1, \"TEXCOORD_0\": 2}, \"indices\": 3, \"material\": 0}]}]\n"
+        "}\n");
+
+    const GltfLoadResult result = loadGltfMesh(path);
+    t.expect(result.ok, "glTF texture map fixture should load.");
+    if (!result.ok)
+    {
+        std::cout << "glTF texture map error: " << result.error << '\n';
+        return;
+    }
+    t.expect(result.mesh.materials[0].textureIndex >= 0, "glTF baseColorTexture should be stored.");
+    t.expect(result.mesh.materials[0].normalTextureIndex >= 0, "glTF normalTexture should be stored.");
+    t.expect(result.mesh.materials[0].metallicTextureIndex >= 0, "glTF metallicRoughnessTexture should store metallic map index.");
+    t.expect(result.mesh.materials[0].roughnessTextureIndex >= 0, "glTF metallicRoughnessTexture should store roughness map index.");
+    t.expect(result.mesh.materials[0].metallicTextureIndex == result.mesh.materials[0].roughnessTextureIndex, "glTF packed metallic/roughness should share one texture.");
+    t.expect(result.mesh.textures.size() == 3, "glTF texture maps should load image data.");
+}
+
+void testGltfLoaderNodeHierarchyTransform(TestContext& t)
+{
+    std::vector<unsigned char> bin = minimalGltfBin();
+    writeFixtureBinaryFile("gltf_nodes.bin", bin);
+    const std::filesystem::path path = writeFixtureFile(
+        "gltf_nodes.gltf",
+        "{\n"
+        "  \"asset\": {\"version\": \"2.0\"},\n"
+        "  \"buffers\": [{\"uri\": \"gltf_nodes.bin\", \"byteLength\": 102}],\n"
+        "  \"bufferViews\": [\n"
+        "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 36},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 72, \"byteLength\": 24},\n"
+        "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 6}\n"
+        "  ],\n"
+        "  \"accessors\": [\n"
+        "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+        "    {\"bufferView\": 1, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+        "    {\"bufferView\": 2, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC2\"},\n"
+        "    {\"bufferView\": 3, \"componentType\": 5123, \"count\": 3, \"type\": \"SCALAR\"}\n"
+        "  ],\n"
+        "  \"meshes\": [{\"primitives\": [{\"attributes\": {\"POSITION\": 0, \"NORMAL\": 1, \"TEXCOORD_0\": 2}, \"indices\": 3}]}],\n"
+        "  \"nodes\": [\n"
+        "    {\"children\": [1], \"translation\": [2.0, 0.0, 0.0]},\n"
+        "    {\"mesh\": 0, \"translation\": [0.0, 3.0, 0.0], \"scale\": [2.0, 2.0, 2.0]}\n"
+        "  ],\n"
+        "  \"scenes\": [{\"nodes\": [0]}],\n"
+        "  \"scene\": 0\n"
+        "}\n");
+
+    const GltfLoadResult result = loadGltfMesh(path);
+    t.expect(result.ok, "glTF node hierarchy fixture should load.");
+    if (!result.ok)
+    {
+        std::cout << "glTF node hierarchy error: " << result.error << '\n';
+        return;
+    }
+    t.expect(almostEqual(result.mesh.vertices[0].position.x, 2.0f), "Parent node translation should affect child mesh X.");
+    t.expect(almostEqual(result.mesh.vertices[0].position.y, 3.0f), "Child node translation should affect mesh Y.");
+    t.expect(almostEqual(result.mesh.vertices[1].position.x, 4.0f), "Child node scale should affect mesh positions.");
 }
 
 void testDemoGltfAssetLoads(TestContext& t)
@@ -2166,7 +2367,11 @@ int main(int argc, char** argv)
     runTest("OBJ loader single triangle boundary", testObjLoaderSingleTriangleBoundary);
     runTest("glTF loader minimal mesh", testGltfLoaderMinimalMesh);
     runTest("glTF loader missing file", testGltfLoaderMissingFile);
+    runTest("glTF loader missing buffer", testGltfLoaderMissingBuffer);
     runTest("glTF loader material factors", testGltfLoaderMaterialFactors);
+    runTest("glTF loader minimal GLB", testGltfLoaderMinimalGlb);
+    runTest("glTF loader texture maps", testGltfLoaderTextureMaps);
+    runTest("glTF loader node hierarchy transform", testGltfLoaderNodeHierarchyTransform);
     runTest("Demo glTF asset loads", testDemoGltfAssetLoads);
     runTest("OBJ loader still loads after glTF support", testObjStillLoadsAfterGltfSupport);
     runTest("Demo OBJ asset loads", testDemoObjAssetLoads);

@@ -779,7 +779,7 @@ std::string lowerExtension(const std::filesystem::path& path)
 ObjLoadResult loadMeshByExtension(const std::filesystem::path& path)
 {
     const std::string extension = lowerExtension(path);
-    if (extension == ".gltf")
+    if (extension == ".gltf" || extension == ".glb")
     {
         GltfLoadResult loaded = loadGltfMesh(path);
         return ObjLoadResult{loaded.ok, std::move(loaded.mesh), loaded.error};

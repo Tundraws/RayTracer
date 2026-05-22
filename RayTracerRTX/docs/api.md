@@ -147,7 +147,7 @@ editing, selected mesh position/rotation/scale editing, explicit material type
 selection, texture enable/disable for textured mesh materials, exposure, sky
 intensity, light intensity, material-specific roughness/transparency/IOR tuning, quality mode,
 progressive mode and denoiser toggle. It also provides a Windows file dialog
-button for loading an additional `.obj` or `.gltf` model as a runtime scene
+button for loading an additional `.obj`, `.gltf`, or `.glb` model as a runtime scene
 preset. UI widgets are not unit-tested directly; the underlying state helpers
 are covered by tests.
 
@@ -201,18 +201,22 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path);
 ```
 
 The glTF loader is a small coursework importer for a limited glTF 2.0 subset.
-It supports `.gltf` JSON files with external `.bin` buffers, `bufferViews`,
-`accessors`, mesh primitives, triangle indices, `POSITION`, `NORMAL`,
-`TEXCOORD_0`, and simple node `translation`/`scale`. Material import reads
-`pbrMetallicRoughness.baseColorFactor`, `metallicFactor`, `roughnessFactor`,
-and optionally `baseColorTexture` when the referenced image is PPM, PNG, or
-JPG/JPEG. Metallic/roughness and normal texture fields are described in the
-glTF section below as part of the extended texture pipeline.
+It supports `.gltf` JSON files with external `.bin` buffers and `.glb` files
+with JSON/BIN chunks. Supported geometry fields include `bufferViews`,
+`accessors`, mesh primitives, triangle indices, `POSITION`, `NORMAL`, and
+`TEXCOORD_0`. Node import supports hierarchy traversal plus `translation`,
+quaternion `rotation`, and `scale` composition.
 
-Unsupported glTF features include `.glb`, embedded base64 buffers, animations,
-skins, morph targets, cameras, lights, sparse accessors, sampler state,
-full node rotation matrices. This is an additional mesh input path; OBJ/MTL
-remains supported separately.
+Material import reads `pbrMetallicRoughness.baseColorFactor`,
+`metallicFactor`, `roughnessFactor`, `baseColorTexture`, `normalTexture`, and
+`metallicRoughnessTexture` when the referenced image is PPM, PNG, or JPG/JPEG.
+The packed glTF metallic/roughness texture is stored as one image reference and
+sampled as roughness from the green channel and metallic from the blue channel.
+
+Unsupported glTF features include embedded base64 buffers, animations, skins,
+morph targets, cameras, lights, sparse accessors, sampler state, material
+extensions, and node `matrix` transforms. Unsupported or malformed files return
+a clean load failure with an error string instead of replacing OBJ/MTL support.
 
 ### `MeshData`
 

@@ -40,7 +40,7 @@ int main(int argc, char** argv)
         const ApplicationOptions options = parseOptions(argc, argv);
         if (options.showHelp)
         {
-            std::cout << "Usage: RayTracerRTX.exe [--mesh path/to/model.obj] [--scene path/to/scene.json]\n";
+            std::cout << "Usage: RayTracerRTX.exe [--mesh path/to/model.obj|model.gltf|model.glb] [--scene path/to/scene.json]\n";
             return 0;
         }
         run_optix_app(options);
