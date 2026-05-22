@@ -10,6 +10,7 @@ The Docker setup provides a reproducible coursework verification environment for
 - documentation marker checks;
 - demo OBJ mesh and MTL asset checks;
 - demo textured OBJ, `map_Kd` PPM, and normal-map PPM asset checks;
+- demo material showcase OBJ/MTL asset checks;
 - demo glTF `.gltf/.bin` asset checks;
 - demo JSON scene config checks;
 - OBJ and glTF loader source-file checks;
@@ -29,6 +30,8 @@ driver integration. GPU execution is verified separately by the native
 - `RayTracerRTX/assets/meshes/textured_demo.obj`
 - `RayTracerRTX/assets/meshes/textured_cube.obj`
 - `RayTracerRTX/assets/meshes/textured_demo.mtl`
+- `RayTracerRTX/assets/meshes/material_showcase.obj`
+- `RayTracerRTX/assets/meshes/material_showcase.mtl`
 - `RayTracerRTX/assets/meshes/minimal_gltf.gltf`
 - `RayTracerRTX/assets/meshes/minimal_gltf.bin`
 - `RayTracerRTX/assets/meshes/checker.ppm`
@@ -37,6 +40,8 @@ driver integration. GPU execution is verified separately by the native
 - `RayTracerRTX/assets/scenes/textured_scene.json`
 - `RayTracerRTX/assets/scenes/textured_cube_scene.json`
 - `RayTracerRTX/assets/scenes/multi_mesh_scene.json`
+- `RayTracerRTX/assets/scenes/material_showcase_scene.json`
+- `RayTracerRTX/assets/scenes/path_tracing_demo_scene.json`
 - `RayTracerRTX/assets/scenes/gltf_scene.json`
 - `RayTracerRTX/src/app/obj_loader.*`
 - `RayTracerRTX/src/app/gltf_loader.*`

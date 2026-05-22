@@ -66,6 +66,8 @@ RayTracerRTX - учебный трассировщик лучей в реаль�
 ```powershell
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\demo_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\multi_mesh_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\material_showcase_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\path_tracing_demo_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\gltf_scene.json
 ```
 
@@ -84,6 +86,7 @@ RayTracerRTX - учебный трассировщик лучей в реаль�
 - `R/F` - двигать сферу вверх/вниз
 - `J/L`, `I/K`, `U/O` - двигать источник света
 - `G` - переключить демонстрационную сцену или модель
+- `C` - сбросить камеру и свет для текущей демонстрационной сцены
 - `M` - сменить материал выбранной сферы
 - `B` - выбрать следующий объект-сетку
 - `V` - сменить материал выбранной сетки

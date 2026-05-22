@@ -1,0 +1,24 @@
+{
+  "camera": {
+    "position": [0.0, 3.1, -12.0],
+    "yaw": 90.0,
+    "pitch": -5.0,
+    "fov": 48.0
+  },
+  "light": {
+    "position": [2.0, 10.0, -9.0],
+    "intensity": 0.9
+  },
+  "render": {
+    "exposure": 0.72,
+    "skyIntensity": 0.7
+  },
+  "meshObjects": [
+    {
+      "path": "../meshes/material_showcase.obj",
+      "position": [0.0, 0.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    }
+  ]
+}

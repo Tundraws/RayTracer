@@ -108,6 +108,31 @@ std::filesystem::path findAssetMesh(const std::string& fileName)
     return {};
 }
 
+std::filesystem::path findAssetScene(const std::string& fileName)
+{
+    const std::filesystem::path sourceDir = RAYTRACERRTX_SOURCE_DIR;
+    const std::filesystem::path fromSource = sourceDir.empty()
+        ? std::filesystem::path{}
+        : sourceDir.parent_path() / "assets" / "scenes" / fileName;
+
+    const std::filesystem::path candidates[] = {
+        fromSource,
+        std::filesystem::path("RayTracerRTX") / "assets" / "scenes" / fileName,
+        std::filesystem::path("assets") / "scenes" / fileName,
+        std::filesystem::path("..") / "assets" / "scenes" / fileName
+    };
+
+    for (const std::filesystem::path& candidate : candidates)
+    {
+        if (!candidate.empty() && std::filesystem::exists(candidate))
+        {
+            return candidate;
+        }
+    }
+
+    return {};
+}
+
 void appendFloat(std::vector<unsigned char>& data, const float value)
 {
     const auto* bytes = reinterpret_cast<const unsigned char*>(&value);
@@ -908,6 +933,76 @@ void testSceneConfigTuningClamps(TestContext& t)
     t.expect(almostEqual(scene.scene.lightIntensity, 0.0f), "Light intensity should clamp to minimum.");
 }
 
+void testAllDemoSceneConfigsLoad(TestContext& t)
+{
+    const std::vector<std::string> scenes = {
+        "demo_scene.json",
+        "textured_scene.json",
+        "textured_cube_scene.json",
+        "multi_mesh_scene.json",
+        "gltf_scene.json",
+        "material_showcase_scene.json",
+        "path_tracing_demo_scene.json"
+    };
+
+    for (const std::string& fileName : scenes)
+    {
+        const std::filesystem::path scenePath = findAssetScene(fileName);
+        t.expect(!scenePath.empty(), "Demo scene asset should exist: " + fileName);
+        if (scenePath.empty())
+        {
+            continue;
+        }
+
+        const SceneConfigResult config = loadSceneConfigFile(scenePath);
+        t.expect(config.ok, "Demo scene config should parse: " + fileName + " " + config.error);
+        if (!config.ok)
+        {
+            continue;
+        }
+
+        const SceneBuildResult scene = buildSceneFromConfig(config.config, scenePath.parent_path());
+        t.expect(scene.ok, "Demo scene config should build: " + fileName + " " + scene.error);
+        t.expect(!scene.scene.meshObjects.empty(), "Demo scene should contain mesh objects: " + fileName);
+        t.expect(hasValidMeshMaterialIndices(scene.scene.mesh), "Demo scene combined mesh material indices should be valid: " + fileName);
+    }
+}
+
+void testScenePresetResetCameraLight(TestContext& t)
+{
+    SceneBuildResult preset = buildDefaultSceneInput();
+    t.expect(preset.ok, "Default preset should build for reset test.");
+    SceneState scene = preset.scene;
+    CameraState camera = preset.camera;
+    scene.lightPosition = make_float3(-20.0f, 25.0f, 20.0f);
+    camera.position = make_float3(7.0f, 8.0f, 9.0f);
+    camera.yaw = -30.0f;
+    camera.pitch = 20.0f;
+
+    const bool reset = resetSceneViewFromPreset(preset, scene, camera);
+    t.expect(reset, "Reset should succeed for a valid preset.");
+    t.expect(almostEqual(camera.position.x, preset.camera.position.x), "Reset should restore camera position.");
+    t.expect(almostEqual(camera.yaw, preset.camera.yaw), "Reset should restore camera yaw.");
+    t.expect(almostEqual(scene.lightPosition.x, preset.scene.lightPosition.x), "Reset should restore light position.");
+}
+
+void testInvalidScenePresetIndexSafe(TestContext& t)
+{
+    std::vector<SceneBuildResult> presets;
+    presets.push_back(buildDefaultSceneInput());
+    SceneState scene = presets[0].scene;
+    CameraState camera = presets[0].camera;
+    scene.lightPosition = make_float3(1.0f, 2.0f, 3.0f);
+    camera.yaw = 42.0f;
+
+    const bool appliedNegative = applyScenePresetByIndex(presets, -1, scene, camera);
+    const bool appliedHigh = applyScenePresetByIndex(presets, 99, scene, camera);
+    t.expect(!appliedNegative, "Negative preset index should fail safely.");
+    t.expect(!appliedHigh, "Out-of-range preset index should fail safely.");
+    t.expect(almostEqual(scene.lightPosition.x, 1.0f), "Invalid preset should not change scene.");
+    t.expect(almostEqual(camera.yaw, 42.0f), "Invalid preset should not change camera.");
+}
+
 void testSceneConfigFallbackDemoScene(TestContext& t)
 {
     const SceneBuildResult scene = buildDefaultSceneInput();
@@ -1472,6 +1567,9 @@ int main(int argc, char** argv)
     runTest("Scene config mesh path applied", testSceneConfigMeshPathApplied);
     runTest("Scene config tuning fields", testSceneConfigTuningFields);
     runTest("Scene config tuning clamps", testSceneConfigTuningClamps);
+    runTest("All demo scene configs load", testAllDemoSceneConfigsLoad);
+    runTest("Scene preset reset camera and light", testScenePresetResetCameraLight);
+    runTest("Invalid scene preset index safe", testInvalidScenePresetIndexSafe);
     runTest("Scene config fallback demo scene", testSceneConfigFallbackDemoScene);
 
     ++testsRun;

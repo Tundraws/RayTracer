@@ -17,6 +17,8 @@ RUN test -f README.md \
     && test -f RayTracerRTX/assets/meshes/textured_demo.obj \
     && test -f RayTracerRTX/assets/meshes/textured_cube.obj \
     && test -f RayTracerRTX/assets/meshes/textured_demo.mtl \
+    && test -f RayTracerRTX/assets/meshes/material_showcase.obj \
+    && test -f RayTracerRTX/assets/meshes/material_showcase.mtl \
     && test -f RayTracerRTX/assets/meshes/minimal_gltf.gltf \
     && test -f RayTracerRTX/assets/meshes/minimal_gltf.bin \
     && test -f RayTracerRTX/assets/meshes/checker.ppm \
@@ -26,6 +28,8 @@ RUN test -f README.md \
     && test -f RayTracerRTX/assets/scenes/textured_cube_scene.json \
     && test -f RayTracerRTX/assets/scenes/multi_mesh_scene.json \
     && test -f RayTracerRTX/assets/scenes/gltf_scene.json \
+    && test -f RayTracerRTX/assets/scenes/material_showcase_scene.json \
+    && test -f RayTracerRTX/assets/scenes/path_tracing_demo_scene.json \
     && test -f RayTracerRTX/src/app/mesh.cpp \
     && test -f RayTracerRTX/src/app/mesh.h \
     && test -f RayTracerRTX/src/app/gltf_loader.cpp \
@@ -43,6 +47,7 @@ RUN test -f README.md \
     && grep -q "bump checker_normal.ppm" RayTracerRTX/assets/meshes/textured_demo.mtl \
     && grep -q "vt " RayTracerRTX/assets/meshes/textured_demo.obj \
     && grep -q "TexturedCourseworkCube" RayTracerRTX/assets/meshes/textured_cube.obj \
+    && grep -q "mat_glass_blue" RayTracerRTX/assets/meshes/material_showcase.mtl \
     && grep -q "MinimalGltfTriangle" RayTracerRTX/assets/meshes/minimal_gltf.gltf \
     && grep -q "OptiX" RayTracerRTX/README.md \
     && grep -q "__raygen__rg" RayTracerRTX/src/gpu/optix_device_programs.h

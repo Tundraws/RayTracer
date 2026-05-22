@@ -51,7 +51,7 @@ struct AppState
     bool denoiserAvailable = false;
     unsigned int progressiveSamples = 0;
     std::vector<SceneBuildResult> scenePresets;
-    std::vector<std::string> scenePresetNames;
+    std::vector<std::wstring> scenePresetNames;
     int scenePresetIndex = 0;
 };
 
@@ -200,7 +200,7 @@ void drawHud(
     const bool denoiserEnabled,
     const bool denoiserAvailable,
     const unsigned int progressiveSamples,
-    const std::string& presetName)
+    const std::wstring& presetName)
 {
     if (window == nullptr)
     {
@@ -270,8 +270,7 @@ void drawHud(
              << L"   DENOISER: " << (denoiserEnabled ? (denoiserAvailable ? L"ON" : L"UNAVAILABLE") : L"OFF");
 
     const std::wstring line3 = lineMode.str();
-    const std::wstring presetWide(presetName.begin(), presetName.end());
-    const std::wstring line4 = L"PRESET: " + presetWide;
+    const std::wstring line4 = L"PRESET: " + presetName;
     std::wostringstream lineTuning;
     lineTuning << L"EXPOSURE: " << std::setprecision(2) << scene.exposure
                << L"   SKY: " << scene.skyIntensity
@@ -279,7 +278,7 @@ void drawHud(
     const std::wstring line5 = lineTuning.str();
     const std::wstring line6 = L"SPHERE MOVE: ARROWS, R/F";
     const std::wstring line7 = L"LIGHT: J/L-X, I/K-Z, U/O-Y";
-    const std::wstring line8 = L"PRESET: G   SPHERE MAT: M   MESH: B/V   MODE: P   QUALITY: Q   DENOISER: N";
+    const std::wstring line8 = L"PRESET: G   RESET: C   SPHERE MAT: M   MESH: B/V   MODE: P   QUALITY: Q   DENOISER: N";
 
     const std::wstring text1 = line1.str();
     const std::wstring text2 = line2.str();
@@ -498,11 +497,25 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (gIsDown && !gWasDown && !appState.scenePresets.empty())
     {
         appState.scenePresetIndex = (appState.scenePresetIndex + 1) % static_cast<int>(appState.scenePresets.size());
-        appState.scene = appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)].scene;
-        appState.camera = appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)].camera;
-        appState.progressiveSamples = 0;
+        if (applyScenePresetByIndex(appState.scenePresets, appState.scenePresetIndex, appState.scene, appState.camera))
+        {
+            appState.progressiveSamples = 0;
+        }
     }
     gWasDown = gIsDown;
+
+    static bool cWasDown = false;
+    const bool cIsDown = glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS;
+    if (cIsDown && !cWasDown &&
+        appState.scenePresetIndex >= 0 &&
+        appState.scenePresetIndex < static_cast<int>(appState.scenePresets.size()))
+    {
+        if (resetSceneViewFromPreset(appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)], scene, camera))
+        {
+            appState.progressiveSamples = 0;
+        }
+    }
+    cWasDown = cIsDown;
 
     static bool qWasDown = false;
     const bool qIsDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
@@ -555,7 +568,7 @@ std::filesystem::path findSceneAsset(const std::string& fileName)
     return {};
 }
 
-void addScenePreset(AppState& appState, SceneBuildResult preset, std::string name)
+void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name)
 {
     if (!preset.ok)
     {
@@ -566,7 +579,7 @@ void addScenePreset(AppState& appState, SceneBuildResult preset, std::string nam
     appState.scenePresetNames.push_back(std::move(name));
 }
 
-void addSceneConfigPreset(AppState& appState, const std::string& fileName, const std::string& name)
+void addSceneConfigPreset(AppState& appState, const std::string& fileName, const std::wstring& name)
 {
     const std::filesystem::path path = findSceneAsset(fileName);
     if (path.empty())
@@ -651,11 +664,13 @@ void run_optix_app(const ApplicationOptions& options)
     AppState appState;
     appState.camera = initial.camera;
     appState.scene = initial.scene;
-    addScenePreset(appState, initial, options.sceneConfigPath.empty() && options.meshPath.empty() ? "default" : "input");
-    addScenePreset(appState, buildDefaultSceneInput(), "default");
-    addSceneConfigPreset(appState, "textured_cube_scene.json", "textured cube");
-    addSceneConfigPreset(appState, "multi_mesh_scene.json", "multi mesh");
-    addSceneConfigPreset(appState, "gltf_scene.json", "gltf");
+    addScenePreset(appState, initial, options.sceneConfigPath.empty() && options.meshPath.empty() ? L"Базовая сцена" : L"Входная сцена");
+    addScenePreset(appState, buildDefaultSceneInput(), L"Базовая сцена");
+    addSceneConfigPreset(appState, "textured_cube_scene.json", L"Текстурированный куб");
+    addSceneConfigPreset(appState, "multi_mesh_scene.json", L"Несколько объектов");
+    addSceneConfigPreset(appState, "material_showcase_scene.json", L"Материалы");
+    addSceneConfigPreset(appState, "gltf_scene.json", L"glTF демо");
+    addSceneConfigPreset(appState, "path_tracing_demo_scene.json", L"Режим накопления");
     glfwSetWindowUserPointer(window, &appState);
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
@@ -743,7 +758,7 @@ void run_optix_app(const ApplicationOptions& options)
             appState.progressiveSamples,
             appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(appState.scenePresetNames.size())
                 ? appState.scenePresetNames[static_cast<size_t>(appState.scenePresetIndex)]
-                : std::string{"custom"});
+                : std::wstring{L"Своя сцена"});
         glfwPollEvents();
     }
 

@@ -32,6 +32,8 @@ fails, the renderer keeps running without denoising.
 The lightweight runtime controls also expose demo scene presets with `G`,
 selected mesh object cycling with `B`, selected mesh material preset cycling
 with `V`, and selected sphere material preset cycling with `M`.
+Pressing `C` restores the current preset camera and light without changing the
+active preset.
 Pressing `Q` cycles rendering quality modes: Low, Medium, High, and
 PathTracing. Quality controls max reflection depth, direct shadow rays,
 primary samples per pixel, progressive mode, and denoiser use.
@@ -98,6 +100,10 @@ supports:
 If image-tuning fields are missing, the default scene values are used. Numeric
 values outside the supported range are clamped so old or experimental scene
 files do not make the renderer unstable.
+
+Preset helpers `applyScenePresetByIndex(...)` and
+`resetSceneViewFromPreset(...)` keep runtime scene switching and reset behavior
+testable without depending on GLFW input.
 
 Configured mesh objects are stored in `SceneState::meshObjects`. Each object
 keeps its source mesh data and transform, while `SceneState::mesh` remains as a

@@ -1,0 +1,24 @@
+newmtl mat_matte_warm
+Kd 0.72 0.58 0.46
+Ks 0.08 0.07 0.06
+Ns 18
+d 1.0
+
+newmtl mat_metal_gold
+Kd 0.95 0.74 0.36
+Ks 0.95 0.86 0.62
+Ns 220
+d 1.0
+
+newmtl mat_glass_blue
+Kd 0.54 0.78 0.95
+Ks 1.0 1.0 1.0
+Ns 420
+Ni 1.45
+d 0.35
+
+newmtl mat_mirror_clear
+Kd 0.92 0.92 0.90
+Ks 1.0 1.0 1.0
+Ns 900
+d 1.0

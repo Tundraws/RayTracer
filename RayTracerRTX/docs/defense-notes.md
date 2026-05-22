@@ -53,7 +53,8 @@ RayTracerRTX - учебная система рендеринга трёхмер
 
 3. Показать переключение сцен:
 
-- `G` - смена демонстрационной сцены или модели.
+- `G` - смена демонстрационной сцены или модели;
+- `C` - сброс камеры и света для текущей сцены.
 
 4. Показать материалы:
 
@@ -75,6 +76,8 @@ RayTracerRTX - учебная система рендеринга трёхмер
 ```powershell
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\textured_cube_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\multi_mesh_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\material_showcase_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\path_tracing_demo_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\gltf_scene.json
 ```
 

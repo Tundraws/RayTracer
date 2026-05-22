@@ -785,3 +785,27 @@ SceneBuildResult buildSceneFromMeshPath(const std::filesystem::path& meshPath)
     config.meshObjects.push_back(MeshObjectConfig{meshPath, {}});
     return buildSceneFromConfig(config, {});
 }
+
+bool applyScenePresetByIndex(const std::vector<SceneBuildResult>& presets, const int index, SceneState& scene, CameraState& camera)
+{
+    if (index < 0 || index >= static_cast<int>(presets.size()) || !presets[static_cast<size_t>(index)].ok)
+    {
+        return false;
+    }
+
+    scene = presets[static_cast<size_t>(index)].scene;
+    camera = presets[static_cast<size_t>(index)].camera;
+    return true;
+}
+
+bool resetSceneViewFromPreset(const SceneBuildResult& preset, SceneState& scene, CameraState& camera)
+{
+    if (!preset.ok)
+    {
+        return false;
+    }
+
+    camera = preset.camera;
+    scene.lightPosition = preset.scene.lightPosition;
+    return true;
+}

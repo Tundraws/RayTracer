@@ -55,3 +55,5 @@ SceneConfigResult loadSceneConfigFile(const std::filesystem::path& path);
 SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::filesystem::path& baseDirectory);
 SceneBuildResult buildSceneFromMeshPath(const std::filesystem::path& meshPath);
 SceneBuildResult buildDefaultSceneInput();
+bool applyScenePresetByIndex(const std::vector<SceneBuildResult>& presets, int index, SceneState& scene, CameraState& camera);
+bool resetSceneViewFromPreset(const SceneBuildResult& preset, SceneState& scene, CameraState& camera);

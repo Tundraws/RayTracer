@@ -24,12 +24,22 @@ RayTracerRTX - интерактивный RTX-трассировщик луче�
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\textured_cube_scene.json
 ```
 
+Другие полезные сцены:
+
+```powershell
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\multi_mesh_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\material_showcase_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\path_tracing_demo_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\gltf_scene.json
+```
+
 ## Что можно показать на защите
 
 - RTX/OptiX рендеринг в реальном времени.
 - OBJ mesh с несколькими материалами.
 - Текстурированный куб.
 - Несколько mesh-объектов в одной сцене.
+- Отдельную сцену с матовым, металлическим, стеклянным и зеркальным материалом.
 - Простую демонстрационную glTF-модель.
 - Переключение материалов прямо в программе.
 - Переключение качества рендера.
@@ -93,6 +103,7 @@ glTF поддерживается в простом варианте для де
 - `R/F` - двигать сферу вверх/вниз
 - `J/L`, `I/K`, `U/O` - двигать свет
 - `G` - переключить демонстрационный набор сцены/модели
+- `C` - сбросить камеру и свет для текущей сцены
 - `M` - сменить материал сферы
 - `B` - выбрать следующий объект-сетку
 - `V` - сменить материал сетки

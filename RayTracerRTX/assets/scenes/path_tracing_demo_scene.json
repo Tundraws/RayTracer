@@ -1,0 +1,30 @@
+{
+  "camera": {
+    "position": [0.0, 3.0, -12.5],
+    "yaw": 90.0,
+    "pitch": -6.0,
+    "fov": 50.0
+  },
+  "light": {
+    "position": [5.0, 11.0, -7.0],
+    "intensity": 0.7
+  },
+  "render": {
+    "exposure": 0.65,
+    "skyIntensity": 0.55
+  },
+  "meshObjects": [
+    {
+      "path": "../meshes/textured_cube.obj",
+      "position": [-1.6, 0.0, 0.0],
+      "rotation": [0.0, -20.0, 0.0],
+      "scale": [0.8, 0.8, 0.8]
+    },
+    {
+      "path": "../meshes/material_showcase.obj",
+      "position": [0.0, 0.0, 0.2],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.55, 0.55, 0.55]
+    }
+  ]
+}
