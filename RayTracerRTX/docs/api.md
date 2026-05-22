@@ -145,8 +145,10 @@ functions as the keyboard controls: scene preset selection, camera/light reset,
 mesh selection, sphere selection, sphere add/remove, sphere radius/color
 editing, explicit material type selection, exposure, sky intensity, light
 intensity, material-specific roughness/transparency/IOR tuning, quality mode,
-progressive mode and denoiser toggle. UI widgets are not unit-tested directly;
-the underlying state helpers are covered by tests.
+progressive mode and denoiser toggle. It also provides a Windows file dialog
+button for loading an additional `.obj` or `.gltf` model as a runtime scene
+preset. UI widgets are not unit-tested directly; the underlying state helpers
+are covered by tests.
 
 Preset helpers `applyScenePresetByIndex(...)` and
 `resetSceneViewFromPreset(...)` keep runtime scene switching and reset behavior

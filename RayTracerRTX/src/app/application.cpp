@@ -14,6 +14,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <commdlg.h>
 
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -28,6 +29,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -63,6 +65,8 @@ struct AppState
     std::vector<SceneBuildResult> scenePresetDefaults;
     std::vector<std::wstring> scenePresetNames;
     int scenePresetIndex = 0;
+    std::string lastUiMessage;
+    bool lastUiMessageIsError = false;
 };
 
 struct FrameStats
@@ -75,6 +79,8 @@ struct FrameStats
     double avgGpuMs = 0.0;
     std::chrono::steady_clock::time_point lastUpdate = std::chrono::steady_clock::now();
 };
+
+void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name);
 
 float3 add3(const float3 a, const float3 b)
 {
@@ -466,7 +472,60 @@ bool resetCurrentPresetView(AppState& appState)
     return reset;
 }
 
-void drawImguiPanel(AppState& appState, const FrameStats& stats)
+std::optional<std::filesystem::path> openMeshFileDialog(GLFWwindow* window)
+{
+    wchar_t fileName[MAX_PATH] = L"";
+
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = window != nullptr ? glfwGetWin32Window(window) : nullptr;
+    ofn.lpstrTitle = L"\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 OBJ \u0438\u043B\u0438 glTF \u043C\u043E\u0434\u0435\u043B\u044C";
+    ofn.lpstrFilter =
+        L"3D \u043C\u043E\u0434\u0435\u043B\u0438 (*.obj;*.gltf)\0*.obj;*.gltf\0"
+        L"OBJ (*.obj)\0*.obj\0"
+        L"glTF (*.gltf)\0*.gltf\0"
+        L"\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B (*.*)\0*.*\0";
+    ofn.lpstrFile = fileName;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (GetOpenFileNameW(&ofn) == TRUE)
+    {
+        return std::filesystem::path(fileName);
+    }
+    return std::nullopt;
+}
+
+bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPath)
+{
+    SceneBuildResult loaded = buildSceneFromMeshPath(meshPath);
+    if (!loaded.ok)
+    {
+        appState.lastUiMessage = loaded.error.empty() ? "Не удалось загрузить модель." : loaded.error;
+        appState.lastUiMessageIsError = true;
+        return false;
+    }
+
+    saveCurrentScenePreset(appState);
+    std::wstring presetName = L"\u041C\u043E\u0434\u0435\u043B\u044C: ";
+    presetName += meshPath.filename().wstring().empty() ? meshPath.wstring() : meshPath.filename().wstring();
+    addScenePreset(appState, std::move(loaded), presetName);
+    const int newPresetIndex = static_cast<int>(appState.scenePresets.size()) - 1;
+    if (!applyScenePresetByIndex(appState.scenePresets, newPresetIndex, appState.scene, appState.camera))
+    {
+        appState.lastUiMessage = "Модель загрузилась, но не удалось применить сцену.";
+        appState.lastUiMessageIsError = true;
+        return false;
+    }
+
+    appState.scenePresetIndex = newPresetIndex;
+    appState.progressiveSamples = 0;
+    appState.lastUiMessage = "Модель загружена: " + meshPath.filename().string();
+    appState.lastUiMessageIsError = false;
+    return true;
+}
+
+void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* window)
 {
     if (!appState.imguiPanelVisible)
     {
@@ -531,6 +590,20 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
         resetCurrentPresetView(appState))
     {
         appState.progressiveSamples = 0;
+    }
+    if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u044C...")))
+    {
+        if (const std::optional<std::filesystem::path> meshPath = openMeshFileDialog(window))
+        {
+            loadUserMeshPreset(appState, *meshPath);
+        }
+    }
+    if (!appState.lastUiMessage.empty())
+    {
+        ImGui::TextWrapped(
+            "%s: %s",
+            appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
+            appState.lastUiMessage.c_str());
     }
 
     ImGui::Separator();
@@ -1344,7 +1417,7 @@ void run_optix_app(const ApplicationOptions& options)
         ImGui_ImplOpenGL2_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        drawImguiPanel(appState, stats);
+        drawImguiPanel(appState, stats, window);
         ImGui::Render();
         ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
