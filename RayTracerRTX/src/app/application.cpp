@@ -675,13 +675,44 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         ImGui::EndCombo();
     }
 
+    MeshObject* selectedMeshObject = nullptr;
     MeshMaterial* meshMaterial = nullptr;
     if (scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size()))
     {
         MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+        selectedMeshObject = &object;
         if (scene.selectedMeshMaterial >= 0 && scene.selectedMeshMaterial < static_cast<int>(object.mesh.materials.size()))
         {
             meshMaterial = &object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+        }
+    }
+
+    if (selectedMeshObject != nullptr)
+    {
+        bool transformChanged = false;
+        float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
+        float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
+        float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
+
+        ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435"));
+        if (ImGui::DragFloat3("##mesh_position", position, 0.05f, -50.0f, 50.0f, "%.2f"))
+        {
+            transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
+        }
+        ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442"));
+        if (ImGui::DragFloat3("##mesh_rotation", rotation, 0.5f, -360.0f, 360.0f, "%.1f"))
+        {
+            transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
+        }
+        ImGui::TextUnformatted(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431"));
+        if (ImGui::DragFloat3("##mesh_scale", scale, 0.02f, 0.05f, 20.0f, "%.2f"))
+        {
+            transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
+        }
+        if (transformChanged)
+        {
+            appState.progressiveSamples = 0;
+            appState.rendererSceneRebuildRequested = true;
         }
     }
 
@@ -704,6 +735,15 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         {
             meshMaterial->color = make_float3(meshColor[0], meshColor[1], meshColor[2]);
             materialChanged = true;
+        }
+        if (meshMaterial->textureIndex >= 0)
+        {
+            bool textureEnabled = meshMaterial->textureEnabled != 0;
+            if (ImGui::Checkbox(u8c(u8"\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0442\u0435\u043A\u0441\u0442\u0443\u0440\u0443"), &textureEnabled))
+            {
+                meshMaterial->textureEnabled = textureEnabled ? 1 : 0;
+                materialChanged = true;
+            }
         }
 
         if (meshMaterial->materialType == MaterialDielectric)

@@ -3,6 +3,7 @@
 #include "obj_loader.h"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <utility>
 
@@ -14,6 +15,7 @@ namespace
 {
 constexpr float kMinSphereRadius = 0.25f;
 constexpr float kMaxSphereRadius = 5.0f;
+constexpr float kPi = 3.14159265358979323846f;
 
 float clampScalar(const float v, const float minV, const float maxV)
 {
@@ -23,6 +25,70 @@ float clampScalar(const float v, const float minV, const float maxV)
 float3 add3(const float3 a, const float3 b)
 {
     return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+float radians(const float degrees)
+{
+    return degrees * kPi / 180.0f;
+}
+
+float3 rotateX(const float3 value, const float angle)
+{
+    const float c = std::cos(angle);
+    const float s = std::sin(angle);
+    return make_float3(value.x, value.y * c - value.z * s, value.y * s + value.z * c);
+}
+
+float3 rotateY(const float3 value, const float angle)
+{
+    const float c = std::cos(angle);
+    const float s = std::sin(angle);
+    return make_float3(value.x * c + value.z * s, value.y, -value.x * s + value.z * c);
+}
+
+float3 rotateZ(const float3 value, const float angle)
+{
+    const float c = std::cos(angle);
+    const float s = std::sin(angle);
+    return make_float3(value.x * c - value.y * s, value.x * s + value.y * c, value.z);
+}
+
+float3 rotateEulerXyz(const float3 value, const float3 degrees)
+{
+    float3 result = rotateX(value, radians(degrees.x));
+    result = rotateY(result, radians(degrees.y));
+    result = rotateZ(result, radians(degrees.z));
+    return result;
+}
+
+std::array<float, 12> makeMeshTransformMatrix(const float3 position, const float3 rotation, const float3 scale)
+{
+    const float3 xAxis = rotateEulerXyz(make_float3(scale.x, 0.0f, 0.0f), rotation);
+    const float3 yAxis = rotateEulerXyz(make_float3(0.0f, scale.y, 0.0f), rotation);
+    const float3 zAxis = rotateEulerXyz(make_float3(0.0f, 0.0f, scale.z), rotation);
+    return {
+        xAxis.x, yAxis.x, zAxis.x, position.x,
+        xAxis.y, yAxis.y, zAxis.y, position.y,
+        xAxis.z, yAxis.z, zAxis.z, position.z};
+}
+
+void updateMeshObjectTransform(MeshObject& object)
+{
+    object.transform = makeMeshTransformMatrix(object.position, object.rotation, object.scale);
+}
+
+MeshObject* selectedMeshObject(SceneState& scene)
+{
+    if (scene.meshObjects.empty())
+    {
+        return nullptr;
+    }
+    clampScene(scene);
+    if (scene.selectedMeshObject < 0 || scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
+    {
+        return nullptr;
+    }
+    return &scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
 }
 
 float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
@@ -42,9 +108,9 @@ MeshData makeFallbackMesh()
 {
     MeshData mesh;
     mesh.materials = {
-        {make_float3(0.72f, 0.86f, 0.95f), MaterialDiffuse, "fallback_blue", make_float3(1.0f, 1.0f, 1.0f), 0.35f, 1.5f, 1.0f, "", -1, "", -1},
-        {make_float3(0.95f, 0.78f, 0.55f), MaterialDiffuse, "fallback_warm", make_float3(1.0f, 1.0f, 1.0f), 0.35f, 1.5f, 1.0f, "", -1, "", -1},
-        {make_float3(0.92f, 0.92f, 0.92f), MaterialMirror, "fallback_mirror", make_float3(1.0f, 1.0f, 1.0f), 0.02f, 1.5f, 1.0f, "", -1, "", -1}
+        {make_float3(0.72f, 0.86f, 0.95f), MaterialDiffuse, "fallback_blue", make_float3(1.0f, 1.0f, 1.0f), 0.35f, 1.5f, 1.0f, "", -1, 1, "", -1},
+        {make_float3(0.95f, 0.78f, 0.55f), MaterialDiffuse, "fallback_warm", make_float3(1.0f, 1.0f, 1.0f), 0.35f, 1.5f, 1.0f, "", -1, 1, "", -1},
+        {make_float3(0.92f, 0.92f, 0.92f), MaterialMirror, "fallback_mirror", make_float3(1.0f, 1.0f, 1.0f), 0.02f, 1.5f, 1.0f, "", -1, 1, "", -1}
     };
 
     mesh.vertices = {
@@ -497,6 +563,45 @@ void setSelectedMeshMaterialType(SceneState& scene, const int materialType)
     objectMaterial.materialType = sanitizeMaterialType(materialType);
     applyMaterialDefaults(objectMaterial);
     syncSelectedMeshMaterialToCombined(scene);
+}
+
+bool setSelectedMeshPosition(SceneState& scene, const float3 position)
+{
+    MeshObject* object = selectedMeshObject(scene);
+    if (object == nullptr)
+    {
+        return false;
+    }
+
+    object->position = clamp3(position, make_float3(-50.0f, -10.0f, -50.0f), make_float3(50.0f, 50.0f, 50.0f));
+    updateMeshObjectTransform(*object);
+    return true;
+}
+
+bool setSelectedMeshRotation(SceneState& scene, const float3 rotation)
+{
+    MeshObject* object = selectedMeshObject(scene);
+    if (object == nullptr)
+    {
+        return false;
+    }
+
+    object->rotation = clamp3(rotation, make_float3(-360.0f, -360.0f, -360.0f), make_float3(360.0f, 360.0f, 360.0f));
+    updateMeshObjectTransform(*object);
+    return true;
+}
+
+bool setSelectedMeshScale(SceneState& scene, const float3 scale)
+{
+    MeshObject* object = selectedMeshObject(scene);
+    if (object == nullptr)
+    {
+        return false;
+    }
+
+    object->scale = clamp3(scale, make_float3(0.05f, 0.05f, 0.05f), make_float3(20.0f, 20.0f, 20.0f));
+    updateMeshObjectTransform(*object);
+    return true;
 }
 
 void moveLight(SceneState& scene, const float3 delta)

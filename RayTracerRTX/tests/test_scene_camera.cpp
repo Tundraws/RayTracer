@@ -1359,6 +1359,43 @@ void testSetSelectedMeshMaterialTypeInvalidSafe(TestContext& t)
     t.expect(hasValidMeshMaterialIndices(scene.mesh), "Invalid mesh type setter should keep combined material indices valid.");
 }
 
+void testSelectedMeshTransformControls(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedMeshObject = 0;
+
+    const bool moved = setSelectedMeshPosition(scene, make_float3(2.0f, 1.5f, -3.0f));
+    const bool rotated = setSelectedMeshRotation(scene, make_float3(0.0f, 45.0f, 0.0f));
+    const bool scaled = setSelectedMeshScale(scene, make_float3(1.5f, 2.0f, 0.75f));
+
+    t.expect(moved, "Selected mesh position should be editable.");
+    t.expect(rotated, "Selected mesh rotation should be editable.");
+    t.expect(scaled, "Selected mesh scale should be editable.");
+    t.expect(almostEqual(scene.meshObjects[0].position.x, 2.0f), "Mesh position should be stored.");
+    t.expect(almostEqual(scene.meshObjects[0].rotation.y, 45.0f), "Mesh rotation should be stored.");
+    t.expect(almostEqual(scene.meshObjects[0].scale.y, 2.0f), "Mesh scale should be stored.");
+    t.expect(almostEqual(scene.meshObjects[0].transform[3], 2.0f), "Mesh transform matrix should include translation X.");
+    t.expect(almostEqual(scene.meshObjects[0].transform[7], 1.5f), "Mesh transform matrix should include translation Y.");
+    t.expect(almostEqual(scene.meshObjects[0].transform[11], -3.0f), "Mesh transform matrix should include translation Z.");
+}
+
+void testSelectedMeshTransformInvalidSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedMeshObject = 100;
+
+    const bool moved = setSelectedMeshPosition(scene, make_float3(100.0f, -100.0f, 100.0f));
+    const bool scaled = setSelectedMeshScale(scene, make_float3(-1.0f, 100.0f, 0.0f));
+
+    t.expect(moved, "Invalid selected mesh should clamp before position edit.");
+    t.expect(scaled, "Invalid selected mesh should clamp before scale edit.");
+    t.expect(scene.selectedMeshObject == 0, "Invalid selected mesh transform edit should clamp selected index.");
+    t.expect(almostEqual(scene.meshObjects[0].position.x, 50.0f), "Mesh position should clamp to max.");
+    t.expect(almostEqual(scene.meshObjects[0].position.y, -10.0f), "Mesh position should clamp to min Y.");
+    t.expect(almostEqual(scene.meshObjects[0].scale.x, 0.05f), "Mesh scale should clamp to min.");
+    t.expect(almostEqual(scene.meshObjects[0].scale.y, 20.0f), "Mesh scale should clamp to max.");
+}
+
 void testInvalidMeshSelectionSafe(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -1975,6 +2012,8 @@ int main(int argc, char** argv)
     runTest("Selected mesh material preset cycle", testSelectedMeshMaterialPresetCycle);
     runTest("Set selected mesh material type", testSetSelectedMeshMaterialType);
     runTest("Set selected mesh material type invalid safe", testSetSelectedMeshMaterialTypeInvalidSafe);
+    runTest("Selected mesh transform controls", testSelectedMeshTransformControls);
+    runTest("Selected mesh transform invalid safe", testSelectedMeshTransformInvalidSafe);
     runTest("Invalid mesh selection safe", testInvalidMeshSelectionSafe);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);

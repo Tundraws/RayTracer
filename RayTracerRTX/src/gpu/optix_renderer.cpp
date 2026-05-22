@@ -627,7 +627,9 @@ void OptixRenderer::createScene(const SceneState& scene)
                 material.roughness,
                 material.ior,
                 material.alpha};
-            if (material.textureIndex >= 0 && static_cast<size_t>(material.textureIndex) < object.mesh.textures.size())
+            if (material.textureEnabled != 0 &&
+                material.textureIndex >= 0 &&
+                static_cast<size_t>(material.textureIndex) < object.mesh.textures.size())
             {
                 const MeshTexture& texture = object.mesh.textures[static_cast<size_t>(material.textureIndex)];
                 if (!texture.pixels.empty() && texture.width > 0 && texture.height > 0)
