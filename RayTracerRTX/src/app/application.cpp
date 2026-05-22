@@ -565,9 +565,10 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
     const float displayWidth = std::max(1.0f, displaySize.x);
     const float displayHeight = std::max(1.0f, displaySize.y);
-    const float margin = 32.0f;
-    const float panelWidth = std::min(380.0f, std::max(260.0f, displayWidth - margin * 2.0f));
-    const float panelHeight = std::min(760.0f, std::max(360.0f, displayHeight - margin * 2.0f));
+    const float margin = 16.0f;
+    const float preferredPanelWidth = std::min(560.0f, std::max(420.0f, displayWidth * 0.36f));
+    const float panelWidth = std::min(preferredPanelWidth, std::max(300.0f, displayWidth - margin * 2.0f));
+    const float panelHeight = std::max(360.0f, displayHeight - margin * 2.0f);
     const float panelX = std::max(margin, displayWidth - panelWidth - margin);
     const float panelY = margin;
     gImguiPanelX = panelX;
@@ -579,7 +580,8 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     ImGui::Begin(
         u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C \u0441\u0446\u0435\u043D\u044B"),
         &appState.imguiPanelVisible,
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::PushItemWidth(-1.0f);
 
     ImGui::Text("FPS %.1f | GPU %.2f ms", stats.fps, stats.avgGpuMs);
@@ -615,12 +617,12 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         ImGui::EndCombo();
     }
 
-    if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B \u0438 \u0441\u0432\u0435\u0442\u0430")) &&
+    if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u0432\u0438\u0434\u0430")) &&
         resetCurrentPresetView(appState))
     {
         appState.progressiveSamples = 0;
     }
-    if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u044C...")))
+    if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C OBJ/glTF...")))
     {
         if (const std::optional<std::filesystem::path> meshPath = openMeshFileDialog(window))
         {
@@ -653,9 +655,9 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     }
 
     ImGui::Separator();
-    ImGui::SeparatorText(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C OBJ/glTF"));
+    ImGui::SeparatorText(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C"));
     const std::string selectedMeshLabel = std::string(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C ")) + std::to_string(scene.selectedMeshObject + 1);
-    if (ImGui::BeginCombo(u8c(u8"\u0412\u044B\u0431\u0440\u0430\u043D\u043D\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C"), selectedMeshLabel.c_str()))
+    if (ImGui::BeginCombo(u8c(u8"\u0412\u044B\u0431\u043E\u0440"), selectedMeshLabel.c_str()))
     {
         for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
         {
@@ -719,7 +721,6 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     if (meshMaterial != nullptr)
     {
         ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u043C\u043E\u0434\u0435\u043B\u0438"), materialTypeNameUtf8(meshMaterial->materialType));
-        ImGui::TextWrapped("%s", u8c(u8"\u042D\u0442\u043E \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u043E\u0439 \u043F\u043E\u043B\u0438\u0433\u043E\u043D\u0430\u043B\u044C\u043D\u043E\u0439 \u043C\u043E\u0434\u0435\u043B\u0438, \u0430 \u043D\u0435 \u0441\u0444\u0435\u0440."));
         bool materialChanged = false;
         int meshMaterialType = meshMaterial->materialType;
         ImGui::TextUnformatted(u8c(u8"\u0422\u0438\u043F \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u0430"));
