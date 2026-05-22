@@ -47,6 +47,7 @@ private:
     void createProgramGroups();
     void createPipeline();
     void createSbt();
+    void ensureSphereResources(const struct SceneState& scene);
     void rebuildAccelerationStructure();
     void initializeDenoiser();
     void releaseDenoiser();
@@ -93,6 +94,8 @@ private:
     std::vector<OptixAccelBuildOptions> meshAccelOptions;
     std::vector<OptixAccelBufferSizes> meshGasSizes;
     std::vector<std::array<float, 12>> meshInstanceTransforms;
+    std::size_t sphereBufferCapacity = 0;
+    std::size_t materialBufferCapacity = 0;
     unsigned int meshTexturePixelCount = 0;
     unsigned int meshObjectCount = 0;
     unsigned int accumulationSampleCount = 0;

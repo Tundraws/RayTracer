@@ -1582,6 +1582,58 @@ bool runProgressiveGpuSmokeTest(TestContext& t)
 #endif
 }
 
+bool runDynamicSphereGpuSmokeTest(TestContext& t)
+{
+#if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
+    (void)t;
+    std::cout << "[SKIP] Dynamic sphere GPU smoke test skipped: RAYTRACERRTX_ENABLE_GPU_TESTS is not enabled.\n";
+    return false;
+#else
+    try
+    {
+        OptixRenderer renderer;
+        renderer.setRenderSize(64, 64);
+        renderer.initialize();
+
+        SceneState scene = makeDefaultScene();
+        CameraState camera;
+        std::vector<uchar4> pixels(64u * 64u);
+        float gpuTimeMs = -1.0f;
+
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        const bool added = addSphere(scene);
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        setSelectedSphereRadius(scene, 0.75f);
+        setSelectedSphereColor(scene, make_float3(0.95f, 0.25f, 0.25f));
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        const bool removed = removeSelectedSphere(scene);
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+
+        bool hasNonZeroPixel = false;
+        for (const uchar4 px : pixels)
+        {
+            if (px.x != 0u || px.y != 0u || px.z != 0u || px.w != 0u)
+            {
+                hasNonZeroPixel = true;
+                break;
+            }
+        }
+
+        t.expect(added, "Dynamic sphere GPU smoke: addSphere should succeed.");
+        t.expect(removed, "Dynamic sphere GPU smoke: removeSelectedSphere should succeed.");
+        t.expect(hasNonZeroPixel, "Dynamic sphere GPU smoke: rendered frame after sphere changes must contain non-zero pixels.");
+        t.expect(gpuTimeMs >= 0.0f, "Dynamic sphere GPU smoke: GPU time must be non-negative.");
+        renderer.destroy();
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << "[SKIP] Dynamic sphere GPU smoke test skipped: " << ex.what() << '\n';
+        return false;
+    }
+#endif
+}
+
 bool runDenoiserGpuSmokeTest(TestContext& t)
 {
 #if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
@@ -1832,6 +1884,15 @@ int main(int argc, char** argv)
     if (runProgressiveGpuSmokeTest(t))
     {
         std::cout << "[PASS] Progressive GPU smoke test (checks: 5)\n";
+    }
+    else
+    {
+        ++testsSkipped;
+    }
+    ++testsRun;
+    if (runDynamicSphereGpuSmokeTest(t))
+    {
+        std::cout << "[PASS] Dynamic sphere GPU smoke test (checks: 4)\n";
     }
     else
     {
