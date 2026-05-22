@@ -115,13 +115,13 @@ const wchar_t* qualityNameW(const int quality)
     switch (clampRenderQuality(quality))
     {
     case RenderQualityLow:
-        return L"LOW";
+        return L"\u041D\u0418\u0417\u041A\u041E\u0415";
     case RenderQualityMedium:
-        return L"MEDIUM";
+        return L"\u0421\u0420\u0415\u0414\u041D\u0415\u0415";
     case RenderQualityPathTracing:
-        return L"PATH";
+        return L"\u041D\u0410\u041A\u041E\u041F\u041B\u0415\u041D\u0418\u0415";
     default:
-        return L"HIGH";
+        return L"\u0412\u042B\u0421\u041E\u041A\u041E\u0415";
     }
 }
 
@@ -248,7 +248,7 @@ void drawHud(
 
     std::wostringstream line1;
     line1 << L"FPS: " << std::fixed << std::setprecision(1) << stats.fps
-          << L"   FRAME: " << stats.avgHostMs << L" MS   GPU: " << stats.avgGpuMs << L" MS";
+          << L"   GPU: " << stats.avgGpuMs << L" \u043C\u0441";
 
     const bool hasSphere = scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.materials.size());
     const bool hasMesh = scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size());
@@ -259,37 +259,41 @@ void drawHud(
     const MeshMaterial* meshMaterial = hasMeshMaterial ? &meshObject->mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)] : nullptr;
 
     std::wostringstream line2;
-    line2 << L"\u0421\u0424\u0415\u0420\u0410: " << (scene.selectedSphere + 1)
-          << L" MAT: " << (hasSphere ? materialNameW(scene.materials[scene.selectedSphere].materialType) : L"N/A")
-          << L"   MESH: " << (hasMesh ? scene.selectedMeshObject + 1 : 0) << L"/" << scene.meshObjects.size()
-          << L"   MMAT: " << (meshMaterial != nullptr ? materialNameW(meshMaterial->materialType) : L"N/A");
-    std::wostringstream lineMode;
-    lineMode << L"MODE: " << (renderMode == RenderModeProgressive ? L"PROGRESSIVE PATH" : L"REAL-TIME DIRECT")
-             << L"   QUALITY: " << qualityNameW(renderQuality)
-             << L"   SAMPLES: " << progressiveSamples
-             << L"   DENOISER: " << (denoiserEnabled ? (denoiserAvailable ? L"ON" : L"UNAVAILABLE") : L"OFF");
+    line2 << L"\u0421\u0426\u0415\u041D\u0410: " << presetName;
 
-    const std::wstring line3 = lineMode.str();
-    const std::wstring line4 = L"\u0421\u0426\u0415\u041D\u0410: " + presetName;
+    std::wostringstream line3;
+    line3 << L"\u041E\u0411\u042A\u0415\u041A\u0422: "
+          << (hasMesh ? L"\u0441\u0435\u0442\u043A\u0430 " : L"\u0441\u0435\u0442\u043A\u0430 ")
+          << (hasMesh ? scene.selectedMeshObject + 1 : 0) << L"/" << scene.meshObjects.size()
+          << L"   \u041C\u0410\u0422\u0415\u0420\u0418\u0410\u041B: "
+          << (meshMaterial != nullptr ? materialNameW(meshMaterial->materialType) :
+              (hasSphere ? materialNameW(scene.materials[scene.selectedSphere].materialType) : L"N/A"));
+
+    std::wostringstream lineMode;
+    lineMode << L"\u0420\u0415\u0416\u0418\u041C: " << (renderMode == RenderModeProgressive ? L"\u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435" : L"\u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F")
+             << L"   \u041A\u0410\u0427\u0415\u0421\u0422\u0412\u041E: " << qualityNameW(renderQuality)
+             << L"   \u0421\u042D\u041C\u041F\u041B\u042B: " << progressiveSamples
+             << L"   \u0428\u0423\u041C: " << (denoiserEnabled ? (denoiserAvailable ? L"\u0432\u043A\u043B" : L"\u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D") : L"\u0432\u044B\u043A\u043B");
+
+    const std::wstring line4 = lineMode.str();
     std::wostringstream lineTuning;
     lineTuning << L"\u042D\u041A\u0421\u041F\u041E\u0417\u0418\u0426\u0418\u042F: " << std::setprecision(2) << scene.exposure
                << L"   \u041D\u0415\u0411\u041E: " << scene.skyIntensity
                << L"   \u0421\u0412\u0415\u0422: " << scene.lightIntensity;
     const std::wstring line5 = lineTuning.str();
-    const std::wstring line6 = L"\u0414\u0412\u0418\u0416\u0415\u041D\u0418\u0415 \u0421\u0424\u0415\u0420\u042B: \u0421\u0422\u0420\u0415\u041B\u041A\u0418, R/F";
-    const std::wstring line7 = L"\u0421\u0412\u0415\u0422: J/L-X, I/K-Z, U/O-Y";
-    const std::wstring line8 = L"\u0421\u0426\u0415\u041D\u0410: G   \u0421\u0411\u0420\u041E\u0421: C   \u041C\u0410\u0422\u0415\u0420\u0418\u0410\u041B: M   \u0421\u0415\u0422\u041A\u0410: B/V   \u0420\u0415\u0416\u0418\u041C: P   \u041A\u0410\u0427\u0415\u0421\u0422\u0412\u041E: Q   \u0428\u0423\u041C: N";
+    const std::wstring line6 = L"G \u0441\u0446\u0435\u043D\u0430   C \u0441\u0431\u0440\u043E\u0441   M/V \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B   Q \u043A\u0430\u0447\u0435\u0441\u0442\u0432\u043E   P \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435";
+    const std::wstring line7 = L"4/5 \u044D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F   6/7 \u043D\u0435\u0431\u043E   8/9 \u0441\u0432\u0435\u0442";
 
     const std::wstring text1 = line1.str();
     const std::wstring text2 = line2.str();
+    const std::wstring text3 = line3.str();
     TextOutW(dc, panelX, panelY, text1.c_str(), static_cast<int>(text1.size()));
     TextOutW(dc, panelX, panelY + 22, text2.c_str(), static_cast<int>(text2.size()));
-    TextOutW(dc, panelX, panelY + 44, line3.c_str(), static_cast<int>(line3.size()));
+    TextOutW(dc, panelX, panelY + 44, text3.c_str(), static_cast<int>(text3.size()));
     TextOutW(dc, panelX, panelY + 66, line4.c_str(), static_cast<int>(line4.size()));
     TextOutW(dc, panelX, panelY + 88, line5.c_str(), static_cast<int>(line5.size()));
     TextOutW(dc, panelX, panelY + 110, line6.c_str(), static_cast<int>(line6.size()));
     TextOutW(dc, panelX, panelY + 132, line7.c_str(), static_cast<int>(line7.size()));
-    TextOutW(dc, panelX, panelY + 154, line8.c_str(), static_cast<int>(line8.size()));
 
     SelectObject(dc, oldFont);
     SetTextColor(dc, oldTextColor);
@@ -543,6 +547,60 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
         appState.progressiveSamples = 0;
     }
     nWasDown = nIsDown;
+
+    static bool key4WasDown = false;
+    const bool key4IsDown = glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS;
+    if (key4IsDown && !key4WasDown)
+    {
+        adjustSceneExposure(scene, -0.05f);
+        appState.progressiveSamples = 0;
+    }
+    key4WasDown = key4IsDown;
+
+    static bool key5WasDown = false;
+    const bool key5IsDown = glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS;
+    if (key5IsDown && !key5WasDown)
+    {
+        adjustSceneExposure(scene, 0.05f);
+        appState.progressiveSamples = 0;
+    }
+    key5WasDown = key5IsDown;
+
+    static bool key6WasDown = false;
+    const bool key6IsDown = glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS;
+    if (key6IsDown && !key6WasDown)
+    {
+        adjustSceneSkyIntensity(scene, -0.05f);
+        appState.progressiveSamples = 0;
+    }
+    key6WasDown = key6IsDown;
+
+    static bool key7WasDown = false;
+    const bool key7IsDown = glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS;
+    if (key7IsDown && !key7WasDown)
+    {
+        adjustSceneSkyIntensity(scene, 0.05f);
+        appState.progressiveSamples = 0;
+    }
+    key7WasDown = key7IsDown;
+
+    static bool key8WasDown = false;
+    const bool key8IsDown = glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS;
+    if (key8IsDown && !key8WasDown)
+    {
+        adjustSceneLightIntensity(scene, -0.1f);
+        appState.progressiveSamples = 0;
+    }
+    key8WasDown = key8IsDown;
+
+    static bool key9WasDown = false;
+    const bool key9IsDown = glfwGetKey(window, GLFW_KEY_9) == GLFW_PRESS;
+    if (key9IsDown && !key9WasDown)
+    {
+        adjustSceneLightIntensity(scene, 0.1f);
+        appState.progressiveSamples = 0;
+    }
+    key9WasDown = key9IsDown;
 
 }
 

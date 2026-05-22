@@ -341,3 +341,33 @@ void moveLight(SceneState& scene, const float3 delta)
     scene.lightPosition = add3(scene.lightPosition, delta);
     clampScene(scene);
 }
+
+void setSceneExposure(SceneState& scene, const float value)
+{
+    scene.exposure = clampSceneExposure(value);
+}
+
+void setSceneSkyIntensity(SceneState& scene, const float value)
+{
+    scene.skyIntensity = clampSceneSkyIntensity(value);
+}
+
+void setSceneLightIntensity(SceneState& scene, const float value)
+{
+    scene.lightIntensity = clampSceneLightIntensity(value);
+}
+
+void adjustSceneExposure(SceneState& scene, const float delta)
+{
+    setSceneExposure(scene, scene.exposure + delta);
+}
+
+void adjustSceneSkyIntensity(SceneState& scene, const float delta)
+{
+    setSceneSkyIntensity(scene, scene.skyIntensity + delta);
+}
+
+void adjustSceneLightIntensity(SceneState& scene, const float delta)
+{
+    setSceneLightIntensity(scene, scene.lightIntensity + delta);
+}

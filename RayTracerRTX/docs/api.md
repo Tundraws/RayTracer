@@ -79,6 +79,12 @@ Declared in `src/app/scene.h`.
 | `selectNextMeshObject(SceneState&)` | Selects the next mesh object for HUD/material editing |
 | `cycleSelectedMeshMaterialPreset(SceneState&)` | Cycles selected mesh material through diffuse, mirror, metal and dielectric presets |
 | `moveLight(SceneState&, float3)` | Moves the light and applies bounds |
+| `setSceneExposure(SceneState&, float)` | Sets tone-mapping exposure with clamping |
+| `setSceneSkyIntensity(SceneState&, float)` | Sets environment-light intensity with clamping |
+| `setSceneLightIntensity(SceneState&, float)` | Sets direct-light intensity with clamping |
+| `adjustSceneExposure(SceneState&, float)` | Changes exposure from keyboard/HUD controls |
+| `adjustSceneSkyIntensity(SceneState&, float)` | Changes sky intensity from keyboard/HUD controls |
+| `adjustSceneLightIntensity(SceneState&, float)` | Changes light intensity from keyboard/HUD controls |
 
 ## OBJ Mesh API
 
@@ -100,6 +106,11 @@ supports:
 If image-tuning fields are missing, the default scene values are used. Numeric
 values outside the supported range are clamped so old or experimental scene
 files do not make the renderer unstable.
+
+The runtime HUD exposes the same image-tuning values through debounced hotkeys:
+`4/5` for exposure, `6/7` for sky intensity, and `8/9` for direct light
+intensity. These controls update `SceneState`, reset progressive accumulation,
+and reuse the same clamping helpers as JSON parsing.
 
 Preset helpers `applyScenePresetByIndex(...)` and
 `resetSceneViewFromPreset(...)` keep runtime scene switching and reset behavior

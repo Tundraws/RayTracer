@@ -64,6 +64,7 @@ sequenceDiagram
     User->>App: Keyboard and mouse input
     ObjLoader->>Scene: Load MeshObject list with OBJ or glTF data, tangents, materials, textures and transforms
     App->>Scene: Move sphere, light, or toggle material
+    App->>Scene: Tune exposure, sky intensity, and light intensity
     App->>Renderer: Optional P toggle for progressive accumulation
     App->>Renderer: Optional N toggle for OptiX denoiser
     App->>Renderer: Optional Q cycle for quality mode

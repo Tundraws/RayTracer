@@ -1106,6 +1106,47 @@ void testMoveLightClamp(TestContext& t)
     t.expect(scene.lightPosition.z >= -40.0f, "Light Z should be clamped.");
 }
 
+void testSceneExposureChangesSafely(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    setSceneExposure(scene, 0.8f);
+    adjustSceneExposure(scene, 0.1f);
+    t.expect(almostEqual(scene.exposure, 0.9f), "Exposure control should increase scene exposure.");
+    adjustSceneExposure(scene, -0.2f);
+    t.expect(almostEqual(scene.exposure, 0.7f), "Exposure control should decrease scene exposure.");
+}
+
+void testSceneSkyIntensityChangesSafely(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    setSceneSkyIntensity(scene, 0.75f);
+    adjustSceneSkyIntensity(scene, 0.1f);
+    t.expect(almostEqual(scene.skyIntensity, 0.85f), "Sky intensity control should increase sky contribution.");
+    adjustSceneSkyIntensity(scene, -0.25f);
+    t.expect(almostEqual(scene.skyIntensity, 0.6f), "Sky intensity control should decrease sky contribution.");
+}
+
+void testSceneLightIntensityChangesSafely(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    setSceneLightIntensity(scene, 1.0f);
+    adjustSceneLightIntensity(scene, 0.25f);
+    t.expect(almostEqual(scene.lightIntensity, 1.25f), "Light intensity control should increase light contribution.");
+    adjustSceneLightIntensity(scene, -0.5f);
+    t.expect(almostEqual(scene.lightIntensity, 0.75f), "Light intensity control should decrease light contribution.");
+}
+
+void testSceneTuningInvalidValuesClamp(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    setSceneExposure(scene, -100.0f);
+    setSceneSkyIntensity(scene, 100.0f);
+    setSceneLightIntensity(scene, -50.0f);
+    t.expect(almostEqual(scene.exposure, 0.1f), "Invalid exposure should clamp to supported minimum.");
+    t.expect(almostEqual(scene.skyIntensity, 3.0f), "Invalid sky intensity should clamp to supported maximum.");
+    t.expect(almostEqual(scene.lightIntensity, 0.0f), "Invalid light intensity should clamp to supported minimum.");
+}
+
 void testClampSceneSelectedSphereBounds(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -1521,6 +1562,10 @@ int main(int argc, char** argv)
     runTest("Invalid mesh selection safe", testInvalidMeshSelectionSafe);
     runTest("Move sphere clamp", testMoveSphereClamp);
     runTest("Move light clamp", testMoveLightClamp);
+    runTest("Scene exposure changes safely", testSceneExposureChangesSafely);
+    runTest("Scene sky intensity changes safely", testSceneSkyIntensityChangesSafely);
+    runTest("Scene light intensity changes safely", testSceneLightIntensityChangesSafely);
+    runTest("Scene tuning invalid values clamp", testSceneTuningInvalidValuesClamp);
     runTest("Clamp selected sphere index", testClampSceneSelectedSphereBounds);
     runTest("Invalid selected sphere operations", testInvalidSelectedSphereOps);
     runTest("All spheres above floor after clamp", testAllSpheresStayAboveFloorAfterClamp);
