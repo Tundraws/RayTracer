@@ -14,15 +14,33 @@ struct MeshTransformConfig
     float3 scale = make_float3(1.0f, 1.0f, 1.0f);
 };
 
+struct SceneMaterialConfig
+{
+    std::string name;
+    int materialType = MaterialDiffuse;
+    bool usedFallbackType = false;
+    float3 baseColor = make_float3(0.8f, 0.8f, 0.78f);
+    float3 specularColor = make_float3(1.0f, 1.0f, 1.0f);
+    float roughness = 0.4f;
+    float metallic = 0.0f;
+    float ior = 1.5f;
+    float alpha = 1.0f;
+    std::string texturePath;
+    std::string normalTexturePath;
+};
+
 struct MeshObjectConfig
 {
     std::filesystem::path meshPath;
     MeshTransformConfig transform;
+    std::string materialOverride;
 };
 
 struct SceneConfig
 {
     std::vector<MeshObjectConfig> meshObjects;
+    std::vector<SceneMaterialConfig> materials;
+    std::vector<std::string> sphereMaterialRefs;
     bool hasCamera = false;
     CameraState camera;
     bool hasLightPosition = false;

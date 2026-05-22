@@ -371,6 +371,25 @@ bool readFloatField(const JsonObject& object, const std::string& name, float& ou
     return true;
 }
 
+bool readStringField(const JsonObject& object, const std::string& name, std::string& out, std::string& error)
+{
+    const JsonValue* field = findField(object, name);
+    if (field == nullptr)
+    {
+        return true;
+    }
+
+    const std::string* value = asString(*field);
+    if (value == nullptr)
+    {
+        error = "'" + name + "' must be a string";
+        return false;
+    }
+
+    out = *value;
+    return true;
+}
+
 bool readSceneTuningFields(const JsonObject& object, SceneConfig& config, std::string& error)
 {
     if (findField(object, "exposure") != nullptr)
@@ -397,6 +416,157 @@ bool readSceneTuningFields(const JsonObject& object, SceneConfig& config, std::s
         }
         config.hasLightIntensity = true;
     }
+    return true;
+}
+
+std::string lowerCopy(std::string value)
+{
+    std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char ch)
+    {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
+
+float clampMaterial01(const float value)
+{
+    return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+}
+
+float clampMaterialRoughness(const float value)
+{
+    return value < 0.02f ? 0.02f : (value > 1.0f ? 1.0f : value);
+}
+
+float clampMaterialIor(const float value)
+{
+    return value < 1.0f ? 1.0f : (value > 2.8f ? 2.8f : value);
+}
+
+int materialTypeFromConfigString(const std::string& type, bool& usedFallback)
+{
+    const std::string lower = lowerCopy(type);
+    usedFallback = false;
+    if (lower == "matte" || lower == "diffuse")
+    {
+        return MaterialDiffuse;
+    }
+    if (lower == "mirror")
+    {
+        return MaterialMirror;
+    }
+    if (lower == "metal")
+    {
+        return MaterialMetal;
+    }
+    if (lower == "glass" || lower == "dielectric")
+    {
+        return MaterialDielectric;
+    }
+
+    usedFallback = true;
+    return MaterialDiffuse;
+}
+
+SceneMaterialConfig makeDefaultSceneMaterialConfig(const std::string& name)
+{
+    SceneMaterialConfig material;
+    material.name = name;
+    return material;
+}
+
+bool parseMaterialObject(
+    const JsonObject& object,
+    const std::string& fallbackName,
+    SceneMaterialConfig& material,
+    std::string& error)
+{
+    material = makeDefaultSceneMaterialConfig(fallbackName);
+    if (!readStringField(object, "name", material.name, error))
+    {
+        return false;
+    }
+
+    std::string typeName = "matte";
+    if (!readStringField(object, "type", typeName, error))
+    {
+        return false;
+    }
+    material.materialType = materialTypeFromConfigString(typeName, material.usedFallbackType);
+
+    if (!readFloat3(object, "baseColor", material.baseColor, error))
+    {
+        return false;
+    }
+    if (findField(object, "color") != nullptr && !readFloat3(object, "color", material.baseColor, error))
+    {
+        return false;
+    }
+    if (!readFloat3(object, "specularColor", material.specularColor, error))
+    {
+        return false;
+    }
+    if (!readFloatField(object, "roughness", material.roughness, error) ||
+        !readFloatField(object, "metallic", material.metallic, error) ||
+        !readFloatField(object, "ior", material.ior, error) ||
+        !readFloatField(object, "alpha", material.alpha, error))
+    {
+        return false;
+    }
+    if (!readStringField(object, "texture", material.texturePath, error) ||
+        !readStringField(object, "map_Kd", material.texturePath, error) ||
+        !readStringField(object, "normalMap", material.normalTexturePath, error) ||
+        !readStringField(object, "normal", material.normalTexturePath, error))
+    {
+        return false;
+    }
+
+    material.baseColor = make_float3(
+        clampMaterial01(material.baseColor.x),
+        clampMaterial01(material.baseColor.y),
+        clampMaterial01(material.baseColor.z));
+    material.specularColor = make_float3(
+        clampMaterial01(material.specularColor.x),
+        clampMaterial01(material.specularColor.y),
+        clampMaterial01(material.specularColor.z));
+    material.roughness = clampMaterialRoughness(material.roughness);
+    material.metallic = clampMaterial01(material.metallic);
+    material.ior = clampMaterialIor(material.ior);
+    material.alpha = clampMaterial01(material.alpha);
+    if (material.metallic >= 0.5f && material.materialType == MaterialDiffuse)
+    {
+        material.materialType = MaterialMetal;
+    }
+    return true;
+}
+
+bool parseMaterialReference(
+    const JsonValue& value,
+    SceneConfig& config,
+    const std::string& fallbackName,
+    std::string& outName,
+    std::string& error)
+{
+    if (const std::string* name = asString(value))
+    {
+        outName = *name;
+        return true;
+    }
+
+    const JsonObject* object = asObject(value);
+    if (object == nullptr)
+    {
+        error = "Material reference must be a string or object";
+        return false;
+    }
+
+    SceneMaterialConfig material;
+    if (!parseMaterialObject(*object, fallbackName, material, error))
+    {
+        return false;
+    }
+    outName = material.name;
+    config.materials.push_back(std::move(material));
     return true;
 }
 
@@ -535,6 +705,101 @@ ObjLoadResult loadMeshByExtension(const std::filesystem::path& path)
     return loadObjMesh(path);
 }
 
+std::map<std::string, SceneMaterialConfig> makeMaterialMap(const std::vector<SceneMaterialConfig>& materials)
+{
+    std::map<std::string, SceneMaterialConfig> materialMap;
+    for (const SceneMaterialConfig& material : materials)
+    {
+        if (!material.name.empty())
+        {
+            materialMap[material.name] = material;
+        }
+    }
+    return materialMap;
+}
+
+SphereMaterial toSphereMaterial(const SceneMaterialConfig& config)
+{
+    SphereMaterial material;
+    material.color = config.baseColor;
+    material.materialType = config.materialType;
+    material.specularColor = config.specularColor;
+    material.roughness = config.roughness;
+    material.ior = config.ior;
+    material.alpha = config.alpha;
+    return material;
+}
+
+MeshMaterial toMeshMaterial(const SceneMaterialConfig& config, MeshMaterial base)
+{
+    base.name = config.name.empty() ? base.name : config.name;
+    base.color = config.baseColor;
+    base.materialType = config.materialType;
+    base.specularColor = config.specularColor;
+    base.roughness = config.roughness;
+    base.ior = config.ior;
+    base.alpha = config.alpha;
+    base.texturePath = config.texturePath;
+    base.textureIndex = -1;
+    base.normalTexturePath = config.normalTexturePath;
+    base.normalTextureIndex = -1;
+    return base;
+}
+
+void appendMaterialWarnings(const SceneConfig& config, SceneBuildResult& result)
+{
+    for (const SceneMaterialConfig& material : config.materials)
+    {
+        if (material.usedFallbackType)
+        {
+            result.warnings.push_back("Material '" + material.name + "' uses an unknown type; matte fallback was applied.");
+        }
+    }
+}
+
+void applySphereMaterialConfig(
+    const SceneConfig& config,
+    const std::map<std::string, SceneMaterialConfig>& materialMap,
+    SceneBuildResult& result)
+{
+    const size_t count = std::min(config.sphereMaterialRefs.size(), result.scene.materials.size());
+    for (size_t i = 0; i < count; ++i)
+    {
+        const std::string& name = config.sphereMaterialRefs[i];
+        const auto found = materialMap.find(name);
+        if (found == materialMap.end())
+        {
+            result.warnings.push_back("Sphere material '" + name + "' was not found; default sphere material was kept.");
+            continue;
+        }
+        result.scene.materials[i] = toSphereMaterial(found->second);
+    }
+}
+
+void applyMeshMaterialOverride(
+    const MeshObjectConfig& object,
+    const std::map<std::string, SceneMaterialConfig>& materialMap,
+    MeshData& mesh,
+    SceneBuildResult& result)
+{
+    if (object.materialOverride.empty())
+    {
+        return;
+    }
+
+    const auto found = materialMap.find(object.materialOverride);
+    if (found == materialMap.end())
+    {
+        result.warnings.push_back("Mesh material override '" + object.materialOverride + "' was not found; source mesh materials were kept.");
+        return;
+    }
+
+    for (MeshMaterial& material : mesh.materials)
+    {
+        material = toMeshMaterial(found->second, material);
+    }
+}
+
 SceneConfigResult parseSceneConfig(const JsonValue& root)
 {
     SceneConfigResult result;
@@ -545,6 +810,62 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
         return result;
     }
 
+    if (const JsonValue* materialsField = findField(*rootObject, "materials"))
+    {
+        const JsonArray* materials = asArray(*materialsField);
+        if (materials == nullptr)
+        {
+            result.error = "'materials' must be an array";
+            return result;
+        }
+
+        for (size_t i = 0; i < materials->size(); ++i)
+        {
+            const JsonObject* materialObject = asObject((*materials)[i]);
+            if (materialObject == nullptr)
+            {
+                result.error = "Each materials item must be an object";
+                return result;
+            }
+
+            SceneMaterialConfig material;
+            std::string error;
+            if (!parseMaterialObject(*materialObject, "material_" + std::to_string(i), material, error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.materials.push_back(std::move(material));
+        }
+    }
+
+    if (const JsonValue* sphereMaterialsField = findField(*rootObject, "sphereMaterials"))
+    {
+        const JsonArray* sphereMaterials = asArray(*sphereMaterialsField);
+        if (sphereMaterials == nullptr)
+        {
+            result.error = "'sphereMaterials' must be an array";
+            return result;
+        }
+
+        for (size_t i = 0; i < sphereMaterials->size(); ++i)
+        {
+            std::string materialName;
+            std::string error;
+            if (!parseMaterialReference(
+                    (*sphereMaterials)[i],
+                    result.config,
+                    "sphere_material_" + std::to_string(i),
+                    materialName,
+                    error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.sphereMaterialRefs.push_back(std::move(materialName));
+        }
+    }
+
     if (const JsonValue* meshField = findField(*rootObject, "mesh"))
     {
         const std::string* meshPath = asString(*meshField);
@@ -553,7 +874,9 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
             result.error = "'mesh' must be a string";
             return result;
         }
-        result.config.meshObjects.push_back(MeshObjectConfig{std::filesystem::path(*meshPath), {}});
+        MeshObjectConfig meshObject;
+        meshObject.meshPath = *meshPath;
+        result.config.meshObjects.push_back(std::move(meshObject));
     }
 
     if (const JsonValue* meshObjectsField = findField(*rootObject, "meshObjects"))
@@ -595,6 +918,32 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
             {
                 result.error = error;
                 return result;
+            }
+            if (const JsonValue* materialField = findField(*object, "material"))
+            {
+                if (!parseMaterialReference(
+                        *materialField,
+                        result.config,
+                        "mesh_material_" + std::to_string(result.config.meshObjects.size()),
+                        meshObject.materialOverride,
+                        error))
+                {
+                    result.error = error;
+                    return result;
+                }
+            }
+            if (const JsonValue* materialOverrideField = findField(*object, "materialOverride"))
+            {
+                if (!parseMaterialReference(
+                        *materialOverrideField,
+                        result.config,
+                        "mesh_material_" + std::to_string(result.config.meshObjects.size()),
+                        meshObject.materialOverride,
+                        error))
+                {
+                    result.error = error;
+                    return result;
+                }
             }
             result.config.meshObjects.push_back(meshObject);
         }
@@ -735,6 +1084,9 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     result.scene.exposure = clampSceneExposure(result.scene.exposure);
     result.scene.skyIntensity = clampSceneSkyIntensity(result.scene.skyIntensity);
     result.scene.lightIntensity = clampSceneLightIntensity(result.scene.lightIntensity);
+    appendMaterialWarnings(config, result);
+    const std::map<std::string, SceneMaterialConfig> materialMap = makeMaterialMap(config.materials);
+    applySphereMaterialConfig(config, materialMap, result);
 
     if (config.meshObjects.empty())
     {
@@ -754,15 +1106,17 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
             result.error = loaded.error;
             return result;
         }
+        MeshData objectMesh = loaded.mesh;
+        applyMeshMaterialOverride(object, materialMap, objectMesh, result);
         MeshObject meshObject;
         meshObject.assetReference = meshPath.string();
-        meshObject.mesh = loaded.mesh;
+        meshObject.mesh = objectMesh;
         meshObject.position = object.transform.position;
         meshObject.rotation = object.transform.rotation;
         meshObject.scale = object.transform.scale;
         meshObject.transform = makeTransformMatrix(object.transform);
         meshObjects.push_back(std::move(meshObject));
-        appendMesh(combinedMesh, transformMesh(loaded.mesh, object.transform));
+        appendMesh(combinedMesh, transformMesh(objectMesh, object.transform));
     }
 
     if (!isEmptyMesh(combinedMesh) && hasValidMeshMaterialIndices(combinedMesh) && !meshObjects.empty())
@@ -782,7 +1136,9 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
 SceneBuildResult buildSceneFromMeshPath(const std::filesystem::path& meshPath)
 {
     SceneConfig config;
-    config.meshObjects.push_back(MeshObjectConfig{meshPath, {}});
+    MeshObjectConfig meshObject;
+    meshObject.meshPath = meshPath;
+    config.meshObjects.push_back(std::move(meshObject));
     return buildSceneFromConfig(config, {});
 }
 

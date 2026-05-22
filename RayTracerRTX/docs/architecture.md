@@ -13,6 +13,7 @@ flowchart LR
     Args --> SceneConfig["SceneConfig JSON"]
     App --> Input["Input handling"]
     App --> Camera["CameraState / updateCameraBasis"]
+    SceneConfig --> JsonMaterials["JSON material inputs"]
     SceneConfig --> MeshObject["MeshObject + transform"]
     MeshObject --> ObjLoader
     ObjLoader["ObjLoader"] --> MeshData["MeshData"]
@@ -25,6 +26,8 @@ flowchart LR
     App --> Scene["SceneState"]
     Scene --> Materials["SphereMaterial"]
     Scene --> MeshMaterials["Mesh materials"]
+    JsonMaterials --> Materials
+    JsonMaterials --> MeshMaterials
     App --> Renderer["OptixRenderer"]
     App --> Mode["Render mode toggle"]
     Camera --> Renderer

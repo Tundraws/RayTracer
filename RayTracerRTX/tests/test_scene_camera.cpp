@@ -933,6 +933,128 @@ void testSceneConfigTuningClamps(TestContext& t)
     t.expect(almostEqual(scene.scene.lightIntensity, 0.0f), "Light intensity should clamp to minimum.");
 }
 
+void testSceneConfigJsonMaterialParses(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "json_material_parse.json",
+        "{\n"
+        "  \"materials\": [{\n"
+        "    \"name\": \"warm_metal\",\n"
+        "    \"type\": \"metal\",\n"
+        "    \"baseColor\": [0.8, 0.6, 0.3],\n"
+        "    \"specularColor\": [0.9, 0.8, 0.7],\n"
+        "    \"roughness\": 0.22,\n"
+        "    \"metallic\": 1.0,\n"
+        "    \"ior\": 1.6,\n"
+        "    \"alpha\": 0.95,\n"
+        "    \"texture\": \"albedo.ppm\",\n"
+        "    \"normalMap\": \"normal.ppm\"\n"
+        "  }]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "JSON material config should parse: " + config.error);
+    t.expect(config.config.materials.size() == 1, "One JSON material should be stored.");
+    t.expect(config.config.materials[0].materialType == MaterialMetal, "JSON material type should map to metal.");
+    t.expect(almostEqual(config.config.materials[0].baseColor.x, 0.8f), "JSON material baseColor should parse.");
+    t.expect(almostEqual(config.config.materials[0].roughness, 0.22f), "JSON material roughness should parse.");
+    t.expect(config.config.materials[0].texturePath == "albedo.ppm", "JSON material texture path should parse.");
+    t.expect(config.config.materials[0].normalTexturePath == "normal.ppm", "JSON material normal map path should parse.");
+}
+
+void testSceneConfigMaterialAssignedToSphere(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "json_sphere_material.json",
+        "{\n"
+        "  \"materials\": [{\"name\": \"glass_blue\", \"type\": \"glass\", \"baseColor\": [0.45, 0.75, 1.0], \"alpha\": 0.4}],\n"
+        "  \"sphereMaterials\": [\"glass_blue\"]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Sphere material config should parse.");
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Sphere material config should build.");
+    t.expect(scene.scene.materials[0].materialType == MaterialDielectric, "JSON material should be assigned to first sphere.");
+    t.expect(almostEqual(scene.scene.materials[0].alpha, 0.4f), "Sphere JSON material alpha should be applied.");
+}
+
+void testSceneConfigMaterialAssignedToMesh(TestContext& t)
+{
+    writeFixtureFile(
+        "json_mesh_material.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    const std::filesystem::path configPath = writeFixtureFile(
+        "json_mesh_material.json",
+        "{\n"
+        "  \"materials\": [{\"name\": \"mirror_override\", \"type\": \"mirror\", \"roughness\": 0.03}],\n"
+        "  \"meshObjects\": [{\"path\": \"json_mesh_material.obj\", \"material\": \"mirror_override\"}]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Mesh material override config should parse.");
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Mesh material override config should build.");
+    t.expect(!scene.scene.meshObjects.empty(), "Mesh material override scene should keep mesh object.");
+    t.expect(scene.scene.meshObjects[0].mesh.materials[0].materialType == MaterialMirror, "JSON material should override mesh material.");
+    t.expect(scene.scene.mesh.materials[0].materialType == MaterialMirror, "Combined mesh should receive JSON material override.");
+}
+
+void testSceneConfigInvalidMaterialTypeFallback(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "json_invalid_material_type.json",
+        "{\n"
+        "  \"materials\": [{\"name\": \"odd\", \"type\": \"plasma\", \"baseColor\": [1, 0, 0]}],\n"
+        "  \"sphereMaterials\": [\"odd\"]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Unknown material type should not fail config parsing.");
+    t.expect(config.config.materials[0].materialType == MaterialDiffuse, "Unknown material type should fall back to matte/diffuse.");
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Unknown material type fallback should build.");
+    t.expect(!scene.warnings.empty(), "Unknown material type should produce a build warning.");
+}
+
+void testSceneConfigMaterialParameterClamps(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "json_material_clamps.json",
+        "{\n"
+        "  \"materials\": [{\"name\": \"clamped\", \"type\": \"matte\", \"roughness\": -4, \"metallic\": 8, \"alpha\": -2, \"ior\": 9}],\n"
+        "  \"sphereMaterials\": [\"clamped\"]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Out-of-range material parameters should parse.");
+    t.expect(almostEqual(config.config.materials[0].roughness, 0.02f), "JSON roughness should clamp to minimum.");
+    t.expect(almostEqual(config.config.materials[0].metallic, 1.0f), "JSON metallic should clamp to maximum.");
+    t.expect(almostEqual(config.config.materials[0].alpha, 0.0f), "JSON alpha should clamp to minimum.");
+    t.expect(almostEqual(config.config.materials[0].ior, 2.8f), "JSON IOR should clamp to maximum.");
+    t.expect(config.config.materials[0].materialType == MaterialMetal, "High metallic should map matte material to metal.");
+}
+
+void testSceneConfigOldSceneStillLoads(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "old_scene_without_materials.json",
+        "{\n"
+        "  \"camera\": {\"position\": [0, 4, 12], \"yaw\": -90, \"pitch\": -10, \"fov\": 60},\n"
+        "  \"light\": {\"position\": [4, 8, -5]}\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Old scene config without JSON materials should still parse.");
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Old scene config without JSON materials should still build.");
+    t.expect(scene.scene.materials.size() == 3, "Old scene config should keep default sphere materials.");
+    t.expect(!scene.scene.meshObjects.empty(), "Old scene config should keep fallback demo mesh.");
+}
+
 void testAllDemoSceneConfigsLoad(TestContext& t)
 {
     const std::vector<std::string> scenes = {
@@ -1612,6 +1734,12 @@ int main(int argc, char** argv)
     runTest("Scene config mesh path applied", testSceneConfigMeshPathApplied);
     runTest("Scene config tuning fields", testSceneConfigTuningFields);
     runTest("Scene config tuning clamps", testSceneConfigTuningClamps);
+    runTest("Scene config JSON material parses", testSceneConfigJsonMaterialParses);
+    runTest("Scene config material assigned to sphere", testSceneConfigMaterialAssignedToSphere);
+    runTest("Scene config material assigned to mesh", testSceneConfigMaterialAssignedToMesh);
+    runTest("Scene config invalid material type fallback", testSceneConfigInvalidMaterialTypeFallback);
+    runTest("Scene config material parameter clamps", testSceneConfigMaterialParameterClamps);
+    runTest("Scene config old scene still loads", testSceneConfigOldSceneStillLoads);
     runTest("All demo scene configs load", testAllDemoSceneConfigsLoad);
     runTest("Scene preset reset camera and light", testScenePresetResetCameraLight);
     runTest("Invalid scene preset index safe", testInvalidScenePresetIndexSafe);

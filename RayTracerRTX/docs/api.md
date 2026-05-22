@@ -101,11 +101,27 @@ supports:
 - `camera`: `position`, `yaw`, `pitch`, `fov`;
 - `light`: `position` and optional `intensity`;
 - root-level or `render` object fields: `exposure`, `skyIntensity`,
-  `lightIntensity`.
+  `lightIntensity`;
+- `materials`: named material inputs with `name`, `type`, `baseColor`,
+  `roughness`, `metallic`, `specularColor`, `ior`, `alpha`, `texture`/`map_Kd`,
+  and `normalMap`;
+- `sphereMaterials`: material names or inline material objects assigned to the
+  default spheres by index;
+- mesh object `material` or `materialOverride`: material name or inline material
+  object applied to all materials of that mesh object.
 
 If image-tuning fields are missing, the default scene values are used. Numeric
 values outside the supported range are clamped so old or experimental scene
 files do not make the renderer unstable.
+
+JSON material `type` accepts `matte`, `mirror`, `metal`, and `glass`. The loader
+also accepts `diffuse` as an alias for `matte` and `dielectric` as an alias for
+`glass`. Unknown material types fall back to matte material and add a build
+warning instead of failing the scene. The `metallic` value is clamped to `[0, 1]`;
+values at or above `0.5` make a matte JSON material use the metal shader path.
+Texture paths from JSON are stored on mesh materials for diagnostics and future
+upload work; when they are not already loaded by OBJ/MTL, rendering falls back
+to the material color.
 
 The runtime HUD exposes the same image-tuning values through debounced hotkeys:
 `4/5` for exposure, `6/7` for sky intensity, and `8/9` for direct light
