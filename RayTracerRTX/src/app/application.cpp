@@ -385,7 +385,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
     const float displayWidth = std::max(1.0f, displaySize.x);
     const float displayHeight = std::max(1.0f, displaySize.y);
     const float margin = 32.0f;
-    const float panelWidth = std::min(340.0f, std::max(240.0f, displayWidth - margin * 2.0f));
+    const float panelWidth = std::min(380.0f, std::max(260.0f, displayWidth - margin * 2.0f));
     const float panelHeight = std::min(760.0f, std::max(360.0f, displayHeight - margin * 2.0f));
     const float panelX = std::max(margin, displayWidth - panelWidth - margin);
     const float panelY = margin;
@@ -448,9 +448,12 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
     ImGui::Separator();
     ImGui::SeparatorText(u8c(u8"\u041A\u0430\u0440\u0442\u0438\u043D\u043A\u0430"));
     bool tuningChanged = false;
-    tuningChanged = ImGui::SliderFloat(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"), &scene.exposure, 0.1f, 2.5f, "%.2f") || tuningChanged;
-    tuningChanged = ImGui::SliderFloat(u8c(u8"\u042F\u0440\u043A\u043E\u0441\u0442\u044C \u043D\u0435\u0431\u0430"), &scene.skyIntensity, 0.0f, 3.0f, "%.2f") || tuningChanged;
-    tuningChanged = ImGui::SliderFloat(u8c(u8"\u0421\u0438\u043B\u0430 \u0441\u0432\u0435\u0442\u0430"), &scene.lightIntensity, 0.0f, 5.0f, "%.2f") || tuningChanged;
+    ImGui::TextUnformatted(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"));
+    tuningChanged = ImGui::SliderFloat("##exposure", &scene.exposure, 0.1f, 2.5f, "%.2f") || tuningChanged;
+    ImGui::TextUnformatted(u8c(u8"\u042F\u0440\u043A\u043E\u0441\u0442\u044C \u043D\u0435\u0431\u0430"));
+    tuningChanged = ImGui::SliderFloat("##sky_intensity", &scene.skyIntensity, 0.0f, 3.0f, "%.2f") || tuningChanged;
+    ImGui::TextUnformatted(u8c(u8"\u0421\u0438\u043B\u0430 \u0441\u0432\u0435\u0442\u0430"));
+    tuningChanged = ImGui::SliderFloat("##light_intensity", &scene.lightIntensity, 0.0f, 5.0f, "%.2f") || tuningChanged;
     if (tuningChanged)
     {
         setSceneExposure(scene, scene.exposure);
@@ -502,9 +505,11 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
             appState.progressiveSamples = 0;
         }
         bool materialChanged = false;
-        materialChanged = ImGui::SliderFloat(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u0438"), &meshMaterial->roughness, 0.02f, 1.0f, "%.2f") || materialChanged;
+        ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u0438"));
+        materialChanged = ImGui::SliderFloat("##mesh_roughness", &meshMaterial->roughness, 0.02f, 1.0f, "%.2f") || materialChanged;
         float metallic = meshMaterial->materialType == MaterialMetal ? 1.0f : 0.0f;
-        if (ImGui::SliderFloat(u8c(u8"\u041C\u0435\u0442\u0430\u043B\u043B\u0438\u0447\u043D\u043E\u0441\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u0438"), &metallic, 0.0f, 1.0f, "%.2f"))
+        ImGui::TextUnformatted(u8c(u8"\u041C\u0435\u0442\u0430\u043B\u043B\u0438\u0447\u043D\u043E\u0441\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u0438"));
+        if (ImGui::SliderFloat("##mesh_metallic", &metallic, 0.0f, 1.0f, "%.2f"))
         {
             meshMaterial->materialType = metallic >= 0.5f ? MaterialMetal : MaterialDiffuse;
             materialChanged = true;
@@ -517,22 +522,91 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
         }
     }
 
-    if (scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.materials.size()))
+    if (scene.selectedSphere >= 0 &&
+        scene.selectedSphere < static_cast<int>(scene.spheres.size()) &&
+        scene.selectedSphere < static_cast<int>(scene.materials.size()))
     {
         ImGui::Separator();
         ImGui::SeparatorText(u8c(u8"\u0421\u0444\u0435\u0440\u0430"));
+        if (!scene.spheres.empty())
+        {
+            const std::string selectedSphereLabel = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1);
+            if (ImGui::BeginCombo(u8c(u8"\u0412\u044B\u0431\u043E\u0440 \u0441\u0444\u0435\u0440\u044B"), selectedSphereLabel.c_str()))
+            {
+                for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
+                {
+                    const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1);
+                    const bool selected = i == scene.selectedSphere;
+                    if (ImGui::Selectable(label.c_str(), selected))
+                    {
+                        scene.selectedSphere = i;
+                        clampScene(scene);
+                    }
+                    if (selected)
+                    {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+
+        if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0441\u0444\u0435\u0440\u0443")))
+        {
+            if (addSphere(scene))
+            {
+                appState.progressiveSamples = 0;
+            }
+        }
+        ImGui::SameLine();
+        if (scene.spheres.size() <= 1)
+        {
+            ImGui::BeginDisabled();
+        }
+        if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C")))
+        {
+            if (removeSelectedSphere(scene))
+            {
+                appState.progressiveSamples = 0;
+            }
+        }
+        if (scene.spheres.size() <= 1)
+        {
+            ImGui::EndDisabled();
+        }
+
+        clampScene(scene);
         SphereMaterial& sphereMaterial = scene.materials[static_cast<size_t>(scene.selectedSphere)];
-        ImGui::Text("%s: %d", u8c(u8"\u0421\u0444\u0435\u0440\u0430"), scene.selectedSphere + 1);
         ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u0441\u0444\u0435\u0440\u044B"), wideToUtf8(materialNameW(sphereMaterial.materialType)).c_str());
         if (ImGui::Button(u8c(u8"\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u0441\u0444\u0435\u0440\u044B")))
         {
             cycleSelectedSphereMaterialPreset(scene);
             appState.progressiveSamples = 0;
         }
+
         bool sphereChanged = false;
-        sphereChanged = ImGui::SliderFloat(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u0441\u0444\u0435\u0440\u044B"), &sphereMaterial.roughness, 0.02f, 1.0f, "%.2f") || sphereChanged;
+        SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
+        float sphereRadius = sphere.radius;
+        ImGui::TextUnformatted(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"));
+        if (ImGui::SliderFloat("##sphere_radius", &sphereRadius, 0.25f, 5.0f, "%.2f"))
+        {
+            setSelectedSphereRadius(scene, sphereRadius);
+            sphereChanged = true;
+        }
+
+        float sphereColor[3] = {sphereMaterial.color.x, sphereMaterial.color.y, sphereMaterial.color.z};
+        ImGui::TextUnformatted(u8c(u8"\u0426\u0432\u0435\u0442"));
+        if (ImGui::ColorEdit3("##sphere_color", sphereColor, ImGuiColorEditFlags_NoInputs))
+        {
+            setSelectedSphereColor(scene, make_float3(sphereColor[0], sphereColor[1], sphereColor[2]));
+            sphereChanged = true;
+        }
+
+        ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u0441\u0444\u0435\u0440\u044B"));
+        sphereChanged = ImGui::SliderFloat("##sphere_roughness", &sphereMaterial.roughness, 0.02f, 1.0f, "%.2f") || sphereChanged;
         float sphereMetallic = sphereMaterial.materialType == MaterialMetal ? 1.0f : 0.0f;
-        if (ImGui::SliderFloat(u8c(u8"\u041C\u0435\u0442\u0430\u043B\u043B\u0438\u0447\u043D\u043E\u0441\u0442\u044C \u0441\u0444\u0435\u0440\u044B"), &sphereMetallic, 0.0f, 1.0f, "%.2f"))
+        ImGui::TextUnformatted(u8c(u8"\u041C\u0435\u0442\u0430\u043B\u043B\u0438\u0447\u043D\u043E\u0441\u0442\u044C \u0441\u0444\u0435\u0440\u044B"));
+        if (ImGui::SliderFloat("##sphere_metallic", &sphereMetallic, 0.0f, 1.0f, "%.2f"))
         {
             sphereMaterial.materialType = sphereMetallic >= 0.5f ? MaterialMetal : MaterialDiffuse;
             sphereChanged = true;
@@ -1091,13 +1165,21 @@ void run_optix_app(const ApplicationOptions& options)
         }
         if (elapsedSec >= 1.0)
         {
+            const bool hasSelectedSphere =
+                appState.scene.selectedSphere >= 0 &&
+                appState.scene.selectedSphere < static_cast<int>(appState.scene.spheres.size()) &&
+                appState.scene.selectedSphere < static_cast<int>(appState.scene.materials.size());
             std::ostringstream title;
             title << std::fixed << std::setprecision(1)
                   << "RayTracerRTX OptiX | FPS " << stats.fps
                   << " | Frame " << stats.avgHostMs << " ms"
-                  << " | GPU " << stats.avgGpuMs << " ms"
-                  << " | Sphere " << (appState.scene.selectedSphere + 1)
-                  << " " << materialName(appState.scene.materials[appState.scene.selectedSphere].materialType)
+                  << " | GPU " << stats.avgGpuMs << " ms";
+            if (hasSelectedSphere)
+            {
+                title << " | Sphere " << (appState.scene.selectedSphere + 1)
+                      << " " << materialName(appState.scene.materials[appState.scene.selectedSphere].materialType);
+            }
+            title
                   << " | Light (" << appState.scene.lightPosition.x << ", "
                   << appState.scene.lightPosition.y << ", "
                   << appState.scene.lightPosition.z << ")";

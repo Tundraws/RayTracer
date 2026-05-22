@@ -12,6 +12,14 @@
 
 namespace
 {
+constexpr float kMinSphereRadius = 0.25f;
+constexpr float kMaxSphereRadius = 5.0f;
+
+float clampScalar(const float v, const float minV, const float maxV)
+{
+    return v < minV ? minV : (v > maxV ? maxV : v);
+}
+
 float3 add3(const float3 a, const float3 b)
 {
     return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
@@ -19,15 +27,15 @@ float3 add3(const float3 a, const float3 b)
 
 float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
 {
-    const auto clampScalar = [](const float v, const float minV, const float maxV)
-    {
-        return v < minV ? minV : (v > maxV ? maxV : v);
-    };
-
     return make_float3(
         clampScalar(value.x, minValue.x, maxValue.x),
         clampScalar(value.y, minValue.y, maxValue.y),
         clampScalar(value.z, minValue.z, maxValue.z));
+}
+
+SphereMaterial makeDefaultSphereMaterial()
+{
+    return {make_float3(0.72f, 0.76f, 0.72f), MaterialDiffuse, make_float3(0.72f, 0.72f, 0.72f), 0.52f, 1.5f, 1.0f};
 }
 
 MeshData makeFallbackMesh()
@@ -122,9 +130,19 @@ void clampScene(SceneState& scene)
     const float3 sphereMax = make_float3(24.0f, 14.0f, 24.0f);
     const float floorY = 0.0f;
 
+    if (scene.materials.size() < scene.spheres.size())
+    {
+        scene.materials.resize(scene.spheres.size(), makeDefaultSphereMaterial());
+    }
+    if (scene.materials.size() > scene.spheres.size())
+    {
+        scene.materials.resize(scene.spheres.size());
+    }
+
     for (size_t i = 0; i < scene.spheres.size(); ++i)
     {
         SphereGeometry& sphere = scene.spheres[i];
+        sphere.radius = clampScalar(sphere.radius, kMinSphereRadius, kMaxSphereRadius);
         const float3 minBounds = make_float3(sphereMin.x, floorY + sphere.radius, sphereMin.z);
         const float3 maxBounds = make_float3(sphereMax.x, sphereMax.y, sphereMax.z);
         sphere.center = clamp3(sphere.center, minBounds, maxBounds);
@@ -144,7 +162,7 @@ void clampScene(SceneState& scene)
     }
     if (scene.selectedSphere >= static_cast<int>(scene.spheres.size()))
     {
-        scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
+        scene.selectedSphere = scene.spheres.empty() ? 0 : static_cast<int>(scene.spheres.size()) - 1;
     }
 
     if (scene.selectedMeshObject < 0)
@@ -170,6 +188,82 @@ void clampScene(SceneState& scene)
     {
         scene.selectedMeshMaterial = materialCount > 0 ? materialCount - 1 : 0;
     }
+}
+
+bool addSphere(SceneState& scene)
+{
+    clampScene(scene);
+
+    SphereGeometry sphere{make_float3(0.0f, 1.25f, -2.5f), 1.25f};
+    SphereMaterial material = makeDefaultSphereMaterial();
+
+    if (!scene.spheres.empty() &&
+        scene.selectedSphere >= 0 &&
+        scene.selectedSphere < static_cast<int>(scene.spheres.size()))
+    {
+        const SphereGeometry& selected = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
+        sphere.radius = selected.radius;
+        sphere.center = add3(selected.center, make_float3(selected.radius * 2.2f + 0.5f, 0.0f, 0.0f));
+
+        if (scene.selectedSphere < static_cast<int>(scene.materials.size()))
+        {
+            material = scene.materials[static_cast<size_t>(scene.selectedSphere)];
+        }
+    }
+
+    scene.spheres.push_back(sphere);
+    scene.materials.push_back(material);
+    scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
+    clampScene(scene);
+    return true;
+}
+
+bool removeSelectedSphere(SceneState& scene)
+{
+    clampScene(scene);
+    if (scene.spheres.size() <= 1)
+    {
+        return false;
+    }
+
+    const int index = scene.selectedSphere;
+    if (index < 0 || index >= static_cast<int>(scene.spheres.size()))
+    {
+        return false;
+    }
+
+    scene.spheres.erase(scene.spheres.begin() + index);
+    if (index < static_cast<int>(scene.materials.size()))
+    {
+        scene.materials.erase(scene.materials.begin() + index);
+    }
+    scene.selectedSphere = std::min(index, static_cast<int>(scene.spheres.size()) - 1);
+    clampScene(scene);
+    return true;
+}
+
+void setSelectedSphereRadius(SceneState& scene, const float radius)
+{
+    const int index = scene.selectedSphere;
+    if (index < 0 || index >= static_cast<int>(scene.spheres.size()))
+    {
+        return;
+    }
+
+    scene.spheres[static_cast<size_t>(index)].radius = clampScalar(radius, kMinSphereRadius, kMaxSphereRadius);
+    clampScene(scene);
+}
+
+void setSelectedSphereColor(SceneState& scene, const float3 color)
+{
+    const int index = scene.selectedSphere;
+    if (index < 0 || index >= static_cast<int>(scene.materials.size()))
+    {
+        return;
+    }
+
+    SphereMaterial& material = scene.materials[static_cast<size_t>(index)];
+    material.color = clamp3(color, make_float3(0.0f, 0.0f, 0.0f), make_float3(1.0f, 1.0f, 1.0f));
 }
 
 void moveSelectedSphere(SceneState& scene, const float3 delta)

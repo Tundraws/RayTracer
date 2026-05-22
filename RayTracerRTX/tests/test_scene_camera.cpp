@@ -1206,6 +1206,75 @@ void testInvalidMeshSelectionSafe(TestContext& t)
     t.expect(scene.selectedMeshObject == 0, "Empty mesh object list should keep selected mesh at zero.");
 }
 
+void testAddSphereSelectsNewSphere(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    const size_t sphereCount = scene.spheres.size();
+    const size_t materialCount = scene.materials.size();
+    scene.selectedSphere = 0;
+
+    const bool added = addSphere(scene);
+
+    t.expect(added, "Adding a sphere should succeed.");
+    t.expect(scene.spheres.size() == sphereCount + 1, "Adding a sphere should append geometry.");
+    t.expect(scene.materials.size() == materialCount + 1, "Adding a sphere should append material.");
+    t.expect(scene.selectedSphere == static_cast<int>(scene.spheres.size()) - 1, "New sphere should become selected.");
+}
+
+void testRemoveSelectedSphereKeepsSceneValid(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    const size_t sphereCount = scene.spheres.size();
+    scene.selectedSphere = 1;
+
+    const bool removed = removeSelectedSphere(scene);
+
+    t.expect(removed, "Removing selected sphere should succeed when more than one sphere exists.");
+    t.expect(scene.spheres.size() == sphereCount - 1, "Removing a sphere should erase geometry.");
+    t.expect(scene.materials.size() == scene.spheres.size(), "Removing a sphere should keep materials aligned.");
+    t.expect(scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.spheres.size()), "Selected sphere should remain valid after removal.");
+}
+
+void testRemoveLastSphereSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.spheres.resize(1);
+    scene.materials.resize(1);
+    scene.selectedSphere = 0;
+
+    const bool removed = removeSelectedSphere(scene);
+
+    t.expect(!removed, "Removing the final sphere should fail safely.");
+    t.expect(scene.spheres.size() == 1, "Final sphere should stay in the scene.");
+    t.expect(scene.materials.size() == 1, "Final sphere material should stay in the scene.");
+    t.expect(scene.selectedSphere == 0, "Selected sphere should stay valid when removal is blocked.");
+}
+
+void testSelectedSphereRadiusClamp(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 0;
+
+    setSelectedSphereRadius(scene, -10.0f);
+    t.expect(almostEqual(scene.spheres[0].radius, 0.25f), "Sphere radius should clamp to supported minimum.");
+    t.expect(scene.spheres[0].center.y >= scene.spheres[0].radius, "Sphere should stay above floor after radius clamp.");
+
+    setSelectedSphereRadius(scene, 100.0f);
+    t.expect(almostEqual(scene.spheres[0].radius, 5.0f), "Sphere radius should clamp to supported maximum.");
+}
+
+void testSelectedSphereColorClamp(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 0;
+
+    setSelectedSphereColor(scene, make_float3(-1.0f, 0.4f, 3.0f));
+
+    t.expect(almostEqual(scene.materials[0].color.x, 0.0f), "Sphere color red channel should clamp to minimum.");
+    t.expect(almostEqual(scene.materials[0].color.y, 0.4f), "Sphere color green channel should keep valid value.");
+    t.expect(almostEqual(scene.materials[0].color.z, 1.0f), "Sphere color blue channel should clamp to maximum.");
+}
+
 void testMoveSphereClamp(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -1682,6 +1751,11 @@ int main(int argc, char** argv)
     runTest("Selected mesh changes", testSelectedMeshChanges);
     runTest("Selected mesh material preset cycle", testSelectedMeshMaterialPresetCycle);
     runTest("Invalid mesh selection safe", testInvalidMeshSelectionSafe);
+    runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
+    runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
+    runTest("Remove last sphere safe", testRemoveLastSphereSafe);
+    runTest("Selected sphere radius clamp", testSelectedSphereRadiusClamp);
+    runTest("Selected sphere color clamp", testSelectedSphereColorClamp);
     runTest("Move sphere clamp", testMoveSphereClamp);
     runTest("Move light clamp", testMoveLightClamp);
     runTest("Scene exposure changes safely", testSceneExposureChangesSafely);

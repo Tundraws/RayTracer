@@ -43,6 +43,10 @@ struct SceneState
 
 SceneState makeDefaultScene();
 void clampScene(SceneState& scene);
+bool addSphere(SceneState& scene);
+bool removeSelectedSphere(SceneState& scene);
+void setSelectedSphereRadius(SceneState& scene, float radius);
+void setSelectedSphereColor(SceneState& scene, float3 color);
 void moveSelectedSphere(SceneState& scene, const float3 delta);
 void toggleSelectedMaterial(SceneState& scene);
 void cycleSelectedSphereMaterialPreset(SceneState& scene);

@@ -73,6 +73,10 @@ Declared in `src/app/scene.h`.
 |---|---|
 | `makeDefaultScene()` | Creates the initial scene with spheres, materials and light |
 | `clampScene(SceneState&)` | Keeps objects inside supported bounds |
+| `addSphere(SceneState&)` | Appends a sphere, copies the selected sphere material and selects the new sphere |
+| `removeSelectedSphere(SceneState&)` | Removes the selected sphere while keeping at least one sphere in the scene |
+| `setSelectedSphereRadius(SceneState&, float)` | Changes selected sphere radius with clamping |
+| `setSelectedSphereColor(SceneState&, float3)` | Changes selected sphere color with clamping |
 | `moveSelectedSphere(SceneState&, float3)` | Moves selected sphere and applies bounds |
 | `toggleSelectedMaterial(SceneState&)` | Switches selected sphere between diffuse and mirror material |
 | `cycleSelectedSphereMaterialPreset(SceneState&)` | Cycles selected sphere through diffuse, mirror, metal and dielectric presets |
@@ -131,10 +135,11 @@ and reuse the same clamping helpers as JSON parsing.
 The interactive app also includes a lightweight Dear ImGui panel rendered on top
 of the existing GLFW/OpenGL window. The panel calls the same scene-state
 functions as the keyboard controls: scene preset selection, camera/light reset,
-mesh selection, material preset changes, exposure, sky intensity, light
-intensity, roughness/metallic tweaks, quality mode, progressive mode and
-denoiser toggle. UI widgets are not unit-tested directly; the underlying state
-helpers are covered by tests.
+mesh selection, sphere selection, sphere add/remove, sphere radius/color
+editing, material preset changes, exposure, sky intensity, light intensity,
+roughness/metallic tweaks, quality mode, progressive mode and denoiser toggle.
+UI widgets are not unit-tested directly; the underlying state helpers are
+covered by tests.
 
 Preset helpers `applyScenePresetByIndex(...)` and
 `resetSceneViewFromPreset(...)` keep runtime scene switching and reset behavior
