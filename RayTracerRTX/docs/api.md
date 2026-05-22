@@ -150,16 +150,19 @@ intensity. These controls update `SceneState`, reset progressive accumulation,
 and reuse the same clamping helpers as JSON parsing.
 
 The interactive app also includes a lightweight Dear ImGui panel rendered on top
-of the existing GLFW/OpenGL window. The panel calls the same scene-state
-functions as the keyboard controls: scene preset selection, camera/light reset,
-mesh selection, sphere selection, sphere add/remove, sphere radius/color
-editing, selected mesh position/rotation/scale editing, explicit material type
-selection, texture enable/disable for textured mesh materials, exposure, sky
-intensity, light intensity, material-specific roughness/transparency/IOR tuning, quality mode,
-progressive mode and denoiser toggle. It also provides a Windows file dialog
-button for loading an additional `.obj`, `.gltf`, or `.glb` model as a runtime scene
-preset, plus a compact F5 reload button for JSON-backed presets. UI widgets are
-not unit-tested directly; the underlying state helpers are covered by tests.
+of the existing GLFW/OpenGL window. The panel is split into tabs: Scene,
+Objects, Materials, Light, Quality, and Diagnostics. These tabs call the same
+scene-state functions as the keyboard controls: scene preset selection,
+camera/light reset, mesh selection, sphere selection, sphere add/remove, sphere
+position/radius/color editing, selected mesh position/rotation/scale editing,
+explicit material type selection, texture enable/disable for textured mesh
+materials, exposure, sky intensity, light intensity, area-light size,
+environment intensity, material-specific roughness/transparency/IOR tuning,
+quality mode, progressive mode and denoiser toggle. It also provides a Windows
+file dialog button for loading an additional `.obj`, `.gltf`, or `.glb` model as
+a runtime scene preset, plus a compact JSON reload button for JSON-backed
+presets. UI widgets are not unit-tested directly; the underlying state helpers
+are covered by tests.
 
 Scene config construction uses `AssetCache` as a small asset manager layer:
 mesh assets are cached by normalized path, and standalone image texture loads

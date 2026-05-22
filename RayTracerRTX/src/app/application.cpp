@@ -677,6 +677,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C \u0441\u0446\u0435\u043D\u044B"),
         &appState.imguiPanelVisible,
         panelFlags);
+
     const ImVec2 panelPos = ImGui::GetWindowPos();
     const ImVec2 panelSize = ImGui::GetWindowSize();
     appState.imguiPanelWidth = panelSize.x;
@@ -685,204 +686,118 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     gImguiPanelY = panelPos.y;
     gImguiPanelWidth = panelSize.x;
     gImguiPanelHeight = panelSize.y;
-    ImGui::PushItemWidth(std::min(280.0f, std::max(180.0f, panelSize.x - 44.0f)));
+    ImGui::PushItemWidth(std::min(260.0f, std::max(170.0f, panelSize.x - 56.0f)));
 
     ImGui::Text("FPS %.1f | GPU %.2f ms", stats.fps, stats.avgGpuMs);
-    ImGui::Text("%s: %s", u8c(u8"\u0420\u0435\u0436\u0438\u043C"), appState.renderMode == RenderModeProgressive ? u8c(u8"\u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435") : u8c(u8"\u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F"));
-    ImGui::Text("%s: %s", u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E"), qualityNameUtf8(appState.renderQuality));
-    ImGui::Text("%s: %s", u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), appState.denoiserEnabled ? u8c(u8"\u0432\u043A\u043B") : u8c(u8"\u0432\u044B\u043A\u043B"));
+    ImGui::SameLine();
     if (ImGui::Button(appState.imguiPanelPinnedRight ? u8c(u8"\u041E\u0442\u043A\u0440\u0435\u043F\u0438\u0442\u044C") : u8c(u8"\u041F\u0440\u0438\u0436\u0430\u0442\u044C \u0441\u043F\u0440\u0430\u0432\u0430")))
     {
         appState.imguiPanelPinnedRight = !appState.imguiPanelPinnedRight;
     }
 
-    ImGui::SeparatorText(u8c(u8"\u0414\u0435\u043C\u043E\u043D\u0441\u0442\u0440\u0430\u0446\u0438\u044F"));
-    std::vector<std::string> presetNames;
-    presetNames.reserve(appState.scenePresetNames.size());
-    for (const std::wstring& name : appState.scenePresetNames)
-    {
-        presetNames.push_back(wideToUtf8(name));
-    }
-    const char* currentPreset = appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(presetNames.size())
-        ? presetNames[static_cast<size_t>(appState.scenePresetIndex)].c_str()
-        : u8c(u8"\u0421\u0432\u043E\u044F \u0441\u0446\u0435\u043D\u0430");
-    if (ImGui::BeginCombo(u8c(u8"\u0421\u0446\u0435\u043D\u0430"), currentPreset))
-    {
-        for (int i = 0; i < static_cast<int>(presetNames.size()); ++i)
-        {
-            const bool selected = i == appState.scenePresetIndex;
-            const std::string presetLabel = presetNames[static_cast<size_t>(i)] + "##preset_" + std::to_string(i);
-            if (ImGui::Selectable(presetLabel.c_str(), selected))
-            {
-                applyScenePreset(appState, i);
-            }
-            if (selected)
-            {
-                ImGui::SetItemDefaultFocus();
-            }
-        }
-        ImGui::EndCombo();
-    }
-
-    if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u0432\u0438\u0434\u0430")) &&
-        resetCurrentPresetView(appState))
-    {
-        appState.progressiveSamples = 0;
-    }
-    const bool canReloadSceneConfig =
-        hasPresetIndex(appState, appState.scenePresetIndex) &&
-        appState.scenePresetIndex < static_cast<int>(appState.scenePresetConfigPaths.size()) &&
-        !appState.scenePresetConfigPaths[static_cast<size_t>(appState.scenePresetIndex)].empty();
-    if (!canReloadSceneConfig)
-    {
-        ImGui::BeginDisabled();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button(u8c(u8"F5 JSON")) && canReloadSceneConfig)
-    {
-        reloadCurrentSceneConfig(appState);
-    }
-    if (!canReloadSceneConfig)
-    {
-        ImGui::EndDisabled();
-    }
-    if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C OBJ/glTF...")))
-    {
-        if (const std::optional<std::filesystem::path> meshPath = openMeshFileDialog(window))
-        {
-            loadUserMeshPreset(appState, *meshPath);
-        }
-    }
-    if (!appState.lastUiMessage.empty())
-    {
-        ImGui::TextWrapped(
-            "%s: %s",
-            appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
-            appState.lastUiMessage.c_str());
-    }
-
-    ImGui::Separator();
-    ImGui::SeparatorText(u8c(u8"\u041A\u0430\u0440\u0442\u0438\u043D\u043A\u0430"));
-    bool tuningChanged = false;
-    ImGui::TextUnformatted(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"));
-    tuningChanged = ImGui::SliderFloat("##exposure", &scene.exposure, 0.1f, 2.5f, "%.2f") || tuningChanged;
-    ImGui::TextUnformatted(u8c(u8"\u042F\u0440\u043A\u043E\u0441\u0442\u044C \u043D\u0435\u0431\u0430"));
-    tuningChanged = ImGui::SliderFloat("##sky_intensity", &scene.skyIntensity, 0.0f, 3.0f, "%.2f") || tuningChanged;
-    ImGui::TextUnformatted(u8c(u8"\u0421\u0438\u043B\u0430 \u0441\u0432\u0435\u0442\u0430"));
-    tuningChanged = ImGui::SliderFloat("##light_intensity", &scene.lightIntensity, 0.0f, 5.0f, "%.2f") || tuningChanged;
-    ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0441\u0432\u0435\u0442\u0430"));
-    float lightPosition[3] = {scene.lightPosition.x, scene.lightPosition.y, scene.lightPosition.z};
-    bool lightPositionChanged = false;
-    lightPositionChanged = ImGui::DragFloat("X##light_pos_x", &lightPosition[0], 0.05f, -40.0f, 40.0f, "%.2f") || lightPositionChanged;
-    lightPositionChanged = ImGui::DragFloat("Y##light_pos_y", &lightPosition[1], 0.05f, 6.0f, 40.0f, "%.2f") || lightPositionChanged;
-    lightPositionChanged = ImGui::DragFloat("Z##light_pos_z", &lightPosition[2], 0.05f, -40.0f, 40.0f, "%.2f") || lightPositionChanged;
-    if (lightPositionChanged)
-    {
-        scene.lightPosition = make_float3(lightPosition[0], lightPosition[1], lightPosition[2]);
-        clampScene(scene);
-        tuningChanged = true;
-    }
-    if (tuningChanged)
-    {
-        setSceneExposure(scene, scene.exposure);
-        setSceneSkyIntensity(scene, scene.skyIntensity);
-        setSceneLightIntensity(scene, scene.lightIntensity);
-        appState.progressiveSamples = 0;
-    }
-
-    ImGui::Separator();
-    ImGui::SeparatorText(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C"));
-    const std::string selectedMeshLabel = std::string(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C ")) + std::to_string(scene.selectedMeshObject + 1);
-    if (ImGui::BeginCombo(u8c(u8"\u0412\u044B\u0431\u043E\u0440"), selectedMeshLabel.c_str()))
-    {
-        for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
-        {
-            const std::string label = std::string(u8c(u8"\u0421\u0435\u0442\u043A\u0430 ")) + std::to_string(i + 1);
-            const bool selected = i == scene.selectedMeshObject;
-            if (ImGui::Selectable(label.c_str(), selected))
-            {
-                scene.selectedMeshObject = i;
-                scene.selectedMeshMaterial = 0;
-                clampScene(scene);
-            }
-            if (selected)
-            {
-                ImGui::SetItemDefaultFocus();
-            }
-        }
-        ImGui::EndCombo();
-    }
+    ImGui::Text("%s: %s | %s: %s",
+        u8c(u8"\u0420\u0435\u0436\u0438\u043C"),
+        appState.renderMode == RenderModeProgressive ? u8c(u8"\u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435") : u8c(u8"\u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F"),
+        u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E"),
+        qualityNameUtf8(appState.renderQuality));
 
     MeshObject* selectedMeshObject = nullptr;
     MeshMaterial* meshMaterial = nullptr;
-    if (scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size()))
+    const auto refreshMeshSelection = [&]()
     {
-        MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
-        selectedMeshObject = &object;
-        if (scene.selectedMeshMaterial >= 0 && scene.selectedMeshMaterial < static_cast<int>(object.mesh.materials.size()))
+        selectedMeshObject = nullptr;
+        meshMaterial = nullptr;
+        if (scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size()))
         {
-            meshMaterial = &object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+            MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+            selectedMeshObject = &object;
+            if (scene.selectedMeshMaterial >= 0 && scene.selectedMeshMaterial < static_cast<int>(object.mesh.materials.size()))
+            {
+                meshMaterial = &object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+            }
         }
-    }
+    };
+    refreshMeshSelection();
 
-    if (selectedMeshObject != nullptr)
+    const auto drawSphereMaterialEditor = [&]()
     {
-        bool transformChanged = false;
-        float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
-        float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
-        float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
+        if (scene.selectedSphere < 0 ||
+            scene.selectedSphere >= static_cast<int>(scene.spheres.size()) ||
+            scene.selectedSphere >= static_cast<int>(scene.materials.size()))
+        {
+            ImGui::TextWrapped("%s", u8c(u8"\u0421\u0444\u0435\u0440\u0430 \u043D\u0435 \u0432\u044B\u0431\u0440\u0430\u043D\u0430."));
+            return;
+        }
 
-        ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435"));
-        bool positionChanged = false;
-        positionChanged = ImGui::DragFloat("X##mesh_pos_x", &position[0], 0.02f, -50.0f, 50.0f, "%.2f") || positionChanged;
-        positionChanged = ImGui::DragFloat("Y##mesh_pos_y", &position[1], 0.02f, -10.0f, 50.0f, "%.2f") || positionChanged;
-        positionChanged = ImGui::DragFloat("Z##mesh_pos_z", &position[2], 0.02f, -50.0f, 50.0f, "%.2f") || positionChanged;
-        if (positionChanged)
+        SphereMaterial& material = scene.materials[static_cast<size_t>(scene.selectedSphere)];
+        bool changed = false;
+        int materialType = material.materialType;
+        if (materialTypeCombo(u8c(u8"\u0422\u0438\u043F##sphere_material_type"), materialType))
         {
-            transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
+            setSelectedSphereMaterialType(scene, materialType);
+            changed = true;
         }
-        ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442"));
-        bool rotationChanged = false;
-        rotationChanged = ImGui::DragFloat("X##mesh_rot_x", &rotation[0], 0.25f, -360.0f, 360.0f, "%.1f") || rotationChanged;
-        rotationChanged = ImGui::DragFloat("Y##mesh_rot_y", &rotation[1], 0.25f, -360.0f, 360.0f, "%.1f") || rotationChanged;
-        rotationChanged = ImGui::DragFloat("Z##mesh_rot_z", &rotation[2], 0.25f, -360.0f, 360.0f, "%.1f") || rotationChanged;
-        if (rotationChanged)
+
+        float color[3] = {material.color.x, material.color.y, material.color.z};
+        if (ImGui::ColorEdit3(material.materialType == MaterialDielectric ? u8c(u8"\u041E\u0442\u0442\u0435\u043D\u043E\u043A##sphere_color") : u8c(u8"\u0426\u0432\u0435\u0442##sphere_color"), color, ImGuiColorEditFlags_NoInputs))
         {
-            transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
+            setSelectedSphereColor(scene, make_float3(color[0], color[1], color[2]));
+            changed = true;
         }
-        ImGui::TextUnformatted(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431"));
-        bool scaleChanged = false;
-        scaleChanged = ImGui::DragFloat("X##mesh_scale_x", &scale[0], 0.01f, 0.05f, 20.0f, "%.2f") || scaleChanged;
-        scaleChanged = ImGui::DragFloat("Y##mesh_scale_y", &scale[1], 0.01f, 0.05f, 20.0f, "%.2f") || scaleChanged;
-        scaleChanged = ImGui::DragFloat("Z##mesh_scale_z", &scale[2], 0.01f, 0.05f, 20.0f, "%.2f") || scaleChanged;
-        if (scaleChanged)
+
+        if (material.materialType == MaterialDielectric)
         {
-            transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
+            changed = ImGui::SliderFloat(u8c(u8"\u041C\u0443\u0442\u043D\u043E\u0441\u0442\u044C##sphere_glass_roughness"), &material.roughness, 0.02f, 0.6f, "%.2f") || changed;
+            changed = ImGui::SliderFloat(u8c(u8"IOR##sphere_ior"), &material.ior, 1.01f, 2.8f, "%.2f") || changed;
+            float transparency = 1.0f - material.alpha;
+            if (ImGui::SliderFloat(u8c(u8"\u041F\u0440\u043E\u0437\u0440\u0430\u0447\u043D\u043E\u0441\u0442\u044C##sphere_transparency"), &transparency, 0.0f, 1.0f, "%.2f"))
+            {
+                material.alpha = 1.0f - transparency;
+                changed = true;
+            }
         }
-        if (transformChanged)
+        else if (material.materialType == MaterialMirror)
         {
+            changed = ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0437\u043C\u044B\u0442\u0438\u0435##sphere_mirror_roughness"), &material.roughness, 0.02f, 0.35f, "%.2f") || changed;
+        }
+        else if (material.materialType == MaterialMetal)
+        {
+            changed = ImGui::SliderFloat(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C##sphere_metal_roughness"), &material.roughness, 0.02f, 1.0f, "%.2f") || changed;
+        }
+        else
+        {
+            changed = ImGui::SliderFloat(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C##sphere_matte_roughness"), &material.roughness, 0.15f, 1.0f, "%.2f") || changed;
+        }
+        if (changed)
+        {
+            material.roughness = clampf(material.roughness, 0.02f, 1.0f);
+            material.ior = clampf(material.ior, 1.01f, 2.8f);
+            material.alpha = clampf(material.alpha, 0.0f, 1.0f);
             appState.progressiveSamples = 0;
         }
-    }
+    };
 
-    if (meshMaterial != nullptr)
+    const auto drawMeshMaterialEditor = [&]()
     {
-        ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u043C\u043E\u0434\u0435\u043B\u0438"), materialTypeNameUtf8(meshMaterial->materialType));
-        bool materialChanged = false;
-        int meshMaterialType = meshMaterial->materialType;
-        ImGui::TextUnformatted(u8c(u8"\u0422\u0438\u043F \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u0430"));
-        if (materialTypeCombo("##mesh_material_type", meshMaterialType))
+        if (meshMaterial == nullptr)
         {
-            setSelectedMeshMaterialType(scene, meshMaterialType);
-            materialChanged = true;
+            ImGui::TextWrapped("%s", u8c(u8"\u041F\u043E\u043B\u0438\u0433\u043E\u043D\u0430\u043B\u044C\u043D\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C \u043D\u0435 \u0432\u044B\u0431\u0440\u0430\u043D\u0430."));
+            return;
         }
 
-        float meshColor[3] = {meshMaterial->color.x, meshMaterial->color.y, meshMaterial->color.z};
-        ImGui::TextUnformatted(meshMaterial->materialType == MaterialDielectric ? u8c(u8"\u041E\u0442\u0442\u0435\u043D\u043E\u043A \u0441\u0442\u0435\u043A\u043B\u0430") : u8c(u8"\u0426\u0432\u0435\u0442"));
-        if (ImGui::ColorEdit3("##mesh_color", meshColor, ImGuiColorEditFlags_NoInputs))
+        bool changed = false;
+        int materialType = meshMaterial->materialType;
+        if (materialTypeCombo(u8c(u8"\u0422\u0438\u043F##mesh_material_type"), materialType))
         {
-            meshMaterial->color = make_float3(meshColor[0], meshColor[1], meshColor[2]);
-            materialChanged = true;
+            setSelectedMeshMaterialType(scene, materialType);
+            changed = true;
+        }
+
+        float color[3] = {meshMaterial->color.x, meshMaterial->color.y, meshMaterial->color.z};
+        if (ImGui::ColorEdit3(meshMaterial->materialType == MaterialDielectric ? u8c(u8"\u041E\u0442\u0442\u0435\u043D\u043E\u043A##mesh_color") : u8c(u8"\u0426\u0432\u0435\u0442##mesh_color"), color, ImGuiColorEditFlags_NoInputs))
+        {
+            meshMaterial->color = make_float3(color[0], color[1], color[2]);
+            changed = true;
         }
         if (meshMaterial->textureIndex >= 0)
         {
@@ -890,41 +805,34 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Checkbox(u8c(u8"\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0442\u0435\u043A\u0441\u0442\u0443\u0440\u0443"), &textureEnabled))
             {
                 meshMaterial->textureEnabled = textureEnabled ? 1 : 0;
-                materialChanged = true;
+                changed = true;
             }
         }
 
         if (meshMaterial->materialType == MaterialDielectric)
         {
-            ImGui::TextUnformatted(u8c(u8"\u041C\u0443\u0442\u043D\u043E\u0441\u0442\u044C \u0441\u0442\u0435\u043A\u043B\u0430"));
-            materialChanged = ImGui::SliderFloat("##mesh_glass_roughness", &meshMaterial->roughness, 0.02f, 0.6f, "%.2f") || materialChanged;
-            ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0435\u043B\u044C \u043F\u0440\u0435\u043B\u043E\u043C\u043B\u0435\u043D\u0438\u044F"));
-            materialChanged = ImGui::SliderFloat("##mesh_ior", &meshMaterial->ior, 1.01f, 2.8f, "%.2f") || materialChanged;
+            changed = ImGui::SliderFloat(u8c(u8"\u041C\u0443\u0442\u043D\u043E\u0441\u0442\u044C##mesh_glass_roughness"), &meshMaterial->roughness, 0.02f, 0.6f, "%.2f") || changed;
+            changed = ImGui::SliderFloat(u8c(u8"IOR##mesh_ior"), &meshMaterial->ior, 1.01f, 2.8f, "%.2f") || changed;
             float transparency = 1.0f - meshMaterial->alpha;
-            ImGui::TextUnformatted(u8c(u8"\u041F\u0440\u043E\u0437\u0440\u0430\u0447\u043D\u043E\u0441\u0442\u044C"));
-            if (ImGui::SliderFloat("##mesh_transparency", &transparency, 0.0f, 1.0f, "%.2f"))
+            if (ImGui::SliderFloat(u8c(u8"\u041F\u0440\u043E\u0437\u0440\u0430\u0447\u043D\u043E\u0441\u0442\u044C##mesh_transparency"), &transparency, 0.0f, 1.0f, "%.2f"))
             {
                 meshMaterial->alpha = 1.0f - transparency;
-                materialChanged = true;
+                changed = true;
             }
         }
         else if (meshMaterial->materialType == MaterialMirror)
         {
-            ImGui::TextUnformatted(u8c(u8"\u0420\u0430\u0437\u043C\u044B\u0442\u0438\u0435 \u043E\u0442\u0440\u0430\u0436\u0435\u043D\u0438\u044F"));
-            materialChanged = ImGui::SliderFloat("##mesh_mirror_roughness", &meshMaterial->roughness, 0.02f, 0.35f, "%.2f") || materialChanged;
+            changed = ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0437\u043C\u044B\u0442\u0438\u0435##mesh_mirror_roughness"), &meshMaterial->roughness, 0.02f, 0.35f, "%.2f") || changed;
         }
         else if (meshMaterial->materialType == MaterialMetal)
         {
-            ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u0435\u0442\u0430\u043B\u043B\u0430"));
-            materialChanged = ImGui::SliderFloat("##mesh_metal_roughness", &meshMaterial->roughness, 0.02f, 1.0f, "%.2f") || materialChanged;
+            changed = ImGui::SliderFloat(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C##mesh_metal_roughness"), &meshMaterial->roughness, 0.02f, 1.0f, "%.2f") || changed;
         }
         else
         {
-            ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u0430\u0442\u043E\u0432\u043E\u0439 \u043F\u043E\u0432\u0435\u0440\u0445\u043D\u043E\u0441\u0442\u0438"));
-            materialChanged = ImGui::SliderFloat("##mesh_matte_roughness", &meshMaterial->roughness, 0.15f, 1.0f, "%.2f") || materialChanged;
+            changed = ImGui::SliderFloat(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C##mesh_matte_roughness"), &meshMaterial->roughness, 0.15f, 1.0f, "%.2f") || changed;
         }
-
-        if (materialChanged)
+        if (changed)
         {
             meshMaterial->roughness = clampf(meshMaterial->roughness, 0.02f, 1.0f);
             meshMaterial->ior = clampf(meshMaterial->ior, 1.01f, 2.8f);
@@ -933,27 +841,30 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             appState.progressiveSamples = 0;
             appState.rendererSceneRebuildRequested = true;
         }
-    }
+    };
 
-    if (scene.selectedSphere >= 0 &&
-        scene.selectedSphere < static_cast<int>(scene.spheres.size()) &&
-        scene.selectedSphere < static_cast<int>(scene.materials.size()))
+    if (ImGui::BeginTabBar("ScenePanelTabs", ImGuiTabBarFlags_FittingPolicyScroll))
     {
-        ImGui::Separator();
-        ImGui::SeparatorText(u8c(u8"\u0421\u0444\u0435\u0440\u0430"));
-        if (!scene.spheres.empty())
+        if (ImGui::BeginTabItem(u8c(u8"\u0421\u0446\u0435\u043D\u0430")))
         {
-            const std::string selectedSphereLabel = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1);
-            if (ImGui::BeginCombo(u8c(u8"\u0412\u044B\u0431\u043E\u0440 \u0441\u0444\u0435\u0440\u044B"), selectedSphereLabel.c_str()))
+            std::vector<std::string> presetNames;
+            presetNames.reserve(appState.scenePresetNames.size());
+            for (const std::wstring& name : appState.scenePresetNames)
             {
-                for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
+                presetNames.push_back(wideToUtf8(name));
+            }
+            const char* currentPreset = appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(presetNames.size())
+                ? presetNames[static_cast<size_t>(appState.scenePresetIndex)].c_str()
+                : u8c(u8"\u0421\u0432\u043E\u044F \u0441\u0446\u0435\u043D\u0430");
+            if (ImGui::BeginCombo(u8c(u8"\u041F\u0440\u0435\u0441\u0435\u0442"), currentPreset))
+            {
+                for (int i = 0; i < static_cast<int>(presetNames.size()); ++i)
                 {
-                    const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1);
-                    const bool selected = i == scene.selectedSphere;
-                    if (ImGui::Selectable(label.c_str(), selected))
+                    const bool selected = i == appState.scenePresetIndex;
+                    const std::string presetLabel = presetNames[static_cast<size_t>(i)] + "##preset_" + std::to_string(i);
+                    if (ImGui::Selectable(presetLabel.c_str(), selected))
                     {
-                        scene.selectedSphere = i;
-                        clampScene(scene);
+                        applyScenePreset(appState, i);
                     }
                     if (selected)
                     {
@@ -962,122 +873,243 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 }
                 ImGui::EndCombo();
             }
-        }
-
-        if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0441\u0444\u0435\u0440\u0443")))
-        {
-            if (addSphere(scene))
+            if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B/\u0441\u0432\u0435\u0442\u0430")) && resetCurrentPresetView(appState))
             {
                 appState.progressiveSamples = 0;
             }
+            const bool canReloadSceneConfig =
+                hasPresetIndex(appState, appState.scenePresetIndex) &&
+                appState.scenePresetIndex < static_cast<int>(appState.scenePresetConfigPaths.size()) &&
+                !appState.scenePresetConfigPaths[static_cast<size_t>(appState.scenePresetIndex)].empty();
+            if (!canReloadSceneConfig)
+            {
+                ImGui::BeginDisabled();
+            }
+            if (ImGui::Button(u8c(u8"\u041F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C JSON")))
+            {
+                reloadCurrentSceneConfig(appState);
+            }
+            if (!canReloadSceneConfig)
+            {
+                ImGui::EndDisabled();
+            }
+            if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C OBJ/glTF...")))
+            {
+                if (const std::optional<std::filesystem::path> meshPath = openMeshFileDialog(window))
+                {
+                    loadUserMeshPreset(appState, *meshPath);
+                }
+            }
+            if (!appState.lastUiMessage.empty())
+            {
+                ImGui::TextWrapped("%s: %s",
+                    appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
+                    appState.lastUiMessage.c_str());
+            }
+            ImGui::EndTabItem();
         }
-        ImGui::SameLine();
-        const bool canRemoveSphere = scene.spheres.size() > 1;
-        if (!canRemoveSphere)
+
+        if (ImGui::BeginTabItem(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u044B")))
         {
-            ImGui::BeginDisabled();
+            if (!scene.spheres.empty())
+            {
+                const std::string selectedSphereLabel = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1);
+                if (ImGui::BeginCombo(u8c(u8"\u0421\u0444\u0435\u0440\u0430"), selectedSphereLabel.c_str()))
+                {
+                    for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
+                    {
+                        const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1);
+                        const bool selected = i == scene.selectedSphere;
+                        if (ImGui::Selectable(label.c_str(), selected))
+                        {
+                            scene.selectedSphere = i;
+                            clampScene(scene);
+                        }
+                        if (selected)
+                        {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C")))
+                {
+                    appState.progressiveSamples = addSphere(scene) ? 0 : appState.progressiveSamples;
+                }
+                ImGui::SameLine();
+                const bool canRemoveSphere = scene.spheres.size() > 1;
+                if (!canRemoveSphere)
+                {
+                    ImGui::BeginDisabled();
+                }
+                if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C")))
+                {
+                    appState.progressiveSamples = removeSelectedSphere(scene) ? 0 : appState.progressiveSamples;
+                }
+                if (!canRemoveSphere)
+                {
+                    ImGui::EndDisabled();
+                }
+                clampScene(scene);
+                if (scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.spheres.size()))
+                {
+                    SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
+                    float pos[3] = {sphere.center.x, sphere.center.y, sphere.center.z};
+                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"), pos, 0.05f, -50.0f, 50.0f, "%.2f"))
+                    {
+                        const float oldRadius = sphere.radius;
+                        sphere.center = make_float3(pos[0], pos[1], pos[2]);
+                        sphere.radius = oldRadius;
+                        clampScene(scene);
+                        appState.progressiveSamples = 0;
+                    }
+                    float radius = sphere.radius;
+                    if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"), &radius, 0.25f, 5.0f, "%.2f"))
+                    {
+                        setSelectedSphereRadius(scene, radius);
+                        appState.progressiveSamples = 0;
+                    }
+                }
+            }
+
+            ImGui::SeparatorText(u8c(u8"\u041F\u043E\u043B\u0438\u0433\u043E\u043D\u0430\u043B\u044C\u043D\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C"));
+            const std::string selectedMeshLabel = scene.meshObjects.empty()
+                ? std::string(u8c(u8"\u041D\u0435\u0442"))
+                : std::string(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C ")) + std::to_string(scene.selectedMeshObject + 1);
+            if (ImGui::BeginCombo(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C"), selectedMeshLabel.c_str()))
+            {
+                for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
+                {
+                    const std::string label = std::string(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C ")) + std::to_string(i + 1);
+                    const bool selected = i == scene.selectedMeshObject;
+                    if (ImGui::Selectable(label.c_str(), selected))
+                    {
+                        scene.selectedMeshObject = i;
+                        scene.selectedMeshMaterial = 0;
+                        clampScene(scene);
+                        refreshMeshSelection();
+                    }
+                    if (selected)
+                    {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (selectedMeshObject != nullptr)
+            {
+                float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
+                float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
+                float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
+                bool transformChanged = false;
+                if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.02f, -50.0f, 50.0f, "%.2f"))
+                {
+                    transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
+                }
+                if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"), rotation, 0.25f, -360.0f, 360.0f, "%.1f"))
+                {
+                    transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
+                }
+                if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.01f, 0.05f, 20.0f, "%.2f"))
+                {
+                    transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
+                }
+                if (transformChanged)
+                {
+                    appState.progressiveSamples = 0;
+                    appState.rendererSceneRebuildRequested = true;
+                }
+            }
+            ImGui::EndTabItem();
         }
-        if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C")))
+
+        if (ImGui::BeginTabItem(u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B")))
         {
-            if (removeSelectedSphere(scene))
+            if (ImGui::CollapsingHeader(u8c(u8"\u0421\u0444\u0435\u0440\u0430"), ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                drawSphereMaterialEditor();
+            }
+            if (ImGui::CollapsingHeader(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C"), ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                drawMeshMaterialEditor();
+            }
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem(u8c(u8"\u0421\u0432\u0435\u0442")))
+        {
+            bool changed = false;
+            float lightPosition[3] = {scene.lightPosition.x, scene.lightPosition.y, scene.lightPosition.z};
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F"), lightPosition, 0.05f, -40.0f, 40.0f, "%.2f"))
+            {
+                scene.lightPosition = make_float3(lightPosition[0], std::max(6.0f, lightPosition[1]), lightPosition[2]);
+                clampScene(scene);
+                changed = true;
+            }
+            changed = ImGui::SliderFloat(u8c(u8"\u0421\u0438\u043B\u0430 \u0441\u0432\u0435\u0442\u0430"), &scene.lightIntensity, 0.0f, 5.0f, "%.2f") || changed;
+            changed = ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0437\u043C\u0435\u0440 area light"), &scene.areaLightRadius, 0.0f, 8.0f, "%.2f") || changed;
+            changed = ImGui::SliderFloat(u8c(u8"\u042F\u0440\u043A\u043E\u0441\u0442\u044C \u043D\u0435\u0431\u0430"), &scene.skyIntensity, 0.0f, 3.0f, "%.2f") || changed;
+            changed = ImGui::SliderFloat(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"), &scene.environmentIntensity, 0.0f, 4.0f, "%.2f") || changed;
+            changed = ImGui::SliderFloat(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"), &scene.exposure, 0.1f, 2.5f, "%.2f") || changed;
+            if (changed)
+            {
+                setSceneExposure(scene, scene.exposure);
+                setSceneSkyIntensity(scene, scene.skyIntensity);
+                setSceneLightIntensity(scene, scene.lightIntensity);
+                scene.areaLightRadius = clampf(scene.areaLightRadius, 0.0f, 8.0f);
+                scene.environmentIntensity = clampf(scene.environmentIntensity, 0.0f, 4.0f);
+                appState.progressiveSamples = 0;
+            }
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E")))
+        {
+            int selectedQuality = appState.renderQuality;
+            if (qualityCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##quality_mode"), selectedQuality))
+            {
+                appState.renderQuality = selectedQuality;
+                applyQualityMode(appState);
+            }
+            bool progressive = appState.renderMode == RenderModeProgressive;
+            if (ImGui::Checkbox(u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F"), &progressive))
+            {
+                appState.renderMode = progressive ? RenderModeProgressive : RenderModeRealtime;
+                appState.progressiveSamples = 0;
+            }
+            if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), &appState.denoiserEnabled))
             {
                 appState.progressiveSamples = 0;
             }
-        }
-        if (!canRemoveSphere)
-        {
-            ImGui::EndDisabled();
+            ImGui::TextWrapped("%s", u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u043C \u0438 \u0448\u0443\u043C\u043D\u044B\u043C. \u0414\u043B\u044F \u043E\u0431\u044B\u0447\u043D\u043E\u0433\u043E \u043F\u043E\u043A\u0430\u0437\u0430 \u043B\u0443\u0447\u0448\u0435 High/Medium."));
+            ImGui::EndTabItem();
         }
 
-        clampScene(scene);
-        SphereMaterial& sphereMaterial = scene.materials[static_cast<size_t>(scene.selectedSphere)];
-        ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u0441\u0444\u0435\u0440\u044B"), materialTypeNameUtf8(sphereMaterial.materialType));
-
-        bool sphereChanged = false;
-        SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
-        float sphereRadius = sphere.radius;
-        ImGui::TextUnformatted(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"));
-        if (ImGui::SliderFloat("##sphere_radius", &sphereRadius, 0.25f, 5.0f, "%.2f"))
+        if (ImGui::BeginTabItem(u8c(u8"\u0414\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0430")))
         {
-            setSelectedSphereRadius(scene, sphereRadius);
-            sphereChanged = true;
-        }
-
-        int sphereMaterialType = sphereMaterial.materialType;
-        ImGui::TextUnformatted(u8c(u8"\u0422\u0438\u043F \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u0430"));
-        if (materialTypeCombo("##sphere_material_type", sphereMaterialType))
-        {
-            setSelectedSphereMaterialType(scene, sphereMaterialType);
-            sphereChanged = true;
-        }
-
-        float sphereColor[3] = {sphereMaterial.color.x, sphereMaterial.color.y, sphereMaterial.color.z};
-        ImGui::TextUnformatted(sphereMaterial.materialType == MaterialDielectric ? u8c(u8"\u041E\u0442\u0442\u0435\u043D\u043E\u043A \u0441\u0442\u0435\u043A\u043B\u0430") : u8c(u8"\u0426\u0432\u0435\u0442"));
-        if (ImGui::ColorEdit3("##sphere_color", sphereColor, ImGuiColorEditFlags_NoInputs))
-        {
-            setSelectedSphereColor(scene, make_float3(sphereColor[0], sphereColor[1], sphereColor[2]));
-            sphereChanged = true;
-        }
-
-        if (sphereMaterial.materialType == MaterialDielectric)
-        {
-            ImGui::TextUnformatted(u8c(u8"\u041C\u0443\u0442\u043D\u043E\u0441\u0442\u044C \u0441\u0442\u0435\u043A\u043B\u0430"));
-            sphereChanged = ImGui::SliderFloat("##sphere_glass_roughness", &sphereMaterial.roughness, 0.02f, 0.6f, "%.2f") || sphereChanged;
-            ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0435\u043B\u044C \u043F\u0440\u0435\u043B\u043E\u043C\u043B\u0435\u043D\u0438\u044F"));
-            sphereChanged = ImGui::SliderFloat("##sphere_ior", &sphereMaterial.ior, 1.01f, 2.8f, "%.2f") || sphereChanged;
-            float sphereTransparency = 1.0f - sphereMaterial.alpha;
-            ImGui::TextUnformatted(u8c(u8"\u041F\u0440\u043E\u0437\u0440\u0430\u0447\u043D\u043E\u0441\u0442\u044C"));
-            if (ImGui::SliderFloat("##sphere_transparency", &sphereTransparency, 0.0f, 1.0f, "%.2f"))
+            size_t meshMaterialCount = 0;
+            size_t triangleCount = 0;
+            for (const MeshObject& object : scene.meshObjects)
             {
-                sphereMaterial.alpha = 1.0f - sphereTransparency;
-                sphereChanged = true;
+                meshMaterialCount += object.mesh.materials.size();
+                triangleCount += object.mesh.triangles.size();
             }
+            ImGui::Text("%s: %zu", u8c(u8"\u0421\u0444\u0435\u0440\u044B"), scene.spheres.size());
+            ImGui::Text("%s: %zu", u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), scene.meshObjects.size());
+            ImGui::Text("%s: %zu", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B"), scene.materials.size() + meshMaterialCount);
+            ImGui::Text("%s: %zu", u8c(u8"\u0422\u0440\u0435\u0443\u0433\u043E\u043B\u044C\u043D\u0438\u043A\u0438"), triangleCount);
+            ImGui::TextWrapped("%s: %s", u8c(u8"\u041B\u043E\u0433"), getLogFilePath().string().c_str());
+            if (!appState.lastUiMessage.empty())
+            {
+                ImGui::TextWrapped("%s: %s",
+                    appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
+                    appState.lastUiMessage.c_str());
+            }
+            ImGui::TextWrapped("%s", u8c(u8"\u041B\u041A\u041C: \u043A\u0443\u0440\u0441\u043E\u0440/\u043A\u0430\u043C\u0435\u0440\u0430. H: \u0441\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C."));
+            ImGui::EndTabItem();
         }
-        else if (sphereMaterial.materialType == MaterialMirror)
-        {
-            ImGui::TextUnformatted(u8c(u8"\u0420\u0430\u0437\u043C\u044B\u0442\u0438\u0435 \u043E\u0442\u0440\u0430\u0436\u0435\u043D\u0438\u044F"));
-            sphereChanged = ImGui::SliderFloat("##sphere_mirror_roughness", &sphereMaterial.roughness, 0.02f, 0.35f, "%.2f") || sphereChanged;
-        }
-        else if (sphereMaterial.materialType == MaterialMetal)
-        {
-            ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u0435\u0442\u0430\u043B\u043B\u0430"));
-            sphereChanged = ImGui::SliderFloat("##sphere_metal_roughness", &sphereMaterial.roughness, 0.02f, 1.0f, "%.2f") || sphereChanged;
-        }
-        else
-        {
-            ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u0430\u0442\u043E\u0432\u043E\u0439 \u043F\u043E\u0432\u0435\u0440\u0445\u043D\u043E\u0441\u0442\u0438"));
-            sphereChanged = ImGui::SliderFloat("##sphere_matte_roughness", &sphereMaterial.roughness, 0.15f, 1.0f, "%.2f") || sphereChanged;
-        }
-        if (sphereChanged)
-        {
-            sphereMaterial.roughness = clampf(sphereMaterial.roughness, 0.02f, 1.0f);
-            sphereMaterial.ior = clampf(sphereMaterial.ior, 1.01f, 2.8f);
-            sphereMaterial.alpha = clampf(sphereMaterial.alpha, 0.0f, 1.0f);
-            appState.progressiveSamples = 0;
-        }
+        ImGui::EndTabBar();
     }
-
-    ImGui::Separator();
-    ImGui::SeparatorText(u8c(u8"\u0420\u0435\u0436\u0438\u043C\u044B"));
-    ImGui::TextUnformatted(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E"));
-    int selectedQuality = appState.renderQuality;
-    if (qualityCombo("##quality_mode", selectedQuality))
-    {
-        appState.renderQuality = selectedQuality;
-        applyQualityMode(appState);
-    }
-    if (ImGui::Button(appState.renderMode == RenderModeProgressive ? u8c(u8"\u0420\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F") : u8c(u8"\u041D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435")))
-    {
-        appState.renderMode = appState.renderMode == RenderModeProgressive ? RenderModeRealtime : RenderModeProgressive;
-        appState.progressiveSamples = 0;
-    }
-    if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), &appState.denoiserEnabled))
-    {
-        appState.progressiveSamples = 0;
-    }
-
-    ImGui::Separator();
-    ImGui::TextWrapped("%s", u8c(u8"\u041B\u041A\u041C: \u043A\u0443\u0440\u0441\u043E\u0440/\u043A\u0430\u043C\u0435\u0440\u0430. H: \u0441\u043A\u0440\u044B\u0442\u044C \u0438\u043B\u0438 \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C."));
     ImGui::PopItemWidth();
     ImGui::End();
 }

@@ -12,6 +12,7 @@ flowchart LR
     Main --> Args["--mesh / --scene args"]
     Args --> SceneConfig["SceneConfig JSON"]
     App --> Input["Input handling"]
+    App --> UI["ImGui tabbed scene panel"]
     App --> Camera["CameraState / updateCameraBasis"]
     SceneConfig --> JsonMaterials["JSON material inputs"]
     SceneConfig --> MeshObject["MeshObject + transform"]
@@ -29,6 +30,8 @@ flowchart LR
     MeshData --> MeshObject
     MeshObject --> Scene
     App --> Scene["SceneState"]
+    UI --> Scene
+    UI --> Mode
     Scene --> Materials["SphereMaterial"]
     Scene --> MeshMaterials["Mesh materials"]
     JsonMaterials --> Materials
@@ -150,6 +153,7 @@ flowchart LR
 | Area | Files | Responsibility |
 |---|---|---|
 | Application loop | `src/app/maingpu.cpp`, `src/app/application.*` | Window creation, input, scene updates, presentation |
+| UI panel | `src/app/application.*` + Dear ImGui | Tabbed runtime controls for scene presets, objects, materials, light, quality, and diagnostics |
 | Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*`, `src/app/gltf_loader.*` | Spheres, OBJ/glTF mesh data, materials, selected object, light movement and clamping |
 | Camera | `src/app/camera.*` | Camera state and basis vectors for ray generation |
 | Shared GPU data | `src/common/rtx_shared.h` | Host/device structures used by CUDA and OptiX |
