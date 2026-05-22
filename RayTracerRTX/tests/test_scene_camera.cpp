@@ -1125,6 +1125,47 @@ void testInvalidScenePresetIndexSafe(TestContext& t)
     t.expect(almostEqual(camera.yaw, 42.0f), "Invalid preset should not change camera.");
 }
 
+void testScenePresetSessionEditsPersist(TestContext& t)
+{
+    std::vector<SceneBuildResult> presets;
+    presets.push_back(buildDefaultSceneInput());
+    presets.push_back(buildDefaultSceneInput());
+    t.expect(presets[0].ok && presets[1].ok, "Default presets should build for session edit test.");
+
+    SceneState scene = presets[0].scene;
+    CameraState camera = presets[0].camera;
+    const size_t originalSphereCount = scene.spheres.size();
+    addSphere(scene);
+    setSelectedSphereRadius(scene, 0.75f);
+    camera.yaw = 12.0f;
+
+    const bool saved = saveScenePresetByIndex(presets, 0, scene, camera);
+    const bool switched = applyScenePresetByIndex(presets, 1, scene, camera);
+    const bool returned = applyScenePresetByIndex(presets, 0, scene, camera);
+
+    t.expect(saved, "Saving a valid scene preset index should succeed.");
+    t.expect(switched, "Switching to another preset should succeed.");
+    t.expect(returned, "Switching back to edited preset should succeed.");
+    t.expect(scene.spheres.size() == originalSphereCount + 1, "Saved preset should keep added sphere.");
+    t.expect(almostEqual(scene.spheres.back().radius, 0.75f), "Saved preset should keep edited sphere radius.");
+    t.expect(almostEqual(camera.yaw, 12.0f), "Saved preset should keep edited camera.");
+}
+
+void testScenePresetSaveInvalidIndexSafe(TestContext& t)
+{
+    std::vector<SceneBuildResult> presets;
+    presets.push_back(buildDefaultSceneInput());
+    SceneState scene = presets[0].scene;
+    CameraState camera = presets[0].camera;
+
+    const bool savedNegative = saveScenePresetByIndex(presets, -1, scene, camera);
+    const bool savedHigh = saveScenePresetByIndex(presets, 20, scene, camera);
+
+    t.expect(!savedNegative, "Saving a negative preset index should fail safely.");
+    t.expect(!savedHigh, "Saving an out-of-range preset index should fail safely.");
+    t.expect(presets.size() == 1, "Invalid preset save should not resize preset list.");
+}
+
 void testSceneConfigFallbackDemoScene(TestContext& t)
 {
     const SceneBuildResult scene = buildDefaultSceneInput();
@@ -1869,6 +1910,8 @@ int main(int argc, char** argv)
     runTest("All demo scene configs load", testAllDemoSceneConfigsLoad);
     runTest("Scene preset reset camera and light", testScenePresetResetCameraLight);
     runTest("Invalid scene preset index safe", testInvalidScenePresetIndexSafe);
+    runTest("Scene preset session edits persist", testScenePresetSessionEditsPersist);
+    runTest("Scene preset save invalid index safe", testScenePresetSaveInvalidIndexSafe);
     runTest("Scene config fallback demo scene", testSceneConfigFallbackDemoScene);
 
     ++testsRun;

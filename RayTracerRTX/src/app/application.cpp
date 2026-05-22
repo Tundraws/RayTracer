@@ -60,6 +60,7 @@ struct AppState
     unsigned int progressiveSamples = 0;
     bool imguiPanelVisible = true;
     std::vector<SceneBuildResult> scenePresets;
+    std::vector<SceneBuildResult> scenePresetDefaults;
     std::vector<std::wstring> scenePresetNames;
     int scenePresetIndex = 0;
 };
@@ -373,6 +374,59 @@ void syncSelectedMeshMaterialToCombined(SceneState& scene)
     scene.mesh.materials[combinedMaterialIndex] = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
 }
 
+bool hasPresetIndex(const AppState& appState, const int index)
+{
+    return index >= 0 && index < static_cast<int>(appState.scenePresets.size());
+}
+
+void saveCurrentScenePreset(AppState& appState)
+{
+    if (!hasPresetIndex(appState, appState.scenePresetIndex))
+    {
+        return;
+    }
+
+    saveScenePresetByIndex(appState.scenePresets, appState.scenePresetIndex, appState.scene, appState.camera);
+}
+
+bool applyScenePreset(AppState& appState, const int index)
+{
+    if (!hasPresetIndex(appState, index))
+    {
+        return false;
+    }
+
+    saveCurrentScenePreset(appState);
+    if (!applyScenePresetByIndex(appState.scenePresets, index, appState.scene, appState.camera))
+    {
+        return false;
+    }
+
+    appState.scenePresetIndex = index;
+    appState.progressiveSamples = 0;
+    return true;
+}
+
+bool resetCurrentPresetView(AppState& appState)
+{
+    if (appState.scenePresetIndex < 0 ||
+        appState.scenePresetIndex >= static_cast<int>(appState.scenePresetDefaults.size()))
+    {
+        return false;
+    }
+
+    const bool reset = resetSceneViewFromPreset(
+        appState.scenePresetDefaults[static_cast<size_t>(appState.scenePresetIndex)],
+        appState.scene,
+        appState.camera);
+    if (reset)
+    {
+        saveCurrentScenePreset(appState);
+        appState.progressiveSamples = 0;
+    }
+    return reset;
+}
+
 void drawImguiPanel(AppState& appState, const FrameStats& stats)
 {
     if (!appState.imguiPanelVisible)
@@ -421,13 +475,10 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
         for (int i = 0; i < static_cast<int>(presetNames.size()); ++i)
         {
             const bool selected = i == appState.scenePresetIndex;
-            if (ImGui::Selectable(presetNames[static_cast<size_t>(i)].c_str(), selected))
+            const std::string presetLabel = presetNames[static_cast<size_t>(i)] + "##preset_" + std::to_string(i);
+            if (ImGui::Selectable(presetLabel.c_str(), selected))
             {
-                if (applyScenePresetByIndex(appState.scenePresets, i, appState.scene, appState.camera))
-                {
-                    appState.scenePresetIndex = i;
-                    appState.progressiveSamples = 0;
-                }
+                applyScenePreset(appState, i);
             }
             if (selected)
             {
@@ -438,9 +489,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
     }
 
     if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B \u0438 \u0441\u0432\u0435\u0442\u0430")) &&
-        appState.scenePresetIndex >= 0 &&
-        appState.scenePresetIndex < static_cast<int>(appState.scenePresets.size()) &&
-        resetSceneViewFromPreset(appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)], scene, appState.camera))
+        resetCurrentPresetView(appState))
     {
         appState.progressiveSamples = 0;
     }
@@ -863,24 +912,16 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool gIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
     if (gIsDown && !gWasDown && !appState.scenePresets.empty())
     {
-        appState.scenePresetIndex = (appState.scenePresetIndex + 1) % static_cast<int>(appState.scenePresets.size());
-        if (applyScenePresetByIndex(appState.scenePresets, appState.scenePresetIndex, appState.scene, appState.camera))
-        {
-            appState.progressiveSamples = 0;
-        }
+        const int nextPresetIndex = (appState.scenePresetIndex + 1) % static_cast<int>(appState.scenePresets.size());
+        applyScenePreset(appState, nextPresetIndex);
     }
     gWasDown = gIsDown;
 
     static bool cWasDown = false;
     const bool cIsDown = glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS;
-    if (cIsDown && !cWasDown &&
-        appState.scenePresetIndex >= 0 &&
-        appState.scenePresetIndex < static_cast<int>(appState.scenePresets.size()))
+    if (cIsDown && !cWasDown)
     {
-        if (resetSceneViewFromPreset(appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)], scene, camera))
-        {
-            appState.progressiveSamples = 0;
-        }
+        resetCurrentPresetView(appState);
     }
     cWasDown = cIsDown;
 
@@ -1004,6 +1045,7 @@ void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring na
         return;
     }
     clampScene(preset.scene);
+    appState.scenePresetDefaults.push_back(preset);
     appState.scenePresets.push_back(std::move(preset));
     appState.scenePresetNames.push_back(std::move(name));
 }
@@ -1093,8 +1135,12 @@ void run_optix_app(const ApplicationOptions& options)
     AppState appState;
     appState.camera = initial.camera;
     appState.scene = initial.scene;
-    addScenePreset(appState, initial, options.sceneConfigPath.empty() && options.meshPath.empty() ? L"\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u0441\u0446\u0435\u043D\u0430" : L"\u0412\u0445\u043E\u0434\u043D\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
-    addScenePreset(appState, buildDefaultSceneInput(), L"\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
+    const bool hasExplicitInput = !options.sceneConfigPath.empty() || !options.meshPath.empty();
+    addScenePreset(appState, initial, hasExplicitInput ? L"\u0412\u0445\u043E\u0434\u043D\u0430\u044F \u0441\u0446\u0435\u043D\u0430" : L"\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
+    if (hasExplicitInput)
+    {
+        addScenePreset(appState, buildDefaultSceneInput(), L"\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
+    }
     addSceneConfigPreset(appState, "textured_cube_scene.json", L"\u0422\u0435\u043A\u0441\u0442\u0443\u0440\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0439 \u043A\u0443\u0431");
     addSceneConfigPreset(appState, "multi_mesh_scene.json", L"\u041D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432");
     addSceneConfigPreset(appState, "material_showcase_scene.json", L"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B");

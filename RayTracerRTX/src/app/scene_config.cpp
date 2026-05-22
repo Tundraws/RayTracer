@@ -1154,6 +1154,21 @@ bool applyScenePresetByIndex(const std::vector<SceneBuildResult>& presets, const
     return true;
 }
 
+bool saveScenePresetByIndex(std::vector<SceneBuildResult>& presets, const int index, const SceneState& scene, const CameraState& camera)
+{
+    if (index < 0 || index >= static_cast<int>(presets.size()))
+    {
+        return false;
+    }
+
+    SceneBuildResult& preset = presets[static_cast<size_t>(index)];
+    preset.ok = true;
+    preset.scene = scene;
+    preset.camera = camera;
+    clampScene(preset.scene);
+    return true;
+}
+
 bool resetSceneViewFromPreset(const SceneBuildResult& preset, SceneState& scene, CameraState& camera)
 {
     if (!preset.ok)
