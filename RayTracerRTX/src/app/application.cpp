@@ -68,6 +68,9 @@ struct AppState
     std::string lastUiMessage;
     bool lastUiMessageIsError = false;
     bool rendererSceneRebuildRequested = false;
+    bool imguiPanelPinnedRight = true;
+    float imguiPanelWidth = 360.0f;
+    float imguiPanelHeight = 680.0f;
 };
 
 struct FrameStats
@@ -566,28 +569,51 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     const float displayWidth = std::max(1.0f, displaySize.x);
     const float displayHeight = std::max(1.0f, displaySize.y);
     const float margin = 16.0f;
-    const float preferredPanelWidth = std::min(560.0f, std::max(420.0f, displayWidth * 0.36f));
-    const float panelWidth = std::min(preferredPanelWidth, std::max(300.0f, displayWidth - margin * 2.0f));
-    const float panelHeight = std::max(360.0f, displayHeight - margin * 2.0f);
-    const float panelX = std::max(margin, displayWidth - panelWidth - margin);
-    const float panelY = margin;
-    gImguiPanelX = panelX;
-    gImguiPanelY = panelY;
-    gImguiPanelWidth = panelWidth;
-    gImguiPanelHeight = panelHeight;
-    ImGui::SetNextWindowPos(ImVec2(panelX, panelY), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
+    const float minPanelWidth = std::min(320.0f, displayWidth - margin * 2.0f);
+    const float maxPanelWidth = std::min(520.0f, displayWidth - margin * 2.0f);
+    const float minPanelHeight = std::min(380.0f, displayHeight - margin * 2.0f);
+    const float maxPanelHeight = std::max(minPanelHeight, displayHeight - margin * 2.0f);
+    appState.imguiPanelWidth = clampf(appState.imguiPanelWidth, minPanelWidth, maxPanelWidth);
+    appState.imguiPanelHeight = clampf(appState.imguiPanelHeight, minPanelHeight, maxPanelHeight);
+
+    if (appState.imguiPanelPinnedRight)
+    {
+        const float panelX = std::max(margin, displayWidth - appState.imguiPanelWidth - margin);
+        ImGui::SetNextWindowPos(ImVec2(panelX, margin), ImGuiCond_Always);
+    }
+    else
+    {
+        ImGui::SetNextWindowPos(ImVec2(std::max(margin, displayWidth - appState.imguiPanelWidth - margin), margin), ImGuiCond_FirstUseEver);
+    }
+    ImGui::SetNextWindowSize(ImVec2(appState.imguiPanelWidth, appState.imguiPanelHeight), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(minPanelWidth, minPanelHeight), ImVec2(maxPanelWidth, maxPanelHeight));
+    ImGuiWindowFlags panelFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysVerticalScrollbar;
+    if (appState.imguiPanelPinnedRight)
+    {
+        panelFlags |= ImGuiWindowFlags_NoMove;
+    }
     ImGui::Begin(
         u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C \u0441\u0446\u0435\u043D\u044B"),
         &appState.imguiPanelVisible,
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_HorizontalScrollbar);
-    ImGui::PushItemWidth(-1.0f);
+        panelFlags);
+    const ImVec2 panelPos = ImGui::GetWindowPos();
+    const ImVec2 panelSize = ImGui::GetWindowSize();
+    appState.imguiPanelWidth = panelSize.x;
+    appState.imguiPanelHeight = panelSize.y;
+    gImguiPanelX = panelPos.x;
+    gImguiPanelY = panelPos.y;
+    gImguiPanelWidth = panelSize.x;
+    gImguiPanelHeight = panelSize.y;
+    ImGui::PushItemWidth(std::min(280.0f, std::max(180.0f, panelSize.x - 44.0f)));
 
     ImGui::Text("FPS %.1f | GPU %.2f ms", stats.fps, stats.avgGpuMs);
     ImGui::Text("%s: %s", u8c(u8"\u0420\u0435\u0436\u0438\u043C"), appState.renderMode == RenderModeProgressive ? u8c(u8"\u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435") : u8c(u8"\u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F"));
     ImGui::Text("%s: %s", u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E"), qualityNameUtf8(appState.renderQuality));
     ImGui::Text("%s: %s", u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), appState.denoiserEnabled ? u8c(u8"\u0432\u043A\u043B") : u8c(u8"\u0432\u044B\u043A\u043B"));
+    if (ImGui::Button(appState.imguiPanelPinnedRight ? u8c(u8"\u041E\u0442\u043A\u0440\u0435\u043F\u0438\u0442\u044C") : u8c(u8"\u041F\u0440\u0438\u0436\u0430\u0442\u044C \u0441\u043F\u0440\u0430\u0432\u0430")))
+    {
+        appState.imguiPanelPinnedRight = !appState.imguiPanelPinnedRight;
+    }
 
     ImGui::SeparatorText(u8c(u8"\u0414\u0435\u043C\u043E\u043D\u0441\u0442\u0440\u0430\u0446\u0438\u044F"));
     std::vector<std::string> presetNames;
