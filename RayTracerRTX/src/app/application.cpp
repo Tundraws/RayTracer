@@ -270,15 +270,15 @@ void drawHud(
              << L"   DENOISER: " << (denoiserEnabled ? (denoiserAvailable ? L"ON" : L"UNAVAILABLE") : L"OFF");
 
     const std::wstring line3 = lineMode.str();
-    const std::wstring line4 = L"PRESET: " + presetName;
+    const std::wstring line4 = L"\u0421\u0426\u0415\u041D\u0410: " + presetName;
     std::wostringstream lineTuning;
-    lineTuning << L"EXPOSURE: " << std::setprecision(2) << scene.exposure
-               << L"   SKY: " << scene.skyIntensity
-               << L"   LIGHT: " << scene.lightIntensity;
+    lineTuning << L"\u042D\u041A\u0421\u041F\u041E\u0417\u0418\u0426\u0418\u042F: " << std::setprecision(2) << scene.exposure
+               << L"   \u041D\u0415\u0411\u041E: " << scene.skyIntensity
+               << L"   \u0421\u0412\u0415\u0422: " << scene.lightIntensity;
     const std::wstring line5 = lineTuning.str();
-    const std::wstring line6 = L"SPHERE MOVE: ARROWS, R/F";
-    const std::wstring line7 = L"LIGHT: J/L-X, I/K-Z, U/O-Y";
-    const std::wstring line8 = L"PRESET: G   RESET: C   SPHERE MAT: M   MESH: B/V   MODE: P   QUALITY: Q   DENOISER: N";
+    const std::wstring line6 = L"\u0414\u0412\u0418\u0416\u0415\u041D\u0418\u0415 \u0421\u0424\u0415\u0420\u042B: \u0421\u0422\u0420\u0415\u041B\u041A\u0418, R/F";
+    const std::wstring line7 = L"\u0421\u0412\u0415\u0422: J/L-X, I/K-Z, U/O-Y";
+    const std::wstring line8 = L"\u0421\u0426\u0415\u041D\u0410: G   \u0421\u0411\u0420\u041E\u0421: C   \u041C\u0410\u0422\u0415\u0420\u0418\u0410\u041B: M   \u0421\u0415\u0422\u041A\u0410: B/V   \u0420\u0415\u0416\u0418\u041C: P   \u041A\u0410\u0427\u0415\u0421\u0422\u0412\u041E: Q   \u0428\u0423\u041C: N";
 
     const std::wstring text1 = line1.str();
     const std::wstring text2 = line2.str();
@@ -636,7 +636,7 @@ void run_optix_app(const ApplicationOptions& options)
 
     if (!glfwInit())
     {
-        throw std::runtime_error("Не удалось инициализировать GLFW.");
+        throw std::runtime_error("Failed to initialize GLFW.");
     }
 
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
@@ -652,7 +652,7 @@ void run_optix_app(const ApplicationOptions& options)
     if (window == nullptr)
     {
         glfwTerminate();
-        throw std::runtime_error("Не удалось создать окно GLFW.");
+        throw std::runtime_error("Failed to create GLFW window.");
     }
 
     glfwMakeContextCurrent(window);
@@ -664,13 +664,13 @@ void run_optix_app(const ApplicationOptions& options)
     AppState appState;
     appState.camera = initial.camera;
     appState.scene = initial.scene;
-    addScenePreset(appState, initial, options.sceneConfigPath.empty() && options.meshPath.empty() ? L"Базовая сцена" : L"Входная сцена");
-    addScenePreset(appState, buildDefaultSceneInput(), L"Базовая сцена");
-    addSceneConfigPreset(appState, "textured_cube_scene.json", L"Текстурированный куб");
-    addSceneConfigPreset(appState, "multi_mesh_scene.json", L"Несколько объектов");
-    addSceneConfigPreset(appState, "material_showcase_scene.json", L"Материалы");
-    addSceneConfigPreset(appState, "gltf_scene.json", L"glTF демо");
-    addSceneConfigPreset(appState, "path_tracing_demo_scene.json", L"Режим накопления");
+    addScenePreset(appState, initial, options.sceneConfigPath.empty() && options.meshPath.empty() ? L"\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u0441\u0446\u0435\u043D\u0430" : L"\u0412\u0445\u043E\u0434\u043D\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
+    addScenePreset(appState, buildDefaultSceneInput(), L"\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
+    addSceneConfigPreset(appState, "textured_cube_scene.json", L"\u0422\u0435\u043A\u0441\u0442\u0443\u0440\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0439 \u043A\u0443\u0431");
+    addSceneConfigPreset(appState, "multi_mesh_scene.json", L"\u041D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432");
+    addSceneConfigPreset(appState, "material_showcase_scene.json", L"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B");
+    addSceneConfigPreset(appState, "gltf_scene.json", L"glTF \u0434\u0435\u043C\u043E");
+    addSceneConfigPreset(appState, "path_tracing_demo_scene.json", L"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F");
     glfwSetWindowUserPointer(window, &appState);
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
@@ -758,7 +758,7 @@ void run_optix_app(const ApplicationOptions& options)
             appState.progressiveSamples,
             appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(appState.scenePresetNames.size())
                 ? appState.scenePresetNames[static_cast<size_t>(appState.scenePresetIndex)]
-                : std::wstring{L"Своя сцена"});
+                : std::wstring{L"\u0421\u0432\u043E\u044F \u0441\u0446\u0435\u043D\u0430"});
         glfwPollEvents();
     }
 

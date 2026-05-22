@@ -107,9 +107,9 @@ SceneState makeDefaultScene()
     defaultMeshObject.mesh = scene.mesh;
     scene.meshObjects = {std::move(defaultMeshObject)};
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
-    scene.exposure = 0.72f;
-    scene.skyIntensity = 0.68f;
-    scene.lightIntensity = 0.82f;
+    scene.exposure = 0.82f;
+    scene.skyIntensity = 0.78f;
+    scene.lightIntensity = 0.95f;
     scene.selectedSphere = 0;
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
