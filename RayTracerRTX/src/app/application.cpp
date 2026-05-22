@@ -42,6 +42,10 @@ namespace
 {
 int gWidth = 800;
 int gHeight = 600;
+float gImguiPanelX = 0.0f;
+float gImguiPanelY = 0.0f;
+float gImguiPanelWidth = 0.0f;
+float gImguiPanelHeight = 0.0f;
 
 struct AppState
 {
@@ -377,10 +381,19 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
     }
 
     SceneState& scene = appState.scene;
-    const float panelWidth = std::min(380.0f, static_cast<float>(gWidth) - 36.0f);
-    const float panelHeight = std::min(650.0f, static_cast<float>(gHeight) - 36.0f);
-    const float panelX = std::max(18.0f, static_cast<float>(gWidth) - panelWidth - 18.0f);
-    ImGui::SetNextWindowPos(ImVec2(panelX, 18.0f), ImGuiCond_Always);
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const float displayWidth = std::max(1.0f, displaySize.x);
+    const float displayHeight = std::max(1.0f, displaySize.y);
+    const float margin = 32.0f;
+    const float panelWidth = std::min(340.0f, std::max(240.0f, displayWidth - margin * 2.0f));
+    const float panelHeight = std::min(760.0f, std::max(360.0f, displayHeight - margin * 2.0f));
+    const float panelX = std::max(margin, displayWidth - panelWidth - margin);
+    const float panelY = margin;
+    gImguiPanelX = panelX;
+    gImguiPanelY = panelY;
+    gImguiPanelWidth = panelWidth;
+    gImguiPanelHeight = panelHeight;
+    ImGui::SetNextWindowPos(ImVec2(panelX, panelY), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(panelWidth, panelHeight), ImGuiCond_Always);
     ImGui::Begin(
         u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C \u0441\u0446\u0435\u043D\u044B"),
@@ -550,7 +563,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
     }
 
     ImGui::Separator();
-    ImGui::TextWrapped("%s", u8c(u8"\u041F\u041A\u041C: \u043A\u0443\u0440\u0441\u043E\u0440/\u043A\u0430\u043C\u0435\u0440\u0430. H: \u0441\u043A\u0440\u044B\u0442\u044C \u0438\u043B\u0438 \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C."));
+    ImGui::TextWrapped("%s", u8c(u8"\u041B\u041A\u041C: \u043A\u0443\u0440\u0441\u043E\u0440/\u043A\u0430\u043C\u0435\u0440\u0430. H: \u0441\u043A\u0440\u044B\u0442\u044C \u0438\u043B\u0438 \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C."));
     ImGui::PopItemWidth();
     ImGui::End();
 }
@@ -602,12 +615,28 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int)
         return;
     }
 
-    if (button != GLFW_MOUSE_BUTTON_RIGHT)
+    if (button != GLFW_MOUSE_BUTTON_LEFT)
     {
         return;
     }
 
-    state->cursorCaptured = !state->cursorCaptured;
+    if (!state->cursorCaptured && state->imguiPanelVisible)
+    {
+        double x = 0.0;
+        double y = 0.0;
+        glfwGetCursorPos(window, &x, &y);
+        const bool insidePanel =
+            static_cast<float>(x) >= gImguiPanelX &&
+            static_cast<float>(x) <= gImguiPanelX + gImguiPanelWidth &&
+            static_cast<float>(y) >= gImguiPanelY &&
+            static_cast<float>(y) <= gImguiPanelY + gImguiPanelHeight;
+        if (insidePanel)
+        {
+            return;
+        }
+    }
+
+    state->cursorCaptured = state->cursorCaptured ? false : true;
     glfwSetInputMode(window, GLFW_CURSOR, state->cursorCaptured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
     state->input.firstMouse = true;
 }
@@ -967,8 +996,8 @@ void run_optix_app(const ApplicationOptions& options)
 
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = monitor != nullptr ? glfwGetVideoMode(monitor) : nullptr;
-    const int windowWidth = 1280;
-    const int windowHeight = 720;
+    const int windowWidth = mode != nullptr ? std::min(1600, std::max(1280, mode->width - 120)) : 1440;
+    const int windowHeight = mode != nullptr ? std::min(900, std::max(720, mode->height - 140)) : 810;
     const int windowX = mode != nullptr ? std::max(0, (mode->width - windowWidth) / 2) : 100;
     const int windowY = mode != nullptr ? std::max(0, (mode->height - windowHeight) / 2) : 100;
 
