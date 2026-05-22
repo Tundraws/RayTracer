@@ -90,6 +90,7 @@
     <ClCompile Include="..\src\app\camera.cpp" />
     <ClCompile Include="..\src\app\gltf_loader.cpp" />
     <ClCompile Include="..\src\app\image_loader.cpp" />
+    <ClCompile Include="..\src\app\logger.cpp" />
     <ClCompile Include="..\src\app\material.cpp" />
     <ClCompile Include="..\src\app\mesh.cpp" />
     <ClCompile Include="..\src\app\obj_loader.cpp" />

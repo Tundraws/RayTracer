@@ -1,6 +1,7 @@
 #include "gltf_loader.h"
 
 #include "image_loader.h"
+#include "logger.h"
 
 #include <algorithm>
 #include <array>
@@ -754,6 +755,7 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
         const JsonObject* root = asObject(rootValue);
         if (root == nullptr)
         {
+            logError("glTF root must be a JSON object: " + path.string());
             return GltfLoadResult{false, {}, "glTF root must be a JSON object"};
         }
 
@@ -956,6 +958,7 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
         const JsonArray* meshes = meshesField != nullptr ? asArray(*meshesField) : nullptr;
         if (meshes == nullptr || meshes->empty())
         {
+            logError("glTF file contains no meshes: " + path.string());
             return GltfLoadResult{false, {}, "glTF file contains no meshes"};
         }
 
@@ -1109,12 +1112,15 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
 
         if (isEmptyMesh(mesh) || !hasValidMeshMaterialIndices(mesh))
         {
+            logError("glTF import produced an invalid mesh: " + path.string());
             return GltfLoadResult{false, {}, "glTF import produced an invalid mesh"};
         }
         return GltfLoadResult{true, std::move(mesh), {}};
     }
     catch (const std::exception& ex)
     {
-        return GltfLoadResult{false, {}, "Invalid glTF file: " + std::string(ex.what())};
+        const std::string error = "Invalid glTF file: " + std::string(ex.what());
+        logError(error);
+        return GltfLoadResult{false, {}, error};
     }
 }

@@ -1,7 +1,10 @@
 #include "image_loader.h"
 
+#include "logger.h"
+
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -37,11 +40,20 @@ std::string lowerExtension(const std::filesystem::path& path)
     return extension;
 }
 
+bool parseIntToken(const std::string& token, int& value)
+{
+    const char* begin = token.data();
+    const char* end = begin + token.size();
+    const auto result = std::from_chars(begin, end, value);
+    return result.ec == std::errc{} && result.ptr == end;
+}
+
 bool loadPpmTexture(const std::filesystem::path& path, MeshTexture& texture, const std::string& type)
 {
     std::ifstream file(path, std::ios::binary);
     if (!file)
     {
+        logWarning("Texture file could not be opened, using material fallback: " + path.string());
         return false;
     }
 
@@ -52,14 +64,21 @@ bool loadPpmTexture(const std::filesystem::path& path, MeshTexture& texture, con
     if (!readPpmToken(file, token) || token != "P3" ||
         !readPpmToken(file, widthToken) || !readPpmToken(file, heightToken) || !readPpmToken(file, maxToken))
     {
+        logWarning("Invalid PPM texture header, using material fallback: " + path.string());
         return false;
     }
 
-    const int width = std::stoi(widthToken);
-    const int height = std::stoi(heightToken);
-    const int maxValue = std::stoi(maxToken);
+    int width = 0;
+    int height = 0;
+    int maxValue = 0;
+    if (!parseIntToken(widthToken, width) || !parseIntToken(heightToken, height) || !parseIntToken(maxToken, maxValue))
+    {
+        logWarning("Invalid PPM texture dimensions, using material fallback: " + path.string());
+        return false;
+    }
     if (width <= 0 || height <= 0 || maxValue <= 0)
     {
+        logWarning("Invalid PPM texture size, using material fallback: " + path.string());
         return false;
     }
 
@@ -72,6 +91,7 @@ bool loadPpmTexture(const std::filesystem::path& path, MeshTexture& texture, con
         std::string bToken;
         if (!readPpmToken(file, rToken) || !readPpmToken(file, gToken) || !readPpmToken(file, bToken))
         {
+            logWarning("PPM texture has incomplete pixel data, using material fallback: " + path.string());
             return false;
         }
 
@@ -80,10 +100,18 @@ bool loadPpmTexture(const std::filesystem::path& path, MeshTexture& texture, con
             const int clamped = value < 0 ? 0 : (value > maxValue ? maxValue : value);
             return static_cast<unsigned char>((clamped * 255) / maxValue);
         };
+        int r = 0;
+        int g = 0;
+        int b = 0;
+        if (!parseIntToken(rToken, r) || !parseIntToken(gToken, g) || !parseIntToken(bToken, b))
+        {
+            logWarning("PPM texture has invalid pixel data, using material fallback: " + path.string());
+            return false;
+        }
         pixels.push_back(make_uchar4(
-            toByte(std::stoi(rToken)),
-            toByte(std::stoi(gToken)),
-            toByte(std::stoi(bToken)),
+            toByte(r),
+            toByte(g),
+            toByte(b),
             255));
     }
 
@@ -114,6 +142,7 @@ bool loadImageTexture(const std::filesystem::path& path, MeshTexture& texture, c
         {
             stbi_image_free(pixels);
         }
+        logWarning("Image texture could not be loaded, using material fallback: " + path.string());
         return false;
     }
 

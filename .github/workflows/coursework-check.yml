@@ -57,6 +57,7 @@ jobs:
             RayTracerRTX/src/app/camera.cpp \
             RayTracerRTX/src/app/gltf_loader.cpp \
             RayTracerRTX/src/app/image_loader.cpp \
+            RayTracerRTX/src/app/logger.cpp \
             RayTracerRTX/src/app/material.cpp \
             RayTracerRTX/src/app/mesh.cpp \
             RayTracerRTX/src/app/obj_loader.cpp \

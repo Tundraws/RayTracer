@@ -39,6 +39,8 @@ RUN test -f README.md \
     && test -f RayTracerRTX/src/app/gltf_loader.h \
     && test -f RayTracerRTX/src/app/image_loader.cpp \
     && test -f RayTracerRTX/src/app/image_loader.h \
+    && test -f RayTracerRTX/src/app/logger.cpp \
+    && test -f RayTracerRTX/src/app/logger.h \
     && test -f RayTracerRTX/src/app/obj_loader.cpp \
     && test -f RayTracerRTX/src/app/obj_loader.h \
     && test -f RayTracerRTX/src/app/scene_config.cpp \
@@ -67,6 +69,7 @@ RUN g++ -std=c++20 -Wall -Wextra -pedantic \
     RayTracerRTX/src/app/camera.cpp \
     RayTracerRTX/src/app/gltf_loader.cpp \
     RayTracerRTX/src/app/image_loader.cpp \
+    RayTracerRTX/src/app/logger.cpp \
     RayTracerRTX/src/app/material.cpp \
     RayTracerRTX/src/app/mesh.cpp \
     RayTracerRTX/src/app/obj_loader.cpp \

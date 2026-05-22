@@ -1,6 +1,7 @@
 #include "scene_config.h"
 
 #include "asset_cache.h"
+#include "logger.h"
 #include "obj_loader.h"
 
 #include <algorithm>
@@ -817,7 +818,9 @@ void appendMaterialWarnings(const SceneConfig& config, SceneBuildResult& result)
     {
         if (material.usedFallbackType)
         {
-            result.warnings.push_back("Material '" + material.name + "' uses an unknown type; matte fallback was applied.");
+            const std::string warning = "Material '" + material.name + "' uses an unknown type; matte fallback was applied.";
+            result.warnings.push_back(warning);
+            logWarning(warning);
         }
     }
 }
@@ -834,7 +837,9 @@ void applySphereMaterialConfig(
         const auto found = materialMap.find(name);
         if (found == materialMap.end())
         {
-            result.warnings.push_back("Sphere material '" + name + "' was not found; default sphere material was kept.");
+            const std::string warning = "Sphere material '" + name + "' was not found; default sphere material was kept.";
+            result.warnings.push_back(warning);
+            logWarning(warning);
             continue;
         }
         result.scene.materials[i] = toSphereMaterial(found->second);
@@ -855,7 +860,9 @@ void applyMeshMaterialOverride(
     const auto found = materialMap.find(object.materialOverride);
     if (found == materialMap.end())
     {
-        result.warnings.push_back("Mesh material override '" + object.materialOverride + "' was not found; source mesh materials were kept.");
+        const std::string warning = "Mesh material override '" + object.materialOverride + "' was not found; source mesh materials were kept.";
+        result.warnings.push_back(warning);
+        logWarning(warning);
         return;
     }
 
@@ -1138,6 +1145,7 @@ SceneConfigResult loadSceneConfigFile(const std::filesystem::path& path)
     std::ifstream file(path, std::ios::binary);
     if (!file)
     {
+        logError("Scene config could not be opened: " + path.string());
         return SceneConfigResult{false, {}, "Scene config could not be opened: " + path.string()};
     }
 
@@ -1151,6 +1159,7 @@ SceneConfigResult loadSceneConfigFile(const std::filesystem::path& path)
     }
     catch (const std::exception& ex)
     {
+        logError("Invalid scene config: " + std::string(ex.what()));
         return SceneConfigResult{false, {}, "Invalid scene config: " + std::string(ex.what())};
     }
 }
@@ -1211,7 +1220,9 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
             : baseDirectory / config.environmentPath;
         if (!loadPpmEnvironmentMap(environmentPath, result.scene.environmentMap))
         {
-            result.warnings.push_back("Environment map could not be loaded, using gradient sky: " + environmentPath.string());
+            const std::string warning = "Environment map could not be loaded, using gradient sky: " + environmentPath.string();
+            result.warnings.push_back(warning);
+            logWarning(warning);
         }
         else
         {
@@ -1228,7 +1239,9 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
 
     if (config.meshObjects.empty())
     {
-        result.warnings.push_back("Scene config has no mesh objects; using default demo mesh.");
+        const std::string warning = "Scene config has no mesh objects; using default demo mesh.";
+        result.warnings.push_back(warning);
+        logWarning(warning);
         return result;
     }
 
@@ -1242,6 +1255,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
         {
             result.ok = false;
             result.error = loaded.error;
+            logError(result.error);
             return result;
         }
         MeshData objectMesh = loaded.mesh;
@@ -1266,6 +1280,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     {
         result.ok = false;
         result.error = "Scene config produced an invalid mesh.";
+        logError(result.error);
     }
 
     return result;

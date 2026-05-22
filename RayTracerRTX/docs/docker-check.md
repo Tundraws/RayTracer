@@ -16,6 +16,7 @@ The Docker setup provides a reproducible coursework verification environment for
 - demo glTF `.gltf/.bin` asset checks;
 - demo JSON scene config checks;
 - OBJ and glTF loader source-file checks;
+- lightweight logger source-file checks;
 - CPU-only unit tests for scene, camera, material, extended MTL, OBJ loader, and glTF loader logic.
 
 The RTX GUI application itself is not launched in Docker because it depends on a
@@ -48,6 +49,7 @@ driver integration. GPU execution is verified separately by the native
 - `RayTracerRTX/assets/scenes/gltf_scene.json`
 - `RayTracerRTX/src/app/obj_loader.*`
 - `RayTracerRTX/src/app/gltf_loader.*`
+- `RayTracerRTX/src/app/logger.*`
 - `RayTracerRTX/src/app/scene_config.*`
 - `RayTracerRTX/src/app/mesh.*`
 - `RayTracerRTX/tests/stubs/cuda_runtime.h`
@@ -96,10 +98,10 @@ raytracerrtx-coursework-check:latest
 ```
 
 `docker compose run --rm coursework-check` should complete with all CPU tests
-passing:
+passing, including negative loader/config tests and log-file checks:
 
 ```text
-All tests passed. Tests: 81, skipped: 4
+All tests passed. Tests: 106, skipped: 4
 ```
 
 The skipped tests are the GPU smoke tests. This is expected in Docker because

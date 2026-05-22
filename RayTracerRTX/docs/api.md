@@ -24,6 +24,8 @@ RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
 JSON scene config with `meshObjects`, `camera`, `light`, image tuning fields,
 and mesh transform fields.
 Invalid input prints a diagnostic message and falls back to the default scene.
+Warnings and errors are also appended to `RayTracerRTX.log` in the current
+working directory through the lightweight logger in `src/app/logger.*`.
 The interactive app starts in `RenderModeRealtime`; pressing `P` toggles
 progressive path tracing accumulation and resets samples when the camera, light,
 scene, material, or mesh signature changes. Pressing `N` requests the optional
@@ -204,6 +206,23 @@ If a texture map points to a missing or unsupported file, the loader keeps the
 path for diagnostics and falls back to the numeric material values. Basic normal
 mapping requires OBJ `vt` coordinates and a valid computed tangent basis; it
 perturbs shading normals only and does not perform displacement mapping.
+
+## Diagnostics And Fallbacks
+
+Asset loading uses graceful fallbacks where that is safe:
+
+- missing MTL files keep generated materials and log a warning;
+- invalid MTL numeric values keep previous material defaults and log a warning;
+- missing, invalid, or unsupported texture files fall back to material values;
+- missing normal maps fall back to interpolated surface normals;
+- missing or invalid environment maps fall back to the gradient sky;
+- invalid OBJ faces, missing OBJ/glTF files, missing glTF buffers, invalid JSON,
+  and invalid scene transforms fail cleanly with an error string instead of an
+  application crash.
+
+The interactive application writes the same diagnostics to the console and to
+`RayTracerRTX.log`. Unit tests cover the negative paths at loader/state level;
+GPU smoke tests still verify that valid scenes render a non-zero framebuffer.
 
 ## glTF Mesh API
 

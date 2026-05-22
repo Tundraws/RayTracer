@@ -3,6 +3,7 @@
 #include "../gpu/optix_renderer.h"
 #include "asset_cache.h"
 #include "camera.h"
+#include "logger.h"
 #include "material.h"
 #include "scene.h"
 #include "scene_config.h"
@@ -1473,6 +1474,9 @@ void addSceneConfigPreset(AppState& appState, const std::string& fileName, const
 
 void run_optix_app(const ApplicationOptions& options)
 {
+    clearLogFile();
+    logInfo("RayTracerRTX started. Log file: " + getLogFilePath().string());
+
     AppState appState;
     SceneBuildResult initial = buildDefaultSceneInput();
     if (!options.sceneConfigPath.empty())
@@ -1484,7 +1488,7 @@ void run_optix_app(const ApplicationOptions& options)
         }
         else
         {
-            std::cerr << config.error << "\nUsing default scene.\n";
+            logError(config.error + " Using default scene.");
         }
     }
     else if (!options.meshPath.empty())
@@ -1496,20 +1500,15 @@ void run_optix_app(const ApplicationOptions& options)
         }
         else
         {
-            std::cerr << meshScene.error << "\nUsing default scene.\n";
+            logError(meshScene.error + " Using default scene.");
         }
     }
 
     if (!initial.ok)
     {
-        std::cerr << initial.error << "\nUsing default scene.\n";
+        logError(initial.error + " Using default scene.");
         initial = buildDefaultSceneInput();
     }
-    for (const std::string& warning : initial.warnings)
-    {
-        std::cerr << warning << '\n';
-    }
-
     if (!glfwInit())
     {
         throw std::runtime_error("Failed to initialize GLFW.");

@@ -2,6 +2,7 @@
 #include "../src/app/asset_cache.h"
 #include "../src/app/gltf_loader.h"
 #include "../src/app/image_loader.h"
+#include "../src/app/logger.h"
 #include "../src/app/material.h"
 #include "../src/app/obj_loader.h"
 #include "../src/app/scene.h"
@@ -60,6 +61,14 @@ std::filesystem::path writeFixtureBinaryFile(const std::string& name, const std:
     return path;
 }
 
+std::string readTextFile(const std::filesystem::path& path)
+{
+    std::ifstream file(path, std::ios::binary);
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
 std::vector<unsigned char> tinyPngBytes()
 {
     return {
@@ -73,6 +82,20 @@ std::vector<unsigned char> tinyPngBytes()
         0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
         0xae, 0x42, 0x60, 0x82
     };
+}
+
+void testLoggerWritesWarnings(TestContext& t)
+{
+    const std::filesystem::path logPath = writeFixtureFile("raytracerrtx_unit_test.log", "");
+    setLogFilePath(logPath);
+    clearLogFile();
+
+    logWarning("test warning message");
+
+    const std::string log = readTextFile(logPath);
+    t.expect(log.find("[warning]") != std::string::npos, "Logger should include warning level.");
+    t.expect(log.find("test warning message") != std::string::npos, "Logger should write message text.");
+    setLogFilePath("RayTracerRTX.log");
 }
 
 std::filesystem::path findDemoObjAsset()
@@ -569,6 +592,27 @@ void testImageLoaderPngTexture(TestContext& t)
     t.expect(texture.pixels.size() == 1, "PNG texture should decode one pixel.");
 }
 
+void testImageLoaderInvalidPpmFallback(TestContext& t)
+{
+    const std::filesystem::path logPath = writeFixtureFile("invalid_ppm_loader.log", "");
+    setLogFilePath(logPath);
+    clearLogFile();
+    const std::filesystem::path texturePath = writeFixtureFile(
+        "invalid_texture.ppm",
+        "P3\n"
+        "bad 1\n"
+        "255\n"
+        "255 0 0\n");
+
+    MeshTexture texture;
+    const bool loaded = loadImageTexture(texturePath, texture, "baseColor");
+
+    t.expect(!loaded, "Invalid PPM should fail cleanly.");
+    t.expect(texture.pixels.empty(), "Invalid PPM should not leave partial pixels.");
+    t.expect(readTextFile(logPath).find("Invalid PPM texture dimensions") != std::string::npos, "Invalid PPM should be written to the log.");
+    setLogFilePath("RayTracerRTX.log");
+}
+
 void testObjLoaderCommonTextureMaps(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -828,6 +872,40 @@ void testObjLoaderMaterialFallbackWhenMtlMissing(TestContext& t)
     t.expect(result.mesh.materials.size() == 2, "Fallback named material should be created.");
     t.expect(result.mesh.materials[1].name == "fallback_name", "Fallback material should keep usemtl name.");
     t.expect(hasValidMeshMaterialIndices(result.mesh), "Fallback material index should be valid.");
+}
+
+void testObjLoaderInvalidMtlValuesFallback(TestContext& t)
+{
+    const std::filesystem::path logPath = writeFixtureFile("invalid_mtl_values.log", "");
+    setLogFilePath(logPath);
+    clearLogFile();
+
+    const std::filesystem::path objPath = writeFixtureFile(
+        "invalid_mtl_values.obj",
+        "mtllib invalid_mtl_values.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "usemtl bad_values\n"
+        "f 1 2 3\n");
+    writeFixtureFile(
+        "invalid_mtl_values.mtl",
+        "newmtl bad_values\n"
+        "Kd red green blue\n"
+        "Ks shine shine shine\n"
+        "Ns glossy\n"
+        "Ni water\n"
+        "d clear\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+
+    t.expect(result.ok, "Invalid MTL values should keep OBJ loading.");
+    t.expect(result.mesh.materials.size() == 2, "Invalid MTL should still create the named material.");
+    t.expect(almostEqual(result.mesh.materials[1].color.x, 0.8f), "Invalid Kd should keep fallback color.");
+    t.expect(almostEqual(result.mesh.materials[1].roughness, 0.35f), "Invalid Ns should keep fallback roughness.");
+    t.expect(readTextFile(logPath).find("Invalid MTL Kd value") != std::string::npos, "Invalid MTL values should be logged.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Invalid MTL fallback should keep material indices valid.");
+    setLogFilePath("RayTracerRTX.log");
 }
 
 void testObjLoaderSingleTriangleBoundary(TestContext& t)
@@ -1389,6 +1467,46 @@ void testSceneConfigInvalidMaterialTypeFallback(TestContext& t)
     const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
     t.expect(scene.ok, "Unknown material type fallback should build.");
     t.expect(!scene.warnings.empty(), "Unknown material type should produce a build warning.");
+}
+
+void testSceneConfigInvalidJsonFailsCleanly(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "invalid_json_scene.json",
+        "{ \"camera\": { \"position\": [0, 1, 2], }\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+
+    t.expect(!config.ok, "Invalid JSON should fail cleanly.");
+    t.expect(config.error.find("Invalid scene config") != std::string::npos, "Invalid JSON should explain scene config parsing.");
+}
+
+void testSceneConfigInvalidMaterialConfigFailsCleanly(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "invalid_material_config.json",
+        "{\n"
+        "  \"materials\": [{\"name\": \"bad\", \"type\": \"matte\", \"baseColor\": \"red\"}]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+
+    t.expect(!config.ok, "Invalid material config should fail cleanly.");
+    t.expect(config.error.find("baseColor") != std::string::npos, "Invalid material config should name the invalid field.");
+}
+
+void testSceneConfigInvalidTransformFailsCleanly(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "invalid_transform_config.json",
+        "{\n"
+        "  \"meshObjects\": [{\"path\": \"missing.obj\", \"position\": [1, 2]}]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+
+    t.expect(!config.ok, "Invalid scene transform should fail cleanly.");
+    t.expect(config.error.find("position") != std::string::npos, "Invalid transform error should name the invalid field.");
 }
 
 void testSceneConfigMaterialParameterClamps(TestContext& t)
@@ -2438,6 +2556,7 @@ int main(int argc, char** argv)
         }
     };
 
+    runTest("Logger writes warnings", testLoggerWritesWarnings);
     runTest("Default scene", testDefaultScene);
     runTest("Toggle material", testToggleMaterial);
     runTest("Sphere material preset cycle", testSphereMaterialPresetCycle);
@@ -2485,6 +2604,7 @@ int main(int argc, char** argv)
     runTest("OBJ loader computes tangents for textured triangle", testObjLoaderComputesTangentsForTexturedTriangle);
     runTest("OBJ loader map_Kd texture", testObjLoaderMapKdTexture);
     runTest("Image loader PNG texture", testImageLoaderPngTexture);
+    runTest("Image loader invalid PPM fallback", testImageLoaderInvalidPpmFallback);
     runTest("OBJ loader common texture maps", testObjLoaderCommonTextureMaps);
     runTest("OBJ loader normal map texture", testObjLoaderNormalMapTexture);
     runTest("OBJ loader missing texture fallback", testObjLoaderMissingTextureFallback);
@@ -2497,6 +2617,7 @@ int main(int argc, char** argv)
     runTest("OBJ loader missing file", testObjLoaderMissingFile);
     runTest("OBJ loader unknown lines ignored", testObjLoaderUnknownLinesIgnored);
     runTest("OBJ loader material fallback when MTL missing", testObjLoaderMaterialFallbackWhenMtlMissing);
+    runTest("OBJ loader invalid MTL values fallback", testObjLoaderInvalidMtlValuesFallback);
     runTest("OBJ loader single triangle boundary", testObjLoaderSingleTriangleBoundary);
     runTest("glTF loader minimal mesh", testGltfLoaderMinimalMesh);
     runTest("glTF loader missing file", testGltfLoaderMissingFile);
@@ -2522,6 +2643,9 @@ int main(int argc, char** argv)
     runTest("Scene config material assigned to sphere", testSceneConfigMaterialAssignedToSphere);
     runTest("Scene config material assigned to mesh", testSceneConfigMaterialAssignedToMesh);
     runTest("Scene config invalid material type fallback", testSceneConfigInvalidMaterialTypeFallback);
+    runTest("Scene config invalid JSON fails cleanly", testSceneConfigInvalidJsonFailsCleanly);
+    runTest("Scene config invalid material config fails cleanly", testSceneConfigInvalidMaterialConfigFailsCleanly);
+    runTest("Scene config invalid transform fails cleanly", testSceneConfigInvalidTransformFailsCleanly);
     runTest("Scene config material parameter clamps", testSceneConfigMaterialParameterClamps);
     runTest("Scene config old scene still loads", testSceneConfigOldSceneStillLoads);
     runTest("All demo scene configs load", testAllDemoSceneConfigsLoad);

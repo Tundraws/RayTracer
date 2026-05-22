@@ -1,6 +1,7 @@
 #include "obj_loader.h"
 
 #include "image_loader.h"
+#include "logger.h"
 
 #include <algorithm>
 #include <charconv>
@@ -254,6 +255,7 @@ void loadMtl(
     std::ifstream file(path);
     if (!file)
     {
+        logWarning("MTL file could not be opened; generated fallback materials will be used: " + path.string());
         return;
     }
 
@@ -289,6 +291,10 @@ void loadMtl(
             {
                 mesh.materials[static_cast<size_t>(currentMaterial)].color = make_float3(r, g, b);
             }
+            else
+            {
+                logWarning("Invalid MTL Kd value; keeping material fallback: " + path.string());
+            }
         }
         else if (command == "Ks" && currentMaterial >= 0)
         {
@@ -299,6 +305,10 @@ void loadMtl(
             {
                 mesh.materials[static_cast<size_t>(currentMaterial)].specularColor = make_float3(r, g, b);
             }
+            else
+            {
+                logWarning("Invalid MTL Ks value; keeping material fallback: " + path.string());
+            }
         }
         else if (command == "Ns" && currentMaterial >= 0)
         {
@@ -306,6 +316,10 @@ void loadMtl(
             if (input >> ns)
             {
                 mesh.materials[static_cast<size_t>(currentMaterial)].roughness = roughnessFromNs(ns);
+            }
+            else
+            {
+                logWarning("Invalid MTL Ns value; keeping material fallback: " + path.string());
             }
         }
         else if (command == "Ni" && currentMaterial >= 0)
@@ -315,6 +329,10 @@ void loadMtl(
             {
                 mesh.materials[static_cast<size_t>(currentMaterial)].ior = clampf(ior, 1.0f, 2.8f);
             }
+            else
+            {
+                logWarning("Invalid MTL Ni value; keeping material fallback: " + path.string());
+            }
         }
         else if (command == "d" && currentMaterial >= 0)
         {
@@ -322,6 +340,10 @@ void loadMtl(
             if (input >> alpha)
             {
                 mesh.materials[static_cast<size_t>(currentMaterial)].alpha = clampf(alpha, 0.0f, 1.0f);
+            }
+            else
+            {
+                logWarning("Invalid MTL d value; keeping material fallback: " + path.string());
             }
         }
         else if (command == "map_Kd" && currentMaterial >= 0)
@@ -338,6 +360,10 @@ void loadMtl(
                 {
                     material.textureIndex = static_cast<int>(mesh.textures.size());
                     mesh.textures.push_back(std::move(texture));
+                }
+                else
+                {
+                    logWarning("MTL map_Kd texture could not be loaded; using Kd color: " + textureName);
                 }
             }
         }
@@ -356,6 +382,10 @@ void loadMtl(
                     material.normalTextureIndex = static_cast<int>(mesh.textures.size());
                     mesh.textures.push_back(std::move(texture));
                 }
+                else
+                {
+                    logWarning("MTL normal map could not be loaded; using interpolated normals: " + textureName);
+                }
             }
         }
         else if ((command == "map_Pr" || command == "map_roughness" || command == "roughness") && currentMaterial >= 0)
@@ -372,6 +402,10 @@ void loadMtl(
                 {
                     material.roughnessTextureIndex = static_cast<int>(mesh.textures.size());
                     mesh.textures.push_back(std::move(texture));
+                }
+                else
+                {
+                    logWarning("MTL roughness map could not be loaded; using material roughness: " + textureName);
                 }
             }
         }
@@ -390,6 +424,10 @@ void loadMtl(
                     material.metallicTextureIndex = static_cast<int>(mesh.textures.size());
                     mesh.textures.push_back(std::move(texture));
                 }
+                else
+                {
+                    logWarning("MTL metallic map could not be loaded; using material metallic value: " + textureName);
+                }
             }
         }
     }
@@ -400,6 +438,7 @@ ObjLoadResult fail(std::string error)
     ObjLoadResult result;
     result.ok = false;
     result.error = std::move(error);
+    logError(result.error);
     return result;
 }
 } // namespace

@@ -41,6 +41,14 @@
   - glTF material factors
   - default scene mesh presence
   - mesh material index validation
+- Negative tests and diagnostics:
+  - missing OBJ and missing glTF files fail with readable errors
+  - invalid OBJ faces fail without crashing
+  - missing MTL and invalid MTL values fall back safely
+  - missing, invalid, and unsupported textures fall back to material values
+  - missing glTF buffers fail cleanly
+  - invalid JSON, invalid material config, and invalid scene transforms fail cleanly
+  - loader warnings are written to console and `RayTracerRTX.log`
 - GPU smoke test:
   - renderer initialization
   - one-frame render
