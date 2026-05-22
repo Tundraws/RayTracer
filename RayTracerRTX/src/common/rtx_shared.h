@@ -110,9 +110,27 @@ inline float3 gammaCorrect(const float3 color, const float gamma = 2.2f)
         std::pow(clamp01(color.z), invGamma));
 }
 
-inline float3 toneMapAndGammaCorrect(const float3 color)
+inline float clampSceneExposure(const float value)
 {
-    return gammaCorrect(reinhardToneMap(color));
+    return value < 0.1f ? 0.1f : (value > 2.5f ? 2.5f : value);
+}
+
+inline float clampSceneLightIntensity(const float value)
+{
+    return value < 0.0f ? 0.0f : (value > 5.0f ? 5.0f : value);
+}
+
+inline float clampSceneSkyIntensity(const float value)
+{
+    return value < 0.0f ? 0.0f : (value > 3.0f ? 3.0f : value);
+}
+
+inline float3 toneMapAndGammaCorrect(const float3 color, const float exposure = 1.0f)
+{
+    return gammaCorrect(reinhardToneMap(make_float3(
+        color.x * clampSceneExposure(exposure),
+        color.y * clampSceneExposure(exposure),
+        color.z * clampSceneExposure(exposure))));
 }
 
 inline float ggxClampDot(const float value)
@@ -223,6 +241,9 @@ struct LaunchParams
     float cameraScale;
     float cameraAspect;
     float3 lightPosition;
+    float exposure;
+    float skyIntensity;
+    float lightIntensity;
     SphereMaterial* materials;
     int sphereCount;
     MeshVertexGpu* meshVertices;

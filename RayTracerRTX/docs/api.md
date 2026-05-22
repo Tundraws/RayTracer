@@ -21,7 +21,8 @@ RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
 ```
 
 `--mesh` loads one OBJ or glTF mesh into the default scene. `--scene` loads a
-JSON scene config with `meshObjects`, `camera`, `light`, and mesh transform fields.
+JSON scene config with `meshObjects`, `camera`, `light`, image tuning fields,
+and mesh transform fields.
 Invalid input prints a diagnostic message and falls back to the default scene.
 The interactive app starts in `RenderModeRealtime`; pressing `P` toggles
 progressive path tracing accumulation and resets samples when the camera, light,
@@ -57,6 +58,9 @@ Declared in `src/app/scene.h`.
 | `meshObjects` | `std::vector<MeshObject>` | Polygonal OBJ mesh objects with asset reference, mesh data, and transform |
 | `mesh` | `MeshData` | Compatibility combined mesh used by tests/docs and fallback paths |
 | `lightPosition` | `float3` | Point-light position used by hit programs |
+| `exposure` | `float` | Tone-mapping exposure multiplier, clamped to a safe range |
+| `skyIntensity` | `float` | Environment-light intensity multiplier |
+| `lightIntensity` | `float` | Direct light intensity multiplier |
 | `selectedSphere` | `int` | Index used by interactive controls |
 | `selectedMeshObject` | `int` | Mesh object index used by interactive controls |
 | `selectedMeshMaterial` | `int` | Material index inside the selected mesh object |
@@ -87,7 +91,13 @@ supports:
 - `meshObjects`: array of mesh objects with `path`, `position`, `rotation`, and
   `scale`;
 - `camera`: `position`, `yaw`, `pitch`, `fov`;
-- `light`: `position`.
+- `light`: `position` and optional `intensity`;
+- root-level or `render` object fields: `exposure`, `skyIntensity`,
+  `lightIntensity`.
+
+If image-tuning fields are missing, the default scene values are used. Numeric
+values outside the supported range are clamped so old or experimental scene
+files do not make the renderer unstable.
 
 Configured mesh objects are stored in `SceneState::meshObjects`. Each object
 keeps its source mesh data and transform, while `SceneState::mesh` remains as a
@@ -237,6 +247,7 @@ Uploaded to the GPU before each OptiX launch.
 | `cameraPosition`, `cameraForward`, `cameraRight`, `cameraUp` | Camera ray generation data |
 | `cameraScale`, `cameraAspect` | Projection parameters |
 | `lightPosition` | Point-light input for hit programs |
+| `exposure`, `skyIntensity`, `lightIntensity` | Image and lighting tuning inputs |
 | `materials`, `sphereCount` | Per-sphere material data |
 | `meshVertices`, `meshVertexCount` | OBJ mesh vertex buffer |
 | `meshTriangles`, `meshTriangleCount` | OBJ mesh triangle buffer with material indices |

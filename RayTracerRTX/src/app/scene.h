@@ -33,6 +33,9 @@ struct SceneState
     std::vector<MeshObject> meshObjects;
     MeshData mesh;
     float3 lightPosition;
+    float exposure = 0.72f;
+    float skyIntensity = 0.68f;
+    float lightIntensity = 0.82f;
     int selectedSphere = 0;
     int selectedMeshObject = 0;
     int selectedMeshMaterial = 0;

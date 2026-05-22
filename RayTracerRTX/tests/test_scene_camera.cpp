@@ -866,6 +866,48 @@ void testSceneConfigMeshPathApplied(TestContext& t)
     t.expect(scene.scene.meshObjects.size() == 1, "Direct mesh path should create one mesh object.");
 }
 
+void testSceneConfigTuningFields(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "scene_tuning.json",
+        "{\n"
+        "  \"render\": {\"exposure\": 0.65, \"skyIntensity\": 0.55},\n"
+        "  \"light\": {\"position\": [4, 7, -5], \"intensity\": 0.75}\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Scene config with render tuning should load.");
+    t.expect(config.config.hasExposure, "Scene config should mark exposure as present.");
+    t.expect(config.config.hasSkyIntensity, "Scene config should mark sky intensity as present.");
+    t.expect(config.config.hasLightIntensity, "Scene config should mark light intensity as present.");
+
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Scene config with tuning and fallback mesh should build.");
+    t.expect(almostEqual(scene.scene.exposure, 0.65f), "Scene config should apply exposure.");
+    t.expect(almostEqual(scene.scene.skyIntensity, 0.55f), "Scene config should apply sky intensity.");
+    t.expect(almostEqual(scene.scene.lightIntensity, 0.75f), "Scene config should apply light intensity.");
+}
+
+void testSceneConfigTuningClamps(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "scene_tuning_clamp.json",
+        "{\n"
+        "  \"exposure\": -4.0,\n"
+        "  \"skyIntensity\": 42.0,\n"
+        "  \"light\": {\"intensity\": -2.0}\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Out-of-range numeric tuning values should parse.");
+
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Out-of-range tuning values should build through clamp/fallback.");
+    t.expect(almostEqual(scene.scene.exposure, 0.1f), "Exposure should clamp to minimum.");
+    t.expect(almostEqual(scene.scene.skyIntensity, 3.0f), "Sky intensity should clamp to maximum.");
+    t.expect(almostEqual(scene.scene.lightIntensity, 0.0f), "Light intensity should clamp to minimum.");
+}
+
 void testSceneConfigFallbackDemoScene(TestContext& t)
 {
     const SceneBuildResult scene = buildDefaultSceneInput();
@@ -873,6 +915,9 @@ void testSceneConfigFallbackDemoScene(TestContext& t)
     t.expect(!isEmptyMesh(scene.scene.mesh), "Default scene input should keep fallback/demo mesh.");
     t.expect(!scene.scene.meshObjects.empty(), "Default scene input should keep mesh object list.");
     t.expect(hasValidMeshMaterialIndices(scene.scene.mesh), "Default scene input mesh material indices should be valid.");
+    t.expect(scene.scene.exposure > 0.0f, "Default scene input should keep exposure.");
+    t.expect(scene.scene.skyIntensity > 0.0f, "Default scene input should keep sky intensity.");
+    t.expect(scene.scene.lightIntensity > 0.0f, "Default scene input should keep light intensity.");
 }
 
 void testToggleMaterial(TestContext& t)
@@ -1080,6 +1125,10 @@ void testToneMappingAndGammaCorrection(TestContext& t)
 
     const float3 clamped = toneMapAndGammaCorrect(make_float3(-1.0f, 0.0f, 0.0f));
     t.expect(almostEqual(clamped.x, 0.0f), "Tone mapping should clamp negative output before gamma.");
+
+    const float3 dimmed = toneMapAndGammaCorrect(make_float3(2.0f, 2.0f, 2.0f), 0.5f);
+    const float3 full = toneMapAndGammaCorrect(make_float3(2.0f, 2.0f, 2.0f), 1.0f);
+    t.expect(dimmed.x < full.x, "Lower exposure should reduce tone-mapped brightness.");
 }
 
 void testDefaultRenderQuality(TestContext& t)
@@ -1421,6 +1470,8 @@ int main(int argc, char** argv)
     runTest("Scene config with multiple meshes loads", testSceneConfigMultipleMeshes);
     runTest("Scene config missing file", testSceneConfigMissingFile);
     runTest("Scene config mesh path applied", testSceneConfigMeshPathApplied);
+    runTest("Scene config tuning fields", testSceneConfigTuningFields);
+    runTest("Scene config tuning clamps", testSceneConfigTuningClamps);
     runTest("Scene config fallback demo scene", testSceneConfigFallbackDemoScene);
 
     ++testsRun;

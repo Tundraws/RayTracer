@@ -100,7 +100,9 @@ static __forceinline__ __device__ float3 environmentColor(const float3 rayDir)
     const float3 zenith = make_vec(0.12f, 0.18f, 0.30f);
     const float3 sky = lerp3(horizon, zenith, t * t);
     const float3 base = rayDir.y < 0.0f ? lerp3(ground, horizon, saturate1(rayDir.y + 1.0f)) : sky;
-    return add3(add3(base, mul3(make_vec(0.95f, 0.74f, 0.42f), 0.18f * horizonGlow)), mul3(make_vec(1.0f, 0.86f, 0.58f), 1.2f * sun));
+    return mul3(
+        add3(add3(base, mul3(make_vec(0.95f, 0.74f, 0.42f), 0.18f * horizonGlow)), mul3(make_vec(1.0f, 0.86f, 0.58f), 1.2f * sun)),
+        params.skyIntensity);
 }
 
 static __forceinline__ __device__ float3 reinhardToneMapDevice(const float3 color)
@@ -122,7 +124,7 @@ static __forceinline__ __device__ float3 gammaCorrectDevice(const float3 color)
 
 static __forceinline__ __device__ float3 postProcessColor(const float3 color)
 {
-    return gammaCorrectDevice(reinhardToneMapDevice(clamp3(color, 0.0f, 16.0f)));
+    return gammaCorrectDevice(reinhardToneMapDevice(clamp3(mul3(color, params.exposure), 0.0f, 12.0f)));
 }
 
 static __forceinline__ __device__ float fresnelSchlick(const float cosTheta, const float f0)
@@ -466,11 +468,11 @@ static __forceinline__ __device__ float3 shadeMaterial(
         : diffuseShadowFloor;
     const float shadowFactor = shadowFloor + (1.0f - shadowFloor) * visibility;
     const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
-    const float diffuse = ndotl * shadowFactor;
+    const float diffuse = ndotl * shadowFactor * params.lightIntensity;
     const float3 viewDir = mul3(rayDirection, -1.0f);
     const float3 halfDir = normalize3(add3(lightDir, viewDir));
     const float specularPower = fmaxf(8.0f, 160.0f * (1.0f - roughness));
-    const float specular = visibility * powf(fmaxf(dot3(normal, halfDir), 0.0f), specularPower);
+    const float specular = visibility * powf(fmaxf(dot3(normal, halfDir), 0.0f), specularPower) * params.lightIntensity;
     const bool reflectiveMaterial = material.materialType == MaterialMirror || material.materialType == MaterialMetal || material.materialType == MaterialDielectric;
     const float diffuseSpecularWeight = reflectiveMaterial ? 0.0f : 0.06f;
     const float diffuseLightWeight = reflectiveMaterial ? 1.0f : 0.88f;
@@ -482,7 +484,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
     const float mirrorGgxBoost = material.materialType == MaterialMirror ? 1.35f : 1.0f;
     const float3 ggxLight = mul3(
         ggxDirectLight(diffuseColor, material.specularColor, normal, viewDir, lightDir, roughness, metallic),
-        shadowFactor * 1.35f * mirrorGgxBoost);
+        shadowFactor * params.lightIntensity * 1.35f * mirrorGgxBoost);
 
     float3 localColor = add3(
         add3(mul3(diffuseColor, ambient + diffuseLightWeight * diffuse * 0.32f), ggxLight),

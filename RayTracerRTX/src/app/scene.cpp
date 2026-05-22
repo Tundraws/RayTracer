@@ -96,9 +96,9 @@ SceneState makeDefaultScene()
     };
 
     scene.materials = {
-        {make_float3(0.98f, 0.98f, 0.95f), MaterialDiffuse},
-        {make_float3(0.92f, 0.78f, 0.66f), MaterialDiffuse},
-        {make_float3(0.72f, 0.92f, 0.84f), MaterialDiffuse}
+        {make_float3(0.72f, 0.76f, 0.72f), MaterialDiffuse, make_float3(0.72f, 0.72f, 0.72f), 0.52f, 1.5f, 1.0f},
+        {make_float3(0.78f, 0.68f, 0.58f), MaterialDiffuse, make_float3(0.70f, 0.68f, 0.62f), 0.58f, 1.5f, 1.0f},
+        {make_float3(0.58f, 0.70f, 0.82f), MaterialDiffuse, make_float3(0.66f, 0.68f, 0.72f), 0.55f, 1.5f, 1.0f}
     };
 
     scene.mesh = loadDefaultMesh();
@@ -107,6 +107,9 @@ SceneState makeDefaultScene()
     defaultMeshObject.mesh = scene.mesh;
     scene.meshObjects = {std::move(defaultMeshObject)};
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
+    scene.exposure = 0.72f;
+    scene.skyIntensity = 0.68f;
+    scene.lightIntensity = 0.82f;
     scene.selectedSphere = 0;
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
@@ -131,6 +134,9 @@ void clampScene(SceneState& scene)
         scene.lightPosition,
         make_float3(-40.0f, 6.0f, -40.0f),
         make_float3(40.0f, 40.0f, 40.0f));
+    scene.exposure = clampSceneExposure(scene.exposure);
+    scene.skyIntensity = clampSceneSkyIntensity(scene.skyIntensity);
+    scene.lightIntensity = clampSceneLightIntensity(scene.lightIntensity);
 
     if (scene.selectedSphere < 0)
     {

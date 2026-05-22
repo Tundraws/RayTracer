@@ -59,6 +59,9 @@ std::size_t makeAccumulationSignature(const SceneState& scene, const CameraState
     hashCombine(seed, hashFloat(scene.lightPosition.x));
     hashCombine(seed, hashFloat(scene.lightPosition.y));
     hashCombine(seed, hashFloat(scene.lightPosition.z));
+    hashCombine(seed, hashFloat(scene.exposure));
+    hashCombine(seed, hashFloat(scene.skyIntensity));
+    hashCombine(seed, hashFloat(scene.lightIntensity));
     for (const SphereGeometry& sphere : scene.spheres)
     {
         hashCombine(seed, hashFloat(sphere.center.x));
@@ -1140,6 +1143,9 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.cameraScale = scale;
     params.cameraAspect = aspect;
     params.lightPosition = scene.lightPosition;
+    params.exposure = scene.exposure;
+    params.skyIntensity = scene.skyIntensity;
+    params.lightIntensity = scene.lightIntensity;
     params.materials = reinterpret_cast<SphereMaterial*>(dMaterials);
     params.sphereCount = static_cast<int>(scene.spheres.size());
     params.meshVertices = reinterpret_cast<MeshVertexGpu*>(dMeshVertices);

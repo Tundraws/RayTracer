@@ -371,6 +371,35 @@ bool readFloatField(const JsonObject& object, const std::string& name, float& ou
     return true;
 }
 
+bool readSceneTuningFields(const JsonObject& object, SceneConfig& config, std::string& error)
+{
+    if (findField(object, "exposure") != nullptr)
+    {
+        if (!readFloatField(object, "exposure", config.exposure, error))
+        {
+            return false;
+        }
+        config.hasExposure = true;
+    }
+    if (findField(object, "skyIntensity") != nullptr)
+    {
+        if (!readFloatField(object, "skyIntensity", config.skyIntensity, error))
+        {
+            return false;
+        }
+        config.hasSkyIntensity = true;
+    }
+    if (findField(object, "lightIntensity") != nullptr)
+    {
+        if (!readFloatField(object, "lightIntensity", config.lightIntensity, error))
+        {
+            return false;
+        }
+        config.hasLightIntensity = true;
+    }
+    return true;
+}
+
 float radians(float degrees)
 {
     return degrees * kPi / 180.0f;
@@ -592,6 +621,27 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
         }
     }
 
+    std::string tuningError;
+    if (!readSceneTuningFields(*rootObject, result.config, tuningError))
+    {
+        result.error = tuningError;
+        return result;
+    }
+    if (const JsonValue* renderField = findField(*rootObject, "render"))
+    {
+        const JsonObject* render = asObject(*renderField);
+        if (render == nullptr)
+        {
+            result.error = "'render' must be an object";
+            return result;
+        }
+        if (!readSceneTuningFields(*render, result.config, tuningError))
+        {
+            result.error = tuningError;
+            return result;
+        }
+    }
+
     if (const JsonValue* lightField = findField(*rootObject, "light"))
     {
         const JsonObject* light = asObject(*lightField);
@@ -605,6 +655,15 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
         {
             result.error = error;
             return result;
+        }
+        if (findField(*light, "intensity") != nullptr)
+        {
+            if (!readFloatField(*light, "intensity", result.config.lightIntensity, error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.hasLightIntensity = true;
         }
         result.config.hasLightPosition = true;
     }
@@ -661,6 +720,21 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     {
         result.scene.lightPosition = config.lightPosition;
     }
+    if (config.hasExposure)
+    {
+        result.scene.exposure = config.exposure;
+    }
+    if (config.hasSkyIntensity)
+    {
+        result.scene.skyIntensity = config.skyIntensity;
+    }
+    if (config.hasLightIntensity)
+    {
+        result.scene.lightIntensity = config.lightIntensity;
+    }
+    result.scene.exposure = clampSceneExposure(result.scene.exposure);
+    result.scene.skyIntensity = clampSceneSkyIntensity(result.scene.skyIntensity);
+    result.scene.lightIntensity = clampSceneLightIntensity(result.scene.lightIntensity);
 
     if (config.meshObjects.empty())
     {

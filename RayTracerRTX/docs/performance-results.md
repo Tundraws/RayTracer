@@ -34,6 +34,8 @@ environment lighting, Reinhard tone mapping, gamma correction, and optional
 OBJ `map_Kd` diffuse texture sampling. Basic tangent-space normal mapping is
 available for OBJ materials that provide a valid normal map and UVs. Mesh
 objects are stored separately and placed in the IAS with per-object transforms.
+The scene also uses configurable exposure, sky intensity, and light intensity
+values so the default image is less overexposed.
 Direct lighting uses a physically motivated GGX microfacet BRDF for diffuse,
 mirror, and metal materials.
 Progressive path tracing accumulation is available through the PathTracing
@@ -50,18 +52,18 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low resolution / High quality | 640x360 | 609.24 | 1.64 | 1.61 |
-| HD resolution / High quality | 1280x720 | 212.12 | 4.71 | 4.68 |
-| Full HD resolution / High quality | 1920x1080 | 104.21 | 9.60 | 9.55 |
-| Low quality | 640x360 | 1349.88 | 0.74 | 0.73 |
-| Medium quality | 640x360 | 204.40 | 4.89 | 4.86 |
-| High quality | 640x360 | 124.84 | 8.01 | 7.97 |
-| PathTracing quality + denoiser | 640x360 | 12.95 | 77.23 | 77.17 |
+| Low resolution / High quality | 640x360 | 687.13 | 1.46 | 1.44 |
+| HD resolution / High quality | 1280x720 | 224.39 | 4.46 | 4.43 |
+| Full HD resolution / High quality | 1920x1080 | 106.99 | 9.35 | 9.29 |
+| Low quality | 640x360 | 264.95 | 3.77 | 3.73 |
+| Medium quality | 640x360 | 150.19 | 6.66 | 6.60 |
+| High quality | 640x360 | 132.34 | 7.56 | 7.50 |
+| PathTracing quality + denoiser | 640x360 | 7.49 | 133.55 | 133.49 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD High quality averages about 104 FPS, so the current
+with the OBJ mesh scene enabled. Full HD High quality averages about 107 FPS, so the current
 scene remains above the 60 FPS target. The extra material, diffuse texture,
 normal-map shading state, and per-object Triangle GAS/IAS layout remain within
 the real-time budget: average GPU time is below 10 ms at 1920x1080, under the

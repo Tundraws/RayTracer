@@ -272,9 +272,14 @@ void drawHud(
     const std::wstring line3 = lineMode.str();
     const std::wstring presetWide(presetName.begin(), presetName.end());
     const std::wstring line4 = L"PRESET: " + presetWide;
-    const std::wstring line5 = L"SPHERE MOVE: ARROWS, R/F";
-    const std::wstring line6 = L"LIGHT: J/L-X, I/K-Z, U/O-Y";
-    const std::wstring line7 = L"PRESET: G   SPHERE MAT: M   MESH: B/V   MODE: P   QUALITY: Q   DENOISER: N";
+    std::wostringstream lineTuning;
+    lineTuning << L"EXPOSURE: " << std::setprecision(2) << scene.exposure
+               << L"   SKY: " << scene.skyIntensity
+               << L"   LIGHT: " << scene.lightIntensity;
+    const std::wstring line5 = lineTuning.str();
+    const std::wstring line6 = L"SPHERE MOVE: ARROWS, R/F";
+    const std::wstring line7 = L"LIGHT: J/L-X, I/K-Z, U/O-Y";
+    const std::wstring line8 = L"PRESET: G   SPHERE MAT: M   MESH: B/V   MODE: P   QUALITY: Q   DENOISER: N";
 
     const std::wstring text1 = line1.str();
     const std::wstring text2 = line2.str();
@@ -285,6 +290,7 @@ void drawHud(
     TextOutW(dc, panelX, panelY + 88, line5.c_str(), static_cast<int>(line5.size()));
     TextOutW(dc, panelX, panelY + 110, line6.c_str(), static_cast<int>(line6.size()));
     TextOutW(dc, panelX, panelY + 132, line7.c_str(), static_cast<int>(line7.size()));
+    TextOutW(dc, panelX, panelY + 154, line8.c_str(), static_cast<int>(line8.size()));
 
     SelectObject(dc, oldFont);
     SetTextColor(dc, oldTextColor);

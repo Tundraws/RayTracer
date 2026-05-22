@@ -27,6 +27,12 @@ struct SceneConfig
     CameraState camera;
     bool hasLightPosition = false;
     float3 lightPosition = make_float3(10.0f, 14.0f, -10.0f);
+    bool hasExposure = false;
+    float exposure = 0.72f;
+    bool hasSkyIntensity = false;
+    float skyIntensity = 0.68f;
+    bool hasLightIntensity = false;
+    float lightIntensity = 0.82f;
 };
 
 struct SceneConfigResult
