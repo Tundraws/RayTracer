@@ -310,6 +310,20 @@ int nextMaterialPreset(const int materialType)
     }
 }
 
+int sanitizeMaterialType(const int materialType)
+{
+    switch (materialType)
+    {
+    case MaterialDiffuse:
+    case MaterialMirror:
+    case MaterialMetal:
+    case MaterialDielectric:
+        return materialType;
+    default:
+        return MaterialDiffuse;
+    }
+}
+
 void applyMaterialDefaults(SphereMaterial& material)
 {
     switch (material.materialType)
@@ -372,6 +386,41 @@ void applyMaterialDefaults(MeshMaterial& material)
     }
 }
 
+void syncSelectedMeshMaterialToCombined(SceneState& scene)
+{
+    if (scene.meshObjects.empty() || scene.mesh.materials.empty())
+    {
+        return;
+    }
+    if (scene.selectedMeshObject < 0 ||
+        scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
+    {
+        return;
+    }
+
+    const MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+    if (scene.selectedMeshMaterial < 0 ||
+        scene.selectedMeshMaterial >= static_cast<int>(object.mesh.materials.size()))
+    {
+        return;
+    }
+
+    size_t combinedMaterialIndex = 0;
+    for (int i = 0; i < scene.selectedMeshObject && i < static_cast<int>(scene.meshObjects.size()); ++i)
+    {
+        combinedMaterialIndex += scene.meshObjects[static_cast<size_t>(i)].mesh.materials.size();
+    }
+    combinedMaterialIndex += static_cast<size_t>(scene.selectedMeshMaterial);
+    if (combinedMaterialIndex >= scene.mesh.materials.size())
+    {
+        return;
+    }
+
+    const MeshMaterial& objectMaterial = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+    MeshMaterial& combinedMaterial = scene.mesh.materials[combinedMaterialIndex];
+    combinedMaterial = objectMaterial;
+}
+
 void cycleSelectedSphereMaterialPreset(SceneState& scene)
 {
     const int index = scene.selectedSphere;
@@ -382,6 +431,19 @@ void cycleSelectedSphereMaterialPreset(SceneState& scene)
 
     SphereMaterial& material = scene.materials[static_cast<size_t>(index)];
     material.materialType = nextMaterialPreset(material.materialType);
+    applyMaterialDefaults(material);
+}
+
+void setSelectedSphereMaterialType(SceneState& scene, const int materialType)
+{
+    const int index = scene.selectedSphere;
+    if (index < 0 || index >= static_cast<int>(scene.materials.size()))
+    {
+        return;
+    }
+
+    SphereMaterial& material = scene.materials[static_cast<size_t>(index)];
+    material.materialType = sanitizeMaterialType(materialType);
     applyMaterialDefaults(material);
 }
 
@@ -415,24 +477,26 @@ void cycleSelectedMeshMaterialPreset(SceneState& scene)
     MeshMaterial& objectMaterial = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
     objectMaterial.materialType = nextMaterialPreset(objectMaterial.materialType);
     applyMaterialDefaults(objectMaterial);
+    syncSelectedMeshMaterialToCombined(scene);
+}
 
-    if (!scene.mesh.materials.empty())
+void setSelectedMeshMaterialType(SceneState& scene, const int materialType)
+{
+    if (scene.meshObjects.empty())
     {
-        size_t combinedMaterialIndex = 0;
-        for (int i = 0; i < scene.selectedMeshObject && i < static_cast<int>(scene.meshObjects.size()); ++i)
-        {
-            combinedMaterialIndex += scene.meshObjects[static_cast<size_t>(i)].mesh.materials.size();
-        }
-        combinedMaterialIndex += static_cast<size_t>(scene.selectedMeshMaterial);
-        if (combinedMaterialIndex < scene.mesh.materials.size())
-        {
-            scene.mesh.materials[combinedMaterialIndex].materialType = objectMaterial.materialType;
-            scene.mesh.materials[combinedMaterialIndex].specularColor = objectMaterial.specularColor;
-            scene.mesh.materials[combinedMaterialIndex].roughness = objectMaterial.roughness;
-            scene.mesh.materials[combinedMaterialIndex].ior = objectMaterial.ior;
-            scene.mesh.materials[combinedMaterialIndex].alpha = objectMaterial.alpha;
-        }
+        return;
     }
+    clampScene(scene);
+    MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+    if (object.mesh.materials.empty())
+    {
+        return;
+    }
+
+    MeshMaterial& objectMaterial = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+    objectMaterial.materialType = sanitizeMaterialType(materialType);
+    applyMaterialDefaults(objectMaterial);
+    syncSelectedMeshMaterialToCombined(scene);
 }
 
 void moveLight(SceneState& scene, const float3 delta)

@@ -173,6 +173,45 @@ const char* qualityNameUtf8(const int quality)
     }
 }
 
+const char* materialTypeNameUtf8(const int materialType)
+{
+    switch (materialType)
+    {
+    case MaterialMirror:
+        return u8c(u8"\u0417\u0435\u0440\u043A\u0430\u043B\u044C\u043D\u044B\u0439");
+    case MaterialMetal:
+        return u8c(u8"\u041C\u0435\u0442\u0430\u043B\u043B");
+    case MaterialDielectric:
+        return u8c(u8"\u0421\u0442\u0435\u043A\u043B\u043E");
+    default:
+        return u8c(u8"\u041C\u0430\u0442\u043E\u0432\u044B\u0439");
+    }
+}
+
+bool materialTypeCombo(const char* id, int& materialType)
+{
+    const int materialTypes[] = {MaterialDiffuse, MaterialMirror, MaterialMetal, MaterialDielectric};
+    bool changed = false;
+    if (ImGui::BeginCombo(id, materialTypeNameUtf8(materialType)))
+    {
+        for (const int type : materialTypes)
+        {
+            const bool selected = materialType == type;
+            if (ImGui::Selectable(materialTypeNameUtf8(type), selected))
+            {
+                materialType = type;
+                changed = true;
+            }
+            if (selected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
 void applyQualityMode(AppState& appState)
 {
     appState.renderQuality = clampRenderQuality(appState.renderQuality);
@@ -546,26 +585,60 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
 
     if (meshMaterial != nullptr)
     {
-        ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u043C\u043E\u0434\u0435\u043B\u0438"), wideToUtf8(materialNameW(meshMaterial->materialType)).c_str());
+        ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u043C\u043E\u0434\u0435\u043B\u0438"), materialTypeNameUtf8(meshMaterial->materialType));
         ImGui::TextWrapped("%s", u8c(u8"\u042D\u0442\u043E \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u043E\u0439 \u043F\u043E\u043B\u0438\u0433\u043E\u043D\u0430\u043B\u044C\u043D\u043E\u0439 \u043C\u043E\u0434\u0435\u043B\u0438, \u0430 \u043D\u0435 \u0441\u0444\u0435\u0440."));
-        if (ImGui::Button(u8c(u8"\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u043C\u043E\u0434\u0435\u043B\u0438")))
-        {
-            cycleSelectedMeshMaterialPreset(scene);
-            appState.progressiveSamples = 0;
-        }
         bool materialChanged = false;
-        ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u0438"));
-        materialChanged = ImGui::SliderFloat("##mesh_roughness", &meshMaterial->roughness, 0.02f, 1.0f, "%.2f") || materialChanged;
-        float metallic = meshMaterial->materialType == MaterialMetal ? 1.0f : 0.0f;
-        ImGui::TextUnformatted(u8c(u8"\u041C\u0435\u0442\u0430\u043B\u043B\u0438\u0447\u043D\u043E\u0441\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u0438"));
-        if (ImGui::SliderFloat("##mesh_metallic", &metallic, 0.0f, 1.0f, "%.2f"))
+        int meshMaterialType = meshMaterial->materialType;
+        ImGui::TextUnformatted(u8c(u8"\u0422\u0438\u043F \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u0430"));
+        if (materialTypeCombo("##mesh_material_type", meshMaterialType))
         {
-            meshMaterial->materialType = metallic >= 0.5f ? MaterialMetal : MaterialDiffuse;
+            setSelectedMeshMaterialType(scene, meshMaterialType);
             materialChanged = true;
         }
+
+        float meshColor[3] = {meshMaterial->color.x, meshMaterial->color.y, meshMaterial->color.z};
+        ImGui::TextUnformatted(meshMaterial->materialType == MaterialDielectric ? u8c(u8"\u041E\u0442\u0442\u0435\u043D\u043E\u043A \u0441\u0442\u0435\u043A\u043B\u0430") : u8c(u8"\u0426\u0432\u0435\u0442"));
+        if (ImGui::ColorEdit3("##mesh_color", meshColor, ImGuiColorEditFlags_NoInputs))
+        {
+            meshMaterial->color = make_float3(meshColor[0], meshColor[1], meshColor[2]);
+            materialChanged = true;
+        }
+
+        if (meshMaterial->materialType == MaterialDielectric)
+        {
+            ImGui::TextUnformatted(u8c(u8"\u041C\u0443\u0442\u043D\u043E\u0441\u0442\u044C \u0441\u0442\u0435\u043A\u043B\u0430"));
+            materialChanged = ImGui::SliderFloat("##mesh_glass_roughness", &meshMaterial->roughness, 0.02f, 0.6f, "%.2f") || materialChanged;
+            ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0435\u043B\u044C \u043F\u0440\u0435\u043B\u043E\u043C\u043B\u0435\u043D\u0438\u044F"));
+            materialChanged = ImGui::SliderFloat("##mesh_ior", &meshMaterial->ior, 1.01f, 2.8f, "%.2f") || materialChanged;
+            float transparency = 1.0f - meshMaterial->alpha;
+            ImGui::TextUnformatted(u8c(u8"\u041F\u0440\u043E\u0437\u0440\u0430\u0447\u043D\u043E\u0441\u0442\u044C"));
+            if (ImGui::SliderFloat("##mesh_transparency", &transparency, 0.0f, 1.0f, "%.2f"))
+            {
+                meshMaterial->alpha = 1.0f - transparency;
+                materialChanged = true;
+            }
+        }
+        else if (meshMaterial->materialType == MaterialMirror)
+        {
+            ImGui::TextUnformatted(u8c(u8"\u0420\u0430\u0437\u043C\u044B\u0442\u0438\u0435 \u043E\u0442\u0440\u0430\u0436\u0435\u043D\u0438\u044F"));
+            materialChanged = ImGui::SliderFloat("##mesh_mirror_roughness", &meshMaterial->roughness, 0.02f, 0.35f, "%.2f") || materialChanged;
+        }
+        else if (meshMaterial->materialType == MaterialMetal)
+        {
+            ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u0435\u0442\u0430\u043B\u043B\u0430"));
+            materialChanged = ImGui::SliderFloat("##mesh_metal_roughness", &meshMaterial->roughness, 0.02f, 1.0f, "%.2f") || materialChanged;
+        }
+        else
+        {
+            ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u0430\u0442\u043E\u0432\u043E\u0439 \u043F\u043E\u0432\u0435\u0440\u0445\u043D\u043E\u0441\u0442\u0438"));
+            materialChanged = ImGui::SliderFloat("##mesh_matte_roughness", &meshMaterial->roughness, 0.15f, 1.0f, "%.2f") || materialChanged;
+        }
+
         if (materialChanged)
         {
             meshMaterial->roughness = clampf(meshMaterial->roughness, 0.02f, 1.0f);
+            meshMaterial->ior = clampf(meshMaterial->ior, 1.01f, 2.8f);
+            meshMaterial->alpha = clampf(meshMaterial->alpha, 0.0f, 1.0f);
             syncSelectedMeshMaterialToCombined(scene);
             appState.progressiveSamples = 0;
         }
@@ -626,12 +699,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
 
         clampScene(scene);
         SphereMaterial& sphereMaterial = scene.materials[static_cast<size_t>(scene.selectedSphere)];
-        ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u0441\u0444\u0435\u0440\u044B"), wideToUtf8(materialNameW(sphereMaterial.materialType)).c_str());
-        if (ImGui::Button(u8c(u8"\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u0441\u0444\u0435\u0440\u044B")))
-        {
-            cycleSelectedSphereMaterialPreset(scene);
-            appState.progressiveSamples = 0;
-        }
+        ImGui::Text("%s: %s", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B \u0441\u0444\u0435\u0440\u044B"), materialTypeNameUtf8(sphereMaterial.materialType));
 
         bool sphereChanged = false;
         SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
@@ -643,26 +711,56 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats)
             sphereChanged = true;
         }
 
+        int sphereMaterialType = sphereMaterial.materialType;
+        ImGui::TextUnformatted(u8c(u8"\u0422\u0438\u043F \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u0430"));
+        if (materialTypeCombo("##sphere_material_type", sphereMaterialType))
+        {
+            setSelectedSphereMaterialType(scene, sphereMaterialType);
+            sphereChanged = true;
+        }
+
         float sphereColor[3] = {sphereMaterial.color.x, sphereMaterial.color.y, sphereMaterial.color.z};
-        ImGui::TextUnformatted(u8c(u8"\u0426\u0432\u0435\u0442"));
+        ImGui::TextUnformatted(sphereMaterial.materialType == MaterialDielectric ? u8c(u8"\u041E\u0442\u0442\u0435\u043D\u043E\u043A \u0441\u0442\u0435\u043A\u043B\u0430") : u8c(u8"\u0426\u0432\u0435\u0442"));
         if (ImGui::ColorEdit3("##sphere_color", sphereColor, ImGuiColorEditFlags_NoInputs))
         {
             setSelectedSphereColor(scene, make_float3(sphereColor[0], sphereColor[1], sphereColor[2]));
             sphereChanged = true;
         }
 
-        ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u0441\u0444\u0435\u0440\u044B"));
-        sphereChanged = ImGui::SliderFloat("##sphere_roughness", &sphereMaterial.roughness, 0.02f, 1.0f, "%.2f") || sphereChanged;
-        float sphereMetallic = sphereMaterial.materialType == MaterialMetal ? 1.0f : 0.0f;
-        ImGui::TextUnformatted(u8c(u8"\u041C\u0435\u0442\u0430\u043B\u043B\u0438\u0447\u043D\u043E\u0441\u0442\u044C \u0441\u0444\u0435\u0440\u044B"));
-        if (ImGui::SliderFloat("##sphere_metallic", &sphereMetallic, 0.0f, 1.0f, "%.2f"))
+        if (sphereMaterial.materialType == MaterialDielectric)
         {
-            sphereMaterial.materialType = sphereMetallic >= 0.5f ? MaterialMetal : MaterialDiffuse;
-            sphereChanged = true;
+            ImGui::TextUnformatted(u8c(u8"\u041C\u0443\u0442\u043D\u043E\u0441\u0442\u044C \u0441\u0442\u0435\u043A\u043B\u0430"));
+            sphereChanged = ImGui::SliderFloat("##sphere_glass_roughness", &sphereMaterial.roughness, 0.02f, 0.6f, "%.2f") || sphereChanged;
+            ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0435\u043B\u044C \u043F\u0440\u0435\u043B\u043E\u043C\u043B\u0435\u043D\u0438\u044F"));
+            sphereChanged = ImGui::SliderFloat("##sphere_ior", &sphereMaterial.ior, 1.01f, 2.8f, "%.2f") || sphereChanged;
+            float sphereTransparency = 1.0f - sphereMaterial.alpha;
+            ImGui::TextUnformatted(u8c(u8"\u041F\u0440\u043E\u0437\u0440\u0430\u0447\u043D\u043E\u0441\u0442\u044C"));
+            if (ImGui::SliderFloat("##sphere_transparency", &sphereTransparency, 0.0f, 1.0f, "%.2f"))
+            {
+                sphereMaterial.alpha = 1.0f - sphereTransparency;
+                sphereChanged = true;
+            }
+        }
+        else if (sphereMaterial.materialType == MaterialMirror)
+        {
+            ImGui::TextUnformatted(u8c(u8"\u0420\u0430\u0437\u043C\u044B\u0442\u0438\u0435 \u043E\u0442\u0440\u0430\u0436\u0435\u043D\u0438\u044F"));
+            sphereChanged = ImGui::SliderFloat("##sphere_mirror_roughness", &sphereMaterial.roughness, 0.02f, 0.35f, "%.2f") || sphereChanged;
+        }
+        else if (sphereMaterial.materialType == MaterialMetal)
+        {
+            ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u0435\u0442\u0430\u043B\u043B\u0430"));
+            sphereChanged = ImGui::SliderFloat("##sphere_metal_roughness", &sphereMaterial.roughness, 0.02f, 1.0f, "%.2f") || sphereChanged;
+        }
+        else
+        {
+            ImGui::TextUnformatted(u8c(u8"\u0428\u0435\u0440\u043E\u0445\u043E\u0432\u0430\u0442\u043E\u0441\u0442\u044C \u043C\u0430\u0442\u043E\u0432\u043E\u0439 \u043F\u043E\u0432\u0435\u0440\u0445\u043D\u043E\u0441\u0442\u0438"));
+            sphereChanged = ImGui::SliderFloat("##sphere_matte_roughness", &sphereMaterial.roughness, 0.15f, 1.0f, "%.2f") || sphereChanged;
         }
         if (sphereChanged)
         {
             sphereMaterial.roughness = clampf(sphereMaterial.roughness, 0.02f, 1.0f);
+            sphereMaterial.ior = clampf(sphereMaterial.ior, 1.01f, 2.8f);
+            sphereMaterial.alpha = clampf(sphereMaterial.alpha, 0.0f, 1.0f);
             appState.progressiveSamples = 0;
         }
     }

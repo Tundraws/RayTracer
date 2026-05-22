@@ -143,10 +143,10 @@ The interactive app also includes a lightweight Dear ImGui panel rendered on top
 of the existing GLFW/OpenGL window. The panel calls the same scene-state
 functions as the keyboard controls: scene preset selection, camera/light reset,
 mesh selection, sphere selection, sphere add/remove, sphere radius/color
-editing, material preset changes, exposure, sky intensity, light intensity,
-roughness/metallic tweaks, quality mode, progressive mode and denoiser toggle.
-UI widgets are not unit-tested directly; the underlying state helpers are
-covered by tests.
+editing, explicit material type selection, exposure, sky intensity, light
+intensity, material-specific roughness/transparency/IOR tuning, quality mode,
+progressive mode and denoiser toggle. UI widgets are not unit-tested directly;
+the underlying state helpers are covered by tests.
 
 Preset helpers `applyScenePresetByIndex(...)` and
 `resetSceneViewFromPreset(...)` keep runtime scene switching and reset behavior

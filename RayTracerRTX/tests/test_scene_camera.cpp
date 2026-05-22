@@ -1275,6 +1275,32 @@ void testSphereMaterialPresetCycle(TestContext& t)
     t.expect(scene.materials[0].materialType == MaterialDielectric, "Sphere material preset should cycle metal to dielectric.");
 }
 
+void testSetSelectedSphereMaterialType(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 0;
+
+    setSelectedSphereMaterialType(scene, MaterialDielectric);
+    t.expect(scene.materials[0].materialType == MaterialDielectric, "Sphere material type setter should select glass.");
+    t.expect(almostEqual(scene.materials[0].ior, 1.45f), "Glass preset should apply IOR default.");
+    t.expect(almostEqual(scene.materials[0].alpha, 0.45f), "Glass preset should apply transparency default.");
+    t.expect(almostEqual(scene.materials[0].roughness, 0.02f), "Glass preset should apply low roughness default.");
+
+    setSelectedSphereMaterialType(scene, 999);
+    t.expect(scene.materials[0].materialType == MaterialDiffuse, "Invalid sphere material type should fall back to matte.");
+}
+
+void testSetSelectedSphereMaterialTypeInvalidIndexSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 100;
+    const int unchanged = scene.materials[0].materialType;
+
+    setSelectedSphereMaterialType(scene, MaterialMetal);
+
+    t.expect(scene.materials[0].materialType == unchanged, "Invalid selected sphere should not modify materials.");
+}
+
 void testSelectedMeshChanges(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -1301,6 +1327,36 @@ void testSelectedMeshMaterialPresetCycle(TestContext& t)
     cycleSelectedMeshMaterialPreset(scene);
     t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialMetal, "Mesh material preset should cycle mirror to metal.");
     t.expect(hasValidMeshMaterialIndices(scene.meshObjects[0].mesh), "Mesh material preset changes should keep material indices valid.");
+}
+
+void testSetSelectedMeshMaterialType(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+
+    setSelectedMeshMaterialType(scene, MaterialMetal);
+
+    t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialMetal, "Mesh material type setter should select metal.");
+    t.expect(scene.mesh.materials[0].materialType == MaterialMetal, "Combined mesh material should stay in sync.");
+    t.expect(almostEqual(scene.meshObjects[0].mesh.materials[0].roughness, 0.18f), "Metal preset should apply roughness default.");
+
+    setSelectedMeshMaterialType(scene, 999);
+    t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialDiffuse, "Invalid mesh material type should fall back to matte.");
+    t.expect(scene.mesh.materials[0].materialType == MaterialDiffuse, "Combined mesh material should sync fallback type.");
+}
+
+void testSetSelectedMeshMaterialTypeInvalidSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedMeshObject = 100;
+    scene.selectedMeshMaterial = 100;
+
+    setSelectedMeshMaterialType(scene, MaterialDielectric);
+
+    t.expect(scene.selectedMeshObject >= 0, "Invalid mesh type setter should clamp selected mesh object safely.");
+    t.expect(scene.selectedMeshMaterial >= 0, "Invalid mesh type setter should clamp selected mesh material safely.");
+    t.expect(hasValidMeshMaterialIndices(scene.mesh), "Invalid mesh type setter should keep combined material indices valid.");
 }
 
 void testInvalidMeshSelectionSafe(TestContext& t)
@@ -1913,8 +1969,12 @@ int main(int argc, char** argv)
     runTest("Default scene", testDefaultScene);
     runTest("Toggle material", testToggleMaterial);
     runTest("Sphere material preset cycle", testSphereMaterialPresetCycle);
+    runTest("Set selected sphere material type", testSetSelectedSphereMaterialType);
+    runTest("Set selected sphere material type invalid index", testSetSelectedSphereMaterialTypeInvalidIndexSafe);
     runTest("Selected mesh changes", testSelectedMeshChanges);
     runTest("Selected mesh material preset cycle", testSelectedMeshMaterialPresetCycle);
+    runTest("Set selected mesh material type", testSetSelectedMeshMaterialType);
+    runTest("Set selected mesh material type invalid safe", testSetSelectedMeshMaterialTypeInvalidSafe);
     runTest("Invalid mesh selection safe", testInvalidMeshSelectionSafe);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
