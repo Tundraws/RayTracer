@@ -67,12 +67,12 @@ sequenceDiagram
     User->>App: Keyboard and mouse input
     ObjLoader->>Scene: Load MeshObject list with OBJ or glTF data, tangents, materials, textures and transforms
     App->>Scene: Move sphere, light, or toggle material
-    App->>Scene: Tune exposure, sky intensity, and light intensity
+    App->>Scene: Tune exposure, sky intensity, light intensity, area light, and environment
     App->>Renderer: Optional P toggle for progressive accumulation
     App->>Renderer: Optional N toggle for OptiX denoiser
     App->>Renderer: Optional Q cycle for quality mode
     App->>Renderer: renderFrame(scene, camera)
-    Renderer->>CUDA: Upload sphere materials, mesh buffers, diffuse/normal texture pixels, and LaunchParams
+    Renderer->>CUDA: Upload sphere materials, mesh buffers, diffuse/normal/environment texture pixels, and LaunchParams
     Renderer->>OptiX: Build sphere GAS + one triangle GAS per mesh object + IAS transforms
     Renderer->>OptiX: optixLaunch
     OptiX->>GPU: Ray generation, sphere hit, mesh closest-hit, miss, shadow, reflection programs
@@ -92,8 +92,8 @@ flowchart TD
     Primary --> HitMesh{"Triangle mesh hit?"}
     Primary --> HitPlane{"Plane hit?"}
     Primary --> Miss["__miss__radiance sky color"]
-    Miss --> Environment["Gradient environment lighting"]
-    HitSphere --> Shadow["Point-light shadow ray"]
+    Miss --> Environment["Gradient or PPM environment lighting"]
+    HitSphere --> Shadow["Point/area light shadow rays"]
     HitMesh --> MeshClosestHit["Mesh closest-hit shader"]
     MeshClosestHit --> NormalMap["Optional tangent-space normal map"]
     NormalMap --> MeshMaterial
@@ -112,8 +112,8 @@ flowchart TD
     Mirror --> Depth{"depth < maxDepth"}
     Depth -->|yes| Primary
     Depth -->|no| Fallback["Neutral fallback color"]
-    HitPlane --> PlaneShadow["Point-light shadow ray"]
-    PlaneShadow --> PlaneLight["Plane lighting + hard shadow + fog"]
+    HitPlane --> PlaneShadow["Point/area light shadow rays"]
+    PlaneShadow --> PlaneLight["Plane lighting + shadow + fog"]
     Diffuse --> Output["setRadiancePayload"]
     Mirror --> Output
     PlaneLight --> Output

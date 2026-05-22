@@ -93,8 +93,41 @@ static __forceinline__ __device__ float3 lerp3(const float3 a, const float3 b, c
     return add3(mul3(a, 1.0f - t), mul3(b, t));
 }
 
+static __forceinline__ __device__ float3 sampleEnvironmentMap(const float3 rayDir)
+{
+    if (params.environmentPixels == nullptr ||
+        params.environmentWidth == 0u ||
+        params.environmentHeight == 0u ||
+        params.environmentPixelCount == 0u)
+    {
+        return make_vec(0.0f, 0.0f, 0.0f);
+    }
+
+    const float u = atan2f(rayDir.z, rayDir.x) * (1.0f / 6.2831853f) + 0.5f;
+    const float v = acosf(fminf(fmaxf(rayDir.y, -1.0f), 1.0f)) * (1.0f / 3.14159265f);
+    const unsigned int x = static_cast<unsigned int>(fminf(u * static_cast<float>(params.environmentWidth), static_cast<float>(params.environmentWidth - 1u)));
+    const unsigned int y = static_cast<unsigned int>(fminf(v * static_cast<float>(params.environmentHeight), static_cast<float>(params.environmentHeight - 1u)));
+    const unsigned int offset = y * params.environmentWidth + x;
+    if (offset >= params.environmentPixelCount)
+    {
+        return make_vec(0.0f, 0.0f, 0.0f);
+    }
+
+    const uchar4 pixel = params.environmentPixels[offset];
+    return make_vec(
+        static_cast<float>(pixel.x) / 255.0f,
+        static_cast<float>(pixel.y) / 255.0f,
+        static_cast<float>(pixel.z) / 255.0f);
+}
+
 static __forceinline__ __device__ float3 environmentColor(const float3 rayDir)
 {
+    const float3 mapped = sampleEnvironmentMap(rayDir);
+    if (params.environmentPixelCount > 0u)
+    {
+        return mul3(mapped, params.skyIntensity * params.environmentIntensity);
+    }
+
     const float t = saturate1(0.5f * (rayDir.y + 1.0f));
     const float horizonGlow = expf(-6.0f * fabsf(rayDir.y));
     const float sun = powf(fmaxf(dot3(rayDir, normalize3(make_vec(0.35f, 0.55f, -0.75f))), 0.0f), 96.0f);
@@ -105,7 +138,7 @@ static __forceinline__ __device__ float3 environmentColor(const float3 rayDir)
     const float3 base = rayDir.y < 0.0f ? lerp3(ground, horizon, saturate1(rayDir.y + 1.0f)) : sky;
     return mul3(
         add3(add3(base, mul3(make_vec(0.95f, 0.74f, 0.42f), 0.18f * horizonGlow)), mul3(make_vec(1.0f, 0.86f, 0.58f), 1.2f * sun)),
-        params.skyIntensity);
+        params.skyIntensity * params.environmentIntensity);
 }
 
 static __forceinline__ __device__ float3 reinhardToneMapDevice(const float3 color)
@@ -410,6 +443,82 @@ static __forceinline__ __device__ float3 cosineHemisphereDirection(const float3 
     return normalize3(add3(add3(mul3(tangent, x), mul3(normal, y)), mul3(bitangent, z)));
 }
 
+static __forceinline__ __device__ int areaLightSampleCount()
+{
+    if (params.areaLightRadius <= 0.001f)
+    {
+        return 1;
+    }
+    if (params.renderQuality == RenderQualityLow)
+    {
+        return 1;
+    }
+    if (params.renderQuality == RenderQualityHigh || params.renderQuality == RenderQualityPathTracing)
+    {
+        return 4;
+    }
+    return 2;
+}
+
+static __forceinline__ __device__ float3 areaLightSamplePosition(const float3 hitPoint, const int sampleIndex, const int sampleCount)
+{
+    if (params.areaLightRadius <= 0.001f || sampleCount <= 1)
+    {
+        return params.lightPosition;
+    }
+
+    const float3 centerDir = normalize3(sub3(params.lightPosition, hitPoint));
+    const float3 helper = fabsf(centerDir.y) < 0.999f ? make_vec(0.0f, 1.0f, 0.0f) : make_vec(1.0f, 0.0f, 0.0f);
+    const float3 tangent = normalize3(cross3(helper, centerDir));
+    const float3 bitangent = normalize3(cross3(centerDir, tangent));
+    const float phaseRaw = sinf(dot3(hitPoint, make_vec(12.9898f, 78.233f, 37.719f))) * 43758.5453f;
+    const float phase = phaseRaw - floorf(phaseRaw);
+    const float angle = 6.2831853f * (phase + (static_cast<float>(sampleIndex) + 0.5f) * 0.6180339f);
+    const float radius = params.areaLightRadius * sqrtf((static_cast<float>(sampleIndex) + 0.5f) / static_cast<float>(sampleCount));
+    return add3(params.lightPosition, add3(mul3(tangent, cosf(angle) * radius), mul3(bitangent, sinf(angle) * radius)));
+}
+
+static __forceinline__ __device__ void evaluateDirectLight(
+    const float3 hitPoint,
+    const float3 normal,
+    float3& lightDir,
+    float& lightDistance,
+    float& visibility,
+    float& ndotl)
+{
+    const int sampleCount = areaLightSampleCount();
+    float3 lightDirSum = make_vec(0.0f, 0.0f, 0.0f);
+    float distanceSum = 0.0f;
+    float visibilitySum = 0.0f;
+    float ndotlSum = 0.0f;
+
+    for (int i = 0; i < sampleCount; ++i)
+    {
+        const float3 samplePosition = areaLightSamplePosition(hitPoint, i, sampleCount);
+        const float3 lightVector = sub3(samplePosition, hitPoint);
+        const float distance = sqrtf(dot3(lightVector, lightVector));
+        const float3 dir = distance > 0.0f ? mul3(lightVector, 1.0f / distance) : make_vec(0.0f, 0.0f, 0.0f);
+        const bool visible = params.shadowEnabled == 0
+            ? true
+            : traceShadow(
+                params.handle,
+                add3(hitPoint, mul3(normal, 0.002f)),
+                dir,
+                0.001f,
+                distance - 0.01f);
+        lightDirSum = add3(lightDirSum, dir);
+        distanceSum += distance;
+        visibilitySum += visible ? 1.0f : 0.0f;
+        ndotlSum += fmaxf(dot3(normal, dir), 0.0f);
+    }
+
+    const float invSamples = 1.0f / static_cast<float>(sampleCount);
+    lightDir = normalize3(mul3(lightDirSum, invSamples));
+    lightDistance = distanceSum * invSamples;
+    visibility = visibilitySum * invSamples;
+    ndotl = ndotlSum * invSamples;
+}
+
 static __forceinline__ __device__ float3 progressiveBounce(
     const float3 hitPoint,
     const float3 normal,
@@ -494,19 +603,11 @@ static __forceinline__ __device__ float3 shadeMaterial(
         normal = mul3(normal, -1.0f);
     }
 
-    const float3 lightVector = sub3(params.lightPosition, hitPoint);
-    const float lightDistance = sqrtf(dot3(lightVector, lightVector));
-    const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
-
-    const bool visible = params.shadowEnabled == 0
-        ? true
-        : traceShadow(
-            params.handle,
-            add3(hitPoint, mul3(normal, 0.002f)),
-            lightDir,
-            0.001f,
-            lightDistance - 0.01f);
-    const float visibility = visible ? 1.0f : 0.0f;
+    float3 lightDir{};
+    float lightDistance = 0.0f;
+    float visibility = 1.0f;
+    float ndotl = 0.0f;
+    evaluateDirectLight(hitPoint, normal, lightDir, lightDistance, visibility, ndotl);
     const float3 env = environmentColor(normal);
 
     const float ambient = 0.14f;
@@ -517,7 +618,6 @@ static __forceinline__ __device__ float3 shadeMaterial(
         ? mirrorShadowFloor
         : diffuseShadowFloor;
     const float shadowFactor = shadowFloor + (1.0f - shadowFloor) * visibility;
-    const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
     const float diffuse = ndotl * shadowFactor * params.lightIntensity;
     const float3 viewDir = mul3(rayDirection, -1.0f);
     const float3 halfDir = normalize3(add3(lightDir, viewDir));
@@ -757,22 +857,15 @@ extern "C" __global__ void __closesthit__radiance_plane()
     const float3 hitPoint = add3(rayOrigin, mul3(rayDirection, tHit));
     const float3 normal = make_vec(0.0f, 1.0f, 0.0f);
 
-    const float3 lightVector = sub3(params.lightPosition, hitPoint);
-    const float lightDistance = sqrtf(dot3(lightVector, lightVector));
-    const float3 lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 0.0f, 0.0f);
-
-    const bool visible = traceShadow(
-        params.handle,
-        add3(hitPoint, mul3(normal, 0.002f)),
-        lightDir,
-        0.001f,
-        lightDistance - 0.01f);
-    const float visibility = visible ? 1.0f : 0.0f;
+    float3 lightDir{};
+    float lightDistance = 0.0f;
+    float visibility = 1.0f;
+    float ndotl = 0.0f;
+    evaluateDirectLight(hitPoint, normal, lightDir, lightDistance, visibility, ndotl);
 
     const float ambient = 0.18f;
     const float planeShadowFloor = 0.32f;
     const float shadowFactor = planeShadowFloor + (1.0f - planeShadowFloor) * visibility;
-    const float ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
     const float diffuse = ndotl * shadowFactor;
     const float3 viewDir = mul3(rayDirection, -1.0f);
     const float3 halfDir = normalize3(add3(lightDir, viewDir));

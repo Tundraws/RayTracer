@@ -62,6 +62,9 @@ std::size_t makeAccumulationSignature(const SceneState& scene, const CameraState
     hashCombine(seed, hashFloat(scene.exposure));
     hashCombine(seed, hashFloat(scene.skyIntensity));
     hashCombine(seed, hashFloat(scene.lightIntensity));
+    hashCombine(seed, hashFloat(scene.areaLightRadius));
+    hashCombine(seed, hashFloat(scene.environmentIntensity));
+    hashCombine(seed, std::hash<std::string>{}(scene.environmentPath));
     for (const SphereGeometry& sphere : scene.spheres)
     {
         hashCombine(seed, hashFloat(sphere.center.x));
@@ -1127,6 +1130,44 @@ void OptixRenderer::ensureSphereResources(const SceneState& scene)
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dSphereGasBuffer), sphereGasSizes.outputSizeInBytes));
 }
 
+void OptixRenderer::ensureEnvironmentResources(const SceneState& scene)
+{
+    const std::size_t pixelCount = scene.environmentMap.pixels.size();
+    if (pixelCount == environmentPixelCapacity)
+    {
+        if (pixelCount > 0)
+        {
+            CUDA_CHECK(cudaMemcpyAsync(
+                reinterpret_cast<void*>(dEnvironmentPixels),
+                scene.environmentMap.pixels.data(),
+                pixelCount * sizeof(uchar4),
+                cudaMemcpyHostToDevice,
+                stream));
+        }
+        return;
+    }
+
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+    if (dEnvironmentPixels != 0)
+    {
+        CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dEnvironmentPixels)));
+        dEnvironmentPixels = 0;
+    }
+    environmentPixelCapacity = pixelCount;
+    if (pixelCount == 0)
+    {
+        return;
+    }
+
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dEnvironmentPixels), pixelCount * sizeof(uchar4)));
+    CUDA_CHECK(cudaMemcpyAsync(
+        reinterpret_cast<void*>(dEnvironmentPixels),
+        scene.environmentMap.pixels.data(),
+        pixelCount * sizeof(uchar4),
+        cudaMemcpyHostToDevice,
+        stream));
+}
+
 void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& camera, std::vector<uchar4>& hostPixels, float* gpuTimeMs)
 {
     float3 forward{};
@@ -1159,6 +1200,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
         radii.push_back(sphere.radius);
     }
     ensureSphereResources(scene);
+    ensureEnvironmentResources(scene);
 
     CUDA_CHECK(cudaEventRecord(frameStart, stream));
 
@@ -1199,6 +1241,8 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.exposure = scene.exposure;
     params.skyIntensity = scene.skyIntensity;
     params.lightIntensity = scene.lightIntensity;
+    params.areaLightRadius = scene.areaLightRadius;
+    params.environmentIntensity = scene.environmentIntensity;
     params.materials = reinterpret_cast<SphereMaterial*>(dMaterials);
     params.sphereCount = static_cast<int>(scene.spheres.size());
     params.meshVertices = reinterpret_cast<MeshVertexGpu*>(dMeshVertices);
@@ -1206,6 +1250,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.meshMaterials = reinterpret_cast<MeshMaterialGpu*>(dMeshMaterials);
     params.meshObjects = reinterpret_cast<MeshObjectGpu*>(dMeshObjects);
     params.meshTexturePixels = reinterpret_cast<uchar4*>(dMeshTexturePixels);
+    params.environmentPixels = reinterpret_cast<uchar4*>(dEnvironmentPixels);
     params.meshVertexCount = 0u;
     params.meshTriangleCount = 0u;
     params.meshMaterialCount = 0u;
@@ -1223,6 +1268,9 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     }
     params.meshObjectCount = meshObjectCount;
     params.meshTexturePixelCount = meshTexturePixelCount;
+    params.environmentWidth = scene.environmentMap.width;
+    params.environmentHeight = scene.environmentMap.height;
+    params.environmentPixelCount = static_cast<unsigned int>(scene.environmentMap.pixels.size());
     params.maxDepth = renderQualityMaxDepth(renderQuality);
     params.renderMode = renderMode;
     params.renderQuality = renderQuality;
@@ -1393,6 +1441,12 @@ void OptixRenderer::destroy()
         cudaFree(reinterpret_cast<void*>(dMeshTexturePixels));
         dMeshTexturePixels = 0;
         meshTexturePixelCount = 0;
+    }
+    if (dEnvironmentPixels != 0)
+    {
+        cudaFree(reinterpret_cast<void*>(dEnvironmentPixels));
+        dEnvironmentPixels = 0;
+        environmentPixelCapacity = 0;
     }
     if (dMeshTriangles != 0)
     {

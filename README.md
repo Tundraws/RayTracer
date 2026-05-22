@@ -73,8 +73,9 @@ RayTracerRTX - учебный трассировщик лучей в реаль�
 
 Если ничего не передавать, программа запустит стандартную демонстрационную сцену.
 
-В JSON-сцене можно задавать камеру, свет, список моделей, простые настройки
-изображения (`exposure`, `skyIntensity`, `lightIntensity`) и материалы:
+В JSON-сцене можно задавать камеру, свет, размер area light через `size`/`radius`,
+environment map в PPM, список моделей, простые настройки изображения
+(`exposure`, `skyIntensity`, `lightIntensity`, `environmentIntensity`) и материалы:
 `matte`, `mirror`, `metal`, `glass`. Для материала поддерживаются
 `baseColor`, `roughness`, `metallic`, `specularColor`, `ior`, `alpha`, а также
 пути `texture`/`map_Kd` и `normalMap`.

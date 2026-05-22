@@ -36,6 +36,11 @@ struct SceneState
     float exposure = 0.82f;
     float skyIntensity = 0.78f;
     float lightIntensity = 0.95f;
+    float areaLightRadius = 0.0f;
+    float environmentIntensity = 1.0f;
+    std::string environmentType = "gradient";
+    std::string environmentPath;
+    MeshTexture environmentMap;
     int selectedSphere = 0;
     int selectedMeshObject = 0;
     int selectedMeshMaterial = 0;

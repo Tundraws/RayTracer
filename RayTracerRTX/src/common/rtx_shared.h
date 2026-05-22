@@ -125,6 +125,16 @@ inline float clampSceneSkyIntensity(const float value)
     return value < 0.0f ? 0.0f : (value > 3.0f ? 3.0f : value);
 }
 
+inline float clampSceneAreaLightRadius(const float value)
+{
+    return value < 0.0f ? 0.0f : (value > 12.0f ? 12.0f : value);
+}
+
+inline float clampSceneEnvironmentIntensity(const float value)
+{
+    return value < 0.0f ? 0.0f : (value > 4.0f ? 4.0f : value);
+}
+
 inline float3 toneMapAndGammaCorrect(const float3 color, const float exposure = 1.0f)
 {
     return gammaCorrect(reinhardToneMap(make_float3(
@@ -306,6 +316,8 @@ struct LaunchParams
     float exposure;
     float skyIntensity;
     float lightIntensity;
+    float areaLightRadius;
+    float environmentIntensity;
     SphereMaterial* materials;
     int sphereCount;
     MeshVertexGpu* meshVertices;
@@ -313,11 +325,15 @@ struct LaunchParams
     MeshMaterialGpu* meshMaterials;
     MeshObjectGpu* meshObjects;
     uchar4* meshTexturePixels;
+    uchar4* environmentPixels;
     unsigned int meshVertexCount;
     unsigned int meshTriangleCount;
     unsigned int meshMaterialCount;
     unsigned int meshObjectCount;
     unsigned int meshTexturePixelCount;
+    unsigned int environmentWidth;
+    unsigned int environmentHeight;
+    unsigned int environmentPixelCount;
     int maxDepth;
     int renderMode;
     int renderQuality;

@@ -51,6 +51,12 @@ struct SceneConfig
     float skyIntensity = 0.78f;
     bool hasLightIntensity = false;
     float lightIntensity = 0.95f;
+    bool hasAreaLightRadius = false;
+    float areaLightRadius = 0.0f;
+    bool hasEnvironmentIntensity = false;
+    float environmentIntensity = 1.0f;
+    std::string environmentType = "gradient";
+    std::filesystem::path environmentPath;
 };
 
 struct SceneConfigResult

@@ -59,10 +59,13 @@ Declared in `src/app/scene.h`.
 | `materials` | `std::vector<SphereMaterial>` | Per-sphere material data uploaded to GPU |
 | `meshObjects` | `std::vector<MeshObject>` | Polygonal OBJ mesh objects with asset reference, mesh data, and transform |
 | `mesh` | `MeshData` | Compatibility combined mesh used by tests/docs and fallback paths |
-| `lightPosition` | `float3` | Point-light position used by hit programs |
+| `lightPosition` | `float3` | Light position used by hit programs |
 | `exposure` | `float` | Tone-mapping exposure multiplier, clamped to a safe range |
 | `skyIntensity` | `float` | Environment-light intensity multiplier |
 | `lightIntensity` | `float` | Direct light intensity multiplier |
+| `areaLightRadius` | `float` | Area-light radius; zero keeps point-light behavior |
+| `environmentIntensity` | `float` | Extra multiplier for gradient sky or environment map |
+| `environmentMap` | `MeshTexture` | Optional PPM lat-long environment map |
 | `selectedSphere` | `int` | Index used by interactive controls |
 | `selectedMeshObject` | `int` | Mesh object index used by interactive controls |
 | `selectedMeshMaterial` | `int` | Material index inside the selected mesh object |
@@ -103,7 +106,11 @@ supports:
 - `meshObjects`: array of mesh objects with `path`, `position`, `rotation`, and
   `scale`;
 - `camera`: `position`, `yaw`, `pitch`, `fov`;
-- `light`: `position` and optional `intensity`;
+- `light`: `position`, optional `intensity`, and optional `size`/`radius` for
+  area-light soft shadows;
+- `environment`: optional object with `type`, `path`, and `intensity`; `path`
+  currently supports small ASCII PPM (`P3`) lat-long maps, with fallback to
+  gradient sky when the file is missing or invalid;
 - root-level or `render` object fields: `exposure`, `skyIntensity`,
   `lightIntensity`;
 - `materials`: named material inputs with `name`, `type`, `baseColor`,
@@ -296,13 +303,14 @@ Uploaded to the GPU before each OptiX launch.
 | `handle` | Top-level OptiX traversable handle |
 | `cameraPosition`, `cameraForward`, `cameraRight`, `cameraUp` | Camera ray generation data |
 | `cameraScale`, `cameraAspect` | Projection parameters |
-| `lightPosition` | Point-light input for hit programs |
-| `exposure`, `skyIntensity`, `lightIntensity` | Image and lighting tuning inputs |
+| `lightPosition`, `areaLightRadius` | Direct-light input for hit programs |
+| `exposure`, `skyIntensity`, `lightIntensity`, `environmentIntensity` | Image and lighting tuning inputs |
 | `materials`, `sphereCount` | Per-sphere material data |
 | `meshVertices`, `meshVertexCount` | OBJ mesh vertex buffer |
 | `meshTriangles`, `meshTriangleCount` | OBJ mesh triangle buffer with material indices |
 | `meshMaterials`, `meshMaterialCount` | OBJ mesh material buffer |
 | `meshTexturePixels`, `meshTexturePixelCount` | Packed diffuse and normal texture pixels for mesh materials |
+| `environmentPixels`, `environmentWidth`, `environmentHeight` | Optional PPM environment map buffer |
 | `accumulation` | Progressive float accumulation buffer |
 | `renderMode` | `RenderModeRealtime` or `RenderModeProgressive` |
 | `renderQuality` | Current `RenderQuality` mode |
@@ -366,7 +374,10 @@ conversion to `uchar4`:
 - Reinhard tone mapping compresses bright values;
 - gamma correction with gamma 2.2 converts linear color to display color.
 
-The miss shader uses a procedural gradient environment with a horizon glow and
-small sun highlight. Reflective materials sample this environment through their
-existing reflection rays.
+The miss shader uses either a procedural gradient environment with a horizon
+glow and small sun highlight, or an optional PPM lat-long environment map loaded
+from scene config. Reflective materials sample the same environment through
+their existing reflection rays. Area-light mode uses multiple deterministic
+shadow samples in Medium/High/PathTracing quality and falls back to one sample
+in Low quality or when the radius is zero.
 

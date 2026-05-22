@@ -10,6 +10,7 @@ The Docker setup provides a reproducible coursework verification environment for
 - documentation marker checks;
 - demo OBJ mesh and MTL asset checks;
 - demo textured OBJ, `map_Kd` PPM, and normal-map PPM asset checks;
+- demo PPM environment-map asset checks;
 - demo material showcase OBJ/MTL asset checks;
 - demo glTF `.gltf/.bin` asset checks;
 - demo JSON scene config checks;
@@ -36,6 +37,7 @@ driver integration. GPU execution is verified separately by the native
 - `RayTracerRTX/assets/meshes/minimal_gltf.bin`
 - `RayTracerRTX/assets/meshes/checker.ppm`
 - `RayTracerRTX/assets/meshes/checker_normal.ppm`
+- `RayTracerRTX/assets/meshes/studio_env.ppm`
 - `RayTracerRTX/assets/scenes/demo_scene.json`
 - `RayTracerRTX/assets/scenes/textured_scene.json`
 - `RayTracerRTX/assets/scenes/textured_cube_scene.json`
@@ -96,7 +98,7 @@ raytracerrtx-coursework-check:latest
 passing:
 
 ```text
-All tests passed. Tests: 49, skipped: 3
+All tests passed. Tests: 81, skipped: 4
 ```
 
 The skipped tests are the GPU smoke tests. This is expected in Docker because

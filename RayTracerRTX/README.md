@@ -69,10 +69,11 @@ JSON-сцена может задавать:
 
 - путь к модели;
 - camera;
-- light;
+- light, включая `size`/`radius` для area light;
 - exposure;
 - skyIntensity;
 - lightIntensity;
+- environment с PPM-картой окружения и `intensity`;
 - материалы через `materials`;
 - назначение материалов сферам через `sphereMaterials`;
 - назначение материала всему mesh-объекту через поле `material`.

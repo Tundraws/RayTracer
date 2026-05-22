@@ -960,6 +960,51 @@ void testSceneConfigTuningClamps(TestContext& t)
     t.expect(almostEqual(scene.scene.lightIntensity, 0.0f), "Light intensity should clamp to minimum.");
 }
 
+void testSceneConfigAreaLightAndEnvironment(TestContext& t)
+{
+    const std::filesystem::path envPath = writeFixtureFile(
+        "raytracerrtx_env_map.ppm",
+        "P3\n"
+        "2 1\n"
+        "255\n"
+        "255 0 0   0 0 255\n");
+    const std::filesystem::path configPath = writeFixtureFile(
+        "raytracerrtx_area_environment_scene.json",
+        "{\n"
+        "  \"light\": {\"position\": [1, 4, -2], \"intensity\": 1.1, \"size\": 2.5},\n"
+        "  \"environment\": {\"type\": \"map\", \"path\": \"raytracerrtx_env_map.ppm\", \"intensity\": 1.6}\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Area light/environment config should parse: " + config.error);
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Area light/environment scene should build.");
+    t.expect(almostEqual(scene.scene.areaLightRadius, 2.5f), "Area light size should parse.");
+    t.expect(almostEqual(scene.scene.environmentIntensity, 1.6f), "Environment intensity should parse.");
+    t.expect(scene.scene.environmentMap.width == 2u, "Environment PPM width should load.");
+    t.expect(scene.scene.environmentMap.height == 1u, "Environment PPM height should load.");
+    t.expect(scene.scene.environmentMap.pixels.size() == 2u, "Environment PPM pixels should load.");
+}
+
+void testSceneConfigAreaEnvironmentFallbacks(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "raytracerrtx_area_environment_fallback.json",
+        "{\n"
+        "  \"light\": {\"position\": [0, 5, 0], \"radius\": -10},\n"
+        "  \"environment\": {\"type\": \"map\", \"path\": \"missing_environment.ppm\", \"intensity\": 99}\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Fallback environment config should parse: " + config.error);
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Fallback environment scene should build.");
+    t.expect(almostEqual(scene.scene.areaLightRadius, 0.0f), "Invalid area light size should clamp to zero.");
+    t.expect(almostEqual(scene.scene.environmentIntensity, 4.0f), "Invalid environment intensity should clamp to maximum.");
+    t.expect(scene.scene.environmentMap.pixels.empty(), "Missing environment map should fall back to gradient sky.");
+    t.expect(!scene.warnings.empty(), "Missing environment map should add a warning.");
+}
+
 void testSceneConfigJsonMaterialParses(TestContext& t)
 {
     const std::filesystem::path configPath = writeFixtureFile(
@@ -1928,6 +1973,8 @@ int main(int argc, char** argv)
     runTest("Scene config mesh path applied", testSceneConfigMeshPathApplied);
     runTest("Scene config tuning fields", testSceneConfigTuningFields);
     runTest("Scene config tuning clamps", testSceneConfigTuningClamps);
+    runTest("Scene config area light and environment", testSceneConfigAreaLightAndEnvironment);
+    runTest("Scene config area environment fallbacks", testSceneConfigAreaEnvironmentFallbacks);
     runTest("Scene config JSON material parses", testSceneConfigJsonMaterialParses);
     runTest("Scene config material assigned to sphere", testSceneConfigMaterialAssignedToSphere);
     runTest("Scene config material assigned to mesh", testSceneConfigMaterialAssignedToMesh);

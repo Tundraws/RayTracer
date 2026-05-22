@@ -419,6 +419,76 @@ bool readSceneTuningFields(const JsonObject& object, SceneConfig& config, std::s
     return true;
 }
 
+bool readPpmToken(std::istream& input, std::string& token)
+{
+    while (input >> token)
+    {
+        if (!token.empty() && token[0] == '#')
+        {
+            std::string ignored;
+            std::getline(input, ignored);
+            continue;
+        }
+        return true;
+    }
+    return false;
+}
+
+bool loadPpmEnvironmentMap(const std::filesystem::path& path, MeshTexture& texture)
+{
+    std::ifstream file(path);
+    if (!file)
+    {
+        return false;
+    }
+
+    std::string magic;
+    std::string widthToken;
+    std::string heightToken;
+    std::string maxToken;
+    if (!readPpmToken(file, magic) || magic != "P3" ||
+        !readPpmToken(file, widthToken) ||
+        !readPpmToken(file, heightToken) ||
+        !readPpmToken(file, maxToken))
+    {
+        return false;
+    }
+
+    const int width = std::stoi(widthToken);
+    const int height = std::stoi(heightToken);
+    const int maxValue = std::stoi(maxToken);
+    if (width <= 0 || height <= 0 || maxValue <= 0)
+    {
+        return false;
+    }
+
+    std::vector<uchar4> pixels;
+    pixels.reserve(static_cast<size_t>(width * height));
+    for (int i = 0; i < width * height; ++i)
+    {
+        std::string rToken;
+        std::string gToken;
+        std::string bToken;
+        if (!readPpmToken(file, rToken) || !readPpmToken(file, gToken) || !readPpmToken(file, bToken))
+        {
+            return false;
+        }
+        const auto toByte = [maxValue](const std::string& value)
+        {
+            const int parsed = std::stoi(value);
+            const int clamped = std::clamp(parsed, 0, maxValue);
+            return static_cast<unsigned char>((clamped * 255) / maxValue);
+        };
+        pixels.push_back(make_uchar4(toByte(rToken), toByte(gToken), toByte(bToken), 255));
+    }
+
+    texture.path = path.string();
+    texture.width = static_cast<unsigned int>(width);
+    texture.height = static_cast<unsigned int>(height);
+    texture.pixels = std::move(pixels);
+    return true;
+}
+
 std::string lowerCopy(std::string value)
 {
     std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char ch)
@@ -1014,7 +1084,53 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
             }
             result.config.hasLightIntensity = true;
         }
+        if (findField(*light, "size") != nullptr || findField(*light, "radius") != nullptr)
+        {
+            const char* fieldName = findField(*light, "size") != nullptr ? "size" : "radius";
+            if (!readFloatField(*light, fieldName, result.config.areaLightRadius, error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.hasAreaLightRadius = true;
+        }
         result.config.hasLightPosition = true;
+    }
+
+    if (const JsonValue* environmentField = findField(*rootObject, "environment"))
+    {
+        const JsonObject* environment = asObject(*environmentField);
+        if (environment == nullptr)
+        {
+            result.error = "'environment' must be an object";
+            return result;
+        }
+
+        std::string error;
+        if (!readStringField(*environment, "type", result.config.environmentType, error))
+        {
+            result.error = error;
+            return result;
+        }
+        std::string path;
+        if (!readStringField(*environment, "path", path, error))
+        {
+            result.error = error;
+            return result;
+        }
+        if (!path.empty())
+        {
+            result.config.environmentPath = path;
+        }
+        if (findField(*environment, "intensity") != nullptr)
+        {
+            if (!readFloatField(*environment, "intensity", result.config.environmentIntensity, error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.hasEnvironmentIntensity = true;
+        }
     }
 
     result.ok = true;
@@ -1080,6 +1196,33 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     if (config.hasLightIntensity)
     {
         result.scene.lightIntensity = config.lightIntensity;
+    }
+    if (config.hasAreaLightRadius)
+    {
+        result.scene.areaLightRadius = config.areaLightRadius;
+    }
+    if (config.hasEnvironmentIntensity)
+    {
+        result.scene.environmentIntensity = config.environmentIntensity;
+    }
+    result.scene.environmentType = config.environmentType.empty() ? "gradient" : config.environmentType;
+    result.scene.environmentPath = config.environmentPath.string();
+    result.scene.areaLightRadius = clampSceneAreaLightRadius(result.scene.areaLightRadius);
+    result.scene.environmentIntensity = clampSceneEnvironmentIntensity(result.scene.environmentIntensity);
+    if (!config.environmentPath.empty())
+    {
+        const std::filesystem::path environmentPath = config.environmentPath.is_absolute()
+            ? config.environmentPath
+            : baseDirectory / config.environmentPath;
+        if (!loadPpmEnvironmentMap(environmentPath, result.scene.environmentMap))
+        {
+            result.warnings.push_back("Environment map could not be loaded, using gradient sky: " + environmentPath.string());
+        }
+        else
+        {
+            result.scene.environmentPath = environmentPath.string();
+            result.scene.environmentType = "map";
+        }
     }
     result.scene.exposure = clampSceneExposure(result.scene.exposure);
     result.scene.skyIntensity = clampSceneSkyIntensity(result.scene.skyIntensity);

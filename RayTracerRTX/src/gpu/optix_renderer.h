@@ -48,6 +48,7 @@ private:
     void createPipeline();
     void createSbt();
     void ensureSphereResources(const struct SceneState& scene);
+    void ensureEnvironmentResources(const struct SceneState& scene);
     void rebuildAccelerationStructure();
     void initializeDenoiser();
     void releaseDenoiser();
@@ -72,6 +73,7 @@ private:
     CUdeviceptr dMeshMaterials = 0;
     CUdeviceptr dMeshObjects = 0;
     CUdeviceptr dMeshTexturePixels = 0;
+    CUdeviceptr dEnvironmentPixels = 0;
     CUdeviceptr dSphereGasBuffer = 0;
     CUdeviceptr dPlaneGasBuffer = 0;
     std::vector<CUdeviceptr> dMeshIndexBuffers;
@@ -96,6 +98,7 @@ private:
     std::vector<std::array<float, 12>> meshInstanceTransforms;
     std::size_t sphereBufferCapacity = 0;
     std::size_t materialBufferCapacity = 0;
+    std::size_t environmentPixelCapacity = 0;
     unsigned int meshTexturePixelCount = 0;
     unsigned int meshObjectCount = 0;
     unsigned int accumulationSampleCount = 0;

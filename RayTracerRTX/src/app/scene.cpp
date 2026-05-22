@@ -118,6 +118,9 @@ SceneState makeDefaultScene()
     scene.exposure = 0.82f;
     scene.skyIntensity = 0.78f;
     scene.lightIntensity = 0.95f;
+    scene.areaLightRadius = 0.0f;
+    scene.environmentIntensity = 1.0f;
+    scene.environmentType = "gradient";
     scene.selectedSphere = 0;
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
@@ -155,6 +158,8 @@ void clampScene(SceneState& scene)
     scene.exposure = clampSceneExposure(scene.exposure);
     scene.skyIntensity = clampSceneSkyIntensity(scene.skyIntensity);
     scene.lightIntensity = clampSceneLightIntensity(scene.lightIntensity);
+    scene.areaLightRadius = clampSceneAreaLightRadius(scene.areaLightRadius);
+    scene.environmentIntensity = clampSceneEnvironmentIntensity(scene.environmentIntensity);
 
     if (scene.selectedSphere < 0)
     {

@@ -42,6 +42,9 @@ Schlick Fresnel, IOR-based refraction, and total internal reflection handling.
 Rough reflective materials broaden reflection directions as roughness increases;
 this is an approximation designed for stable real-time rendering, not a full
 offline material model.
+Scene config can also enable area-light soft shadows through `light.size` or
+`light.radius`, and an optional ASCII PPM environment map. If no environment map
+is provided, the renderer keeps using the procedural gradient sky.
 Progressive path tracing accumulation is available through the PathTracing
 quality mode. Optional OptiX denoising is enabled for that quality mode and is
 much heavier than the direct real-time modes.
@@ -56,22 +59,22 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low resolution / High quality | 640x360 | 632.76 | 1.58 | 1.55 |
-| HD resolution / High quality | 1280x720 | 216.06 | 4.63 | 4.60 |
-| Full HD resolution / High quality | 1920x1080 | 65.33 | 15.31 | 15.11 |
-| Low quality | 640x360 | 217.98 | 4.59 | 4.53 |
-| Medium quality | 640x360 | 115.24 | 8.68 | 8.41 |
-| High quality | 640x360 | 125.49 | 7.97 | 7.86 |
-| PathTracing quality + denoiser | 640x360 | 5.96 | 167.68 | 167.60 |
+| Low resolution / High quality | 640x360 | 617.72 | 1.62 | 1.59 |
+| HD resolution / High quality | 1280x720 | 222.02 | 4.50 | 4.48 |
+| Full HD resolution / High quality | 1920x1080 | 112.69 | 8.87 | 8.84 |
+| Low quality | 640x360 | 411.76 | 2.43 | 2.41 |
+| Medium quality | 640x360 | 161.95 | 6.17 | 6.14 |
+| High quality | 640x360 | 173.94 | 5.75 | 5.72 |
+| PathTracing quality + denoiser | 640x360 | 12.75 | 78.40 | 78.35 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD High quality averages about 65 FPS, so
-the current scene remains just above the 60 FPS target in the Debug build. The
+with the OBJ mesh scene enabled. Full HD High quality averages about 113 FPS, so
+the current scene remains above the 60 FPS target in the Debug build. The
 extra material, diffuse texture, normal-map shading state, dielectric
 refraction, rough reflection approximation, and per-object Triangle GAS/IAS
-layout remain within the real-time budget: average GPU time is about 15.1 ms at
+layout remain within the real-time budget: average GPU time is about 8.8 ms at
 1920x1080, under the 16.67 ms frame budget for 60 FPS.
 
 Quality modes are intended for demonstration and performance comparison. Low

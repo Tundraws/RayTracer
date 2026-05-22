@@ -23,6 +23,7 @@ RUN test -f README.md \
     && test -f RayTracerRTX/assets/meshes/minimal_gltf.bin \
     && test -f RayTracerRTX/assets/meshes/checker.ppm \
     && test -f RayTracerRTX/assets/meshes/checker_normal.ppm \
+    && test -f RayTracerRTX/assets/meshes/studio_env.ppm \
     && test -f RayTracerRTX/assets/scenes/demo_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_cube_scene.json \
@@ -49,6 +50,7 @@ RUN test -f README.md \
     && grep -q "TexturedCourseworkCube" RayTracerRTX/assets/meshes/textured_cube.obj \
     && grep -q "mat_glass_blue" RayTracerRTX/assets/meshes/material_showcase.mtl \
     && grep -q "MinimalGltfTriangle" RayTracerRTX/assets/meshes/minimal_gltf.gltf \
+    && grep -q "Small lat-long environment map" RayTracerRTX/assets/meshes/studio_env.ppm \
     && grep -q "OptiX" RayTracerRTX/README.md \
     && grep -q "__raygen__rg" RayTracerRTX/src/gpu/optix_device_programs.h
 
