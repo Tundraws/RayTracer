@@ -472,8 +472,15 @@ static __forceinline__ __device__ unsigned int hash32(unsigned int x)
 
 static __forceinline__ __device__ float random01(unsigned int& seed)
 {
-    seed = hash32(seed);
-    return static_cast<float>(seed & 0x00ffffffu) / 16777216.0f;
+    seed = seed * 747796405u + 2891336453u;
+    unsigned int word = ((seed >> ((seed >> 28u) + 4u)) ^ seed) * 277803737u;
+    word = (word >> 22u) ^ word;
+    return static_cast<float>(word & 0x00ffffffu) / 16777216.0f;
+}
+
+static __forceinline__ __device__ float maxComponent(const float3 value)
+{
+    return fmaxf(value.x, fmaxf(value.y, value.z));
 }
 
 static __forceinline__ __device__ float3 cosineHemisphereDirection(const float3 normal, unsigned int& seed)
@@ -489,6 +496,44 @@ static __forceinline__ __device__ float3 cosineHemisphereDirection(const float3 
     const float3 tangent = normalize3(cross3(helper, normal));
     const float3 bitangent = normalize3(cross3(normal, tangent));
     return normalize3(add3(add3(mul3(tangent, x), mul3(normal, y)), mul3(bitangent, z)));
+}
+
+static __forceinline__ __device__ float3 sampleRoughReflectionDirection(
+    const float3 reflectedDir,
+    const float3 normal,
+    const float roughness,
+    unsigned int& seed)
+{
+    const float r = safeMaterialRoughness(roughness);
+    const float spread = saturate1(r * r);
+    if (spread <= 0.0004f)
+    {
+        return normalize3(reflectedDir);
+    }
+
+    const float r1 = random01(seed);
+    const float r2 = random01(seed);
+    const float phi = 6.2831853f * r1;
+    const float coneCos = 1.0f - spread * r2;
+    const float coneSin = sqrtf(fmaxf(0.0f, 1.0f - coneCos * coneCos));
+    const float3 axis = normalize3(reflectedDir);
+    const float3 helper = fabsf(axis.y) < 0.999f ? make_vec(0.0f, 1.0f, 0.0f) : make_vec(1.0f, 0.0f, 0.0f);
+    const float3 tangent = normalize3(cross3(helper, axis));
+    const float3 bitangent = normalize3(cross3(axis, tangent));
+    float3 sampled = normalize3(add3(add3(mul3(tangent, cosf(phi) * coneSin), mul3(bitangent, sinf(phi) * coneSin)), mul3(axis, coneCos)));
+    if (dot3(sampled, normal) <= 0.001f)
+    {
+        sampled = normalize3(lerp3(sampled, normal, 0.35f + 0.5f * spread));
+    }
+    return sampled;
+}
+
+static __forceinline__ __device__ unsigned int makePixelSampleSeed(const uint3 idx, const uint3 dim, const int sample)
+{
+    unsigned int seed = hash32(idx.x * 1973u ^ idx.y * 9277u ^ dim.x * 26699u ^ dim.y * 31847u);
+    seed ^= hash32(params.accumulationSample * 9781u + static_cast<unsigned int>(sample) * 6271u);
+    seed ^= hash32(static_cast<unsigned int>(params.renderQuality) * 7919u + static_cast<unsigned int>(params.renderMode) * 104729u);
+    return hash32(seed);
 }
 
 static __forceinline__ __device__ int areaLightSampleCount()
@@ -586,8 +631,7 @@ static __forceinline__ __device__ float3 progressiveBounce(
     if (material.materialType == MaterialMirror || material.materialType == MaterialMetal)
     {
         const float3 reflected = normalize3(reflect3(rayDirection, normal));
-        const float3 diffuseLobe = cosineHemisphereDirection(normal, seed);
-        bounceDir = roughReflectionDir(lerp3(reflected, diffuseLobe, saturate1(material.roughness)), normal, material.roughness);
+        bounceDir = sampleRoughReflectionDirection(reflected, normal, material.roughness, seed);
         const float3 tint = material.materialType == MaterialMetal ? material.color : material.specularColor;
         throughput = make_vec(tint.x * baseColor.x, tint.y * baseColor.y, tint.z * baseColor.z);
     }
@@ -602,7 +646,7 @@ static __forceinline__ __device__ float3 progressiveBounce(
         float3 refractedDir{};
         if (chooseReflection < fresnel || !refract3(rayDirection, orientedNormal, eta, refractedDir))
         {
-            bounceDir = roughReflectionDir(normalize3(reflect3(rayDirection, orientedNormal)), orientedNormal, material.roughness);
+            bounceDir = sampleRoughReflectionDirection(normalize3(reflect3(rayDirection, orientedNormal)), orientedNormal, material.roughness, seed);
         }
         else
         {
@@ -613,6 +657,16 @@ static __forceinline__ __device__ float3 progressiveBounce(
     else
     {
         bounceDir = cosineHemisphereDirection(normal, seed);
+    }
+
+    if (depth >= 2u)
+    {
+        const float survival = fminf(fmaxf(maxComponent(throughput), 0.25f), 0.95f);
+        if (random01(seed) > survival)
+        {
+            return make_vec(0.0f, 0.0f, 0.0f);
+        }
+        throughput = mul3(throughput, 1.0f / survival);
     }
 
     const float3 bounced = traceRadiance(
@@ -800,7 +854,9 @@ static __forceinline__ __device__ float3 shadeMaterial(
 
     if (params.renderMode == RenderModeProgressive)
     {
-        const float3 indirect = progressiveBounce(hitPoint, normal, rayDirection, diffuseColor, material, depth);
+        MeshMaterialGpu progressiveMaterial = material;
+        progressiveMaterial.roughness = roughness;
+        const float3 indirect = progressiveBounce(hitPoint, normal, rayDirection, diffuseColor, progressiveMaterial, depth);
         localColor = add3(mul3(localColor, 0.72f), mul3(indirect, 0.28f));
     }
 
@@ -827,7 +883,7 @@ extern "C" __global__ void __raygen__rg()
     float3 color = make_vec(0.0f, 0.0f, 0.0f);
     for (int sample = 0; sample < primarySampleCount; ++sample)
     {
-        unsigned int seed = hash32(idx.x + idx.y * dim.x + params.accumulationSample * 9781u + static_cast<unsigned int>(sample) * 6271u);
+        unsigned int seed = makePixelSampleSeed(idx, dim, sample);
         const float jitterX = params.renderMode == RenderModeProgressive ? random01(seed) : offsets[sample].x;
         const float jitterY = params.renderMode == RenderModeProgressive ? random01(seed) : offsets[sample].y;
         const float u = (static_cast<float>(idx.x) + jitterX) / static_cast<float>(dim.x);

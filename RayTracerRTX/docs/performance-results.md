@@ -46,8 +46,11 @@ Scene config can also enable area-light soft shadows through `light.size` or
 `light.radius`, and an optional ASCII PPM environment map. If no environment map
 is provided, the renderer keeps using the procedural gradient sky.
 Progressive path tracing accumulation is available through the PathTracing
-quality mode. Optional OptiX denoising is enabled for that quality mode and is
-much heavier than the direct real-time modes.
+quality mode. The progressive sampler uses per-pixel/per-sample random numbers,
+cosine-weighted hemisphere sampling for matte bounces, rough reflection sampling
+for mirror/metal materials, a depth limit, and Russian roulette termination
+after the first few bounces. Optional OptiX denoising can be enabled for that
+quality mode and is much heavier than the direct real-time modes.
 The benchmark scene still uses the OBJ demo mesh; glTF import is covered by
 loader and scene-input tests rather than this FPS table.
 
@@ -59,18 +62,19 @@ because it includes display presentation and VSync settings.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low resolution / High quality | 640x360 | 617.72 | 1.62 | 1.59 |
-| HD resolution / High quality | 1280x720 | 222.02 | 4.50 | 4.48 |
-| Full HD resolution / High quality | 1920x1080 | 112.69 | 8.87 | 8.84 |
-| Low quality | 640x360 | 411.76 | 2.43 | 2.41 |
-| Medium quality | 640x360 | 161.95 | 6.17 | 6.14 |
-| High quality | 640x360 | 173.94 | 5.75 | 5.72 |
-| PathTracing quality + denoiser | 640x360 | 12.75 | 78.40 | 78.35 |
+| Low resolution / High quality | 640x360 | 634.32 | 1.58 | 1.55 |
+| HD resolution / High quality | 1280x720 | 215.16 | 4.65 | 4.61 |
+| Full HD resolution / High quality | 1920x1080 | 110.91 | 9.02 | 8.97 |
+| Low quality | 640x360 | 327.92 | 3.05 | 3.02 |
+| Medium quality | 640x360 | 173.47 | 5.76 | 5.72 |
+| High quality | 640x360 | 184.83 | 5.41 | 5.37 |
+| PathTracing quality | 640x360 | 78.67 | 12.71 | 12.65 |
+| PathTracing quality + denoiser | 640x360 | 13.28 | 75.33 | 75.28 |
 
 ## Interpretation
 
 The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD High quality averages about 113 FPS, so
+with the OBJ mesh scene enabled. Full HD High quality averages about 111 FPS, so
 the current scene remains above the 60 FPS target in the Debug build. The
 extra material, diffuse texture, normal-map shading state, dielectric
 refraction, rough reflection approximation, and per-object Triangle GAS/IAS
@@ -82,8 +86,10 @@ quality disables direct shadow rays and uses fewer samples/depth, so it is much
 faster but visually flatter. Medium and High keep shadows enabled and increase
 sample/depth budgets. PathTracing quality trades immediate stability for
 progressive convergence and denoising; moving the camera, light, spheres,
-materials, or mesh scene resets the accumulation buffer so stale samples are not
-mixed with the new view.
+materials, exposure, quality, denoiser state, or mesh scene resets the
+accumulation buffer so stale samples are not mixed with the new view. Without
+the denoiser, PathTracing quality remains interactive at 640x360 in the
+benchmark but is visibly noisy until samples accumulate.
 
 The optional OptiX denoiser greatly reduces progressive noise but is not a
 real-time default path in this Debug build. It is intentionally controlled by a

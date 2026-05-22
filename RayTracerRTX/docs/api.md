@@ -29,6 +29,10 @@ progressive path tracing accumulation and resets samples when the camera, light,
 scene, material, or mesh signature changes. Pressing `N` requests the optional
 OptiX denoiser for progressive mode. If denoiser initialization or invocation
 fails, the renderer keeps running without denoising.
+The progressive path currently uses a small stochastic sampler: per-pixel RNG,
+cosine-weighted matte bounces, rough reflection bounces for mirror/metal
+materials, a max-depth limit, and Russian roulette termination. It is still a
+coursework quality mode, not a full offline path tracer.
 The lightweight runtime controls also expose demo scene presets with `G`,
 selected mesh object cycling with `B`, selected mesh material preset cycling
 with `V`, and selected sphere material preset cycling with `M`.

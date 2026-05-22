@@ -2109,6 +2109,8 @@ void testRenderQualityDepthAndFallback(TestContext& t)
 {
     t.expect(clampRenderQuality(-100) == RenderQualityMedium, "Invalid low quality should fall back to Medium.");
     t.expect(clampRenderQuality(100) == RenderQualityMedium, "Invalid high quality should fall back to Medium.");
+    t.expect(renderQualityMaxDepth(-100) == renderQualityMaxDepth(RenderQualityMedium), "Invalid quality should use Medium max depth.");
+    t.expect(renderQualitySamplesPerPixel(100) == renderQualitySamplesPerPixel(RenderQualityMedium), "Invalid quality should use Medium sample count.");
     t.expect(!renderQualityShadowsEnabled(RenderQualityLow), "Low quality should disable direct shadow rays.");
     t.expect(renderQualityShadowsEnabled(RenderQualityMedium), "Medium quality should enable direct shadow rays.");
     t.expect(renderQualityUsesPathTracing(RenderQualityPathTracing), "PathTracing quality should request progressive rendering.");
@@ -2185,6 +2187,17 @@ bool runProgressiveGpuSmokeTest(TestContext& t)
         camera.yaw += 2.0f;
         renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
         t.expect(renderer.getAccumulationSampleCount() == 1u, "Progressive accumulation should reset on camera change.");
+
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        t.expect(renderer.getAccumulationSampleCount() == 2u, "Progressive mode should continue after camera reset.");
+
+        scene.exposure += 0.1f;
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        t.expect(renderer.getAccumulationSampleCount() == 1u, "Progressive accumulation should reset on exposure change.");
+
+        scene.lightPosition.x += 0.5f;
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+        t.expect(renderer.getAccumulationSampleCount() == 1u, "Progressive accumulation should reset on light change.");
 
         bool hasNonZeroPixel = false;
         for (const uchar4 px : pixels)
@@ -2335,14 +2348,14 @@ int runGpuBenchmark()
     std::cout << "| Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |\n";
     std::cout << "|---|---:|---:|---:|---:|\n";
 
-    const auto runBenchmarkRow = [](const char* name, const int width, const int height, const int frames, const int quality)
+    const auto runBenchmarkRow = [](const char* name, const int width, const int height, const int frames, const int quality, const bool denoiser)
     {
         OptixRenderer renderer;
         renderer.setRenderSize(width, height);
         renderer.initialize();
         renderer.setRenderQuality(quality);
         renderer.setRenderMode(renderQualityUsesPathTracing(quality) ? RenderModeProgressive : RenderModeRealtime);
-        renderer.setDenoiserEnabled(renderQualityUsesDenoiser(quality));
+        renderer.setDenoiserEnabled(denoiser);
 
         SceneState scene = makeDefaultScene();
         CameraState camera;
@@ -2381,13 +2394,14 @@ int runGpuBenchmark()
     for (const Scenario& scenario : scenarios)
     {
         std::string name = std::string(scenario.name) + " resolution / High quality";
-        runBenchmarkRow(name.c_str(), scenario.width, scenario.height, scenario.frames, RenderQualityHigh);
+        runBenchmarkRow(name.c_str(), scenario.width, scenario.height, scenario.frames, RenderQualityHigh, false);
     }
 
-    runBenchmarkRow("Low quality", 640, 360, 30, RenderQualityLow);
-    runBenchmarkRow("Medium quality", 640, 360, 30, RenderQualityMedium);
-    runBenchmarkRow("High quality", 640, 360, 30, RenderQualityHigh);
-    runBenchmarkRow("PathTracing quality + denoiser", 640, 360, 12, RenderQualityPathTracing);
+    runBenchmarkRow("Low quality", 640, 360, 30, RenderQualityLow, false);
+    runBenchmarkRow("Medium quality", 640, 360, 30, RenderQualityMedium, false);
+    runBenchmarkRow("High quality", 640, 360, 30, RenderQualityHigh, false);
+    runBenchmarkRow("PathTracing quality", 640, 360, 12, RenderQualityPathTracing, false);
+    runBenchmarkRow("PathTracing quality + denoiser", 640, 360, 12, RenderQualityPathTracing, true);
 
     return 0;
 #endif
@@ -2533,7 +2547,7 @@ int main(int argc, char** argv)
     ++testsRun;
     if (runProgressiveGpuSmokeTest(t))
     {
-        std::cout << "[PASS] Progressive GPU smoke test (checks: 5)\n";
+        std::cout << "[PASS] Progressive GPU smoke test (checks: 8)\n";
     }
     else
     {
