@@ -1321,11 +1321,13 @@ void OptixRenderer::destroy()
     {
         cudaFree(reinterpret_cast<void*>(dSphereGasBuffer));
         dSphereGasBuffer = 0;
+        sphereGasHandle = 0;
     }
     if (dPlaneGasBuffer != 0)
     {
         cudaFree(reinterpret_cast<void*>(dPlaneGasBuffer));
         dPlaneGasBuffer = 0;
+        planeGasHandle = 0;
     }
     for (CUdeviceptr buffer : dMeshGasBuffers)
     {
@@ -1335,10 +1337,12 @@ void OptixRenderer::destroy()
         }
     }
     dMeshGasBuffers.clear();
+    meshGasHandles.clear();
     if (dIasBuffer != 0)
     {
         cudaFree(reinterpret_cast<void*>(dIasBuffer));
         dIasBuffer = 0;
+        iasHandle = 0;
     }
     if (dIasInstances != 0)
     {

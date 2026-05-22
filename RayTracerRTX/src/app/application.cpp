@@ -219,6 +219,31 @@ bool materialTypeCombo(const char* id, int& materialType)
     return changed;
 }
 
+bool qualityCombo(const char* id, int& quality)
+{
+    const int qualities[] = {RenderQualityLow, RenderQualityMedium, RenderQualityHigh, RenderQualityPathTracing};
+    int selectedQuality = clampRenderQuality(quality);
+    bool changed = false;
+    if (ImGui::BeginCombo(id, qualityNameUtf8(selectedQuality)))
+    {
+        for (const int candidate : qualities)
+        {
+            const bool selected = selectedQuality == candidate;
+            if (ImGui::Selectable(qualityNameUtf8(candidate), selected))
+            {
+                quality = candidate;
+                changed = true;
+            }
+            if (selected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
 void applyQualityMode(AppState& appState)
 {
     appState.renderQuality = clampRenderQuality(appState.renderQuality);
@@ -718,6 +743,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             meshMaterial->alpha = clampf(meshMaterial->alpha, 0.0f, 1.0f);
             syncSelectedMeshMaterialToCombined(scene);
             appState.progressiveSamples = 0;
+            appState.rendererSceneRebuildRequested = true;
         }
     }
 
@@ -844,12 +870,13 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
 
     ImGui::Separator();
     ImGui::SeparatorText(u8c(u8"\u0420\u0435\u0436\u0438\u043C\u044B"));
-    if (ImGui::Button(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E")))
+    ImGui::TextUnformatted(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E"));
+    int selectedQuality = appState.renderQuality;
+    if (qualityCombo("##quality_mode", selectedQuality))
     {
-        appState.renderQuality = nextRenderQuality(appState.renderQuality);
+        appState.renderQuality = selectedQuality;
         applyQualityMode(appState);
     }
-    ImGui::SameLine();
     if (ImGui::Button(appState.renderMode == RenderModeProgressive ? u8c(u8"\u0420\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F") : u8c(u8"\u041D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435")))
     {
         appState.renderMode = appState.renderMode == RenderModeProgressive ? RenderModeRealtime : RenderModeProgressive;
