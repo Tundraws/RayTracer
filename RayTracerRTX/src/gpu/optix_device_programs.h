@@ -62,13 +62,16 @@ static __forceinline__ __device__ float3 reflect3(const float3 i, const float3 n
 
 static __forceinline__ __device__ bool refract3(const float3 i, const float3 n, const float eta, float3& refracted)
 {
-    const float cosi = fminf(fmaxf(dot3(i, n), -1.0f), 1.0f);
-    const float k = 1.0f - eta * eta * (1.0f - cosi * cosi);
+    const float safeEta = fminf(fmaxf(eta, 0.01f), 8.0f);
+    const float cosi = fminf(fmaxf(-dot3(i, n), 0.0f), 1.0f);
+    const float sin2Theta = 1.0f - cosi * cosi;
+    const float k = 1.0f - safeEta * safeEta * sin2Theta;
     if (k < 0.0f)
     {
+        refracted = make_vec(0.0f, 0.0f, 0.0f);
         return false;
     }
-    refracted = normalize3(add3(mul3(i, eta), mul3(n, eta * -cosi - sqrtf(k))));
+    refracted = normalize3(add3(mul3(i, safeEta), mul3(n, safeEta * cosi - sqrtf(k))));
     return true;
 }
 
@@ -134,6 +137,28 @@ static __forceinline__ __device__ float fresnelSchlick(const float cosTheta, con
     return f0 + (1.0f - f0) * m2 * m2 * m;
 }
 
+static __forceinline__ __device__ float safeMaterialRoughness(const float roughness)
+{
+    return fminf(fmaxf(roughness, 0.02f), 1.0f);
+}
+
+static __forceinline__ __device__ float safeMaterialIor(const float ior)
+{
+    return fminf(fmaxf(ior, 1.01f), 2.8f);
+}
+
+static __forceinline__ __device__ float dielectricF0(const float ior)
+{
+    const float safeIor = safeMaterialIor(ior);
+    const float f0 = (safeIor - 1.0f) / (safeIor + 1.0f);
+    return f0 * f0;
+}
+
+static __forceinline__ __device__ float dielectricFresnel(const float cosTheta, const float ior)
+{
+    return fresnelSchlick(cosTheta, dielectricF0(ior));
+}
+
 static __forceinline__ __device__ float ggxDistributionDevice(const float nDotH, const float roughness)
 {
     const float alpha = fmaxf(saturate1(roughness), 0.045f);
@@ -194,10 +219,21 @@ static __forceinline__ __device__ float3 ggxDirectLight(
 
 static __forceinline__ __device__ float3 roughReflectionDir(const float3 reflectedDir, const float3 normal, const float roughness)
 {
-    const float blend = saturate1(roughness * roughness);
-    return normalize3(lerp3(reflectedDir, normal, 0.45f * blend));
+    const float r = safeMaterialRoughness(roughness);
+    const float spread = saturate1(r * r);
+    const float3 helper = fabsf(normal.y) < 0.999f ? make_vec(0.0f, 1.0f, 0.0f) : make_vec(1.0f, 0.0f, 0.0f);
+    const float3 tangent = normalize3(cross3(helper, normal));
+    const float3 bitangent = normalize3(cross3(normal, tangent));
+    const float phaseRaw = sinf(dot3(reflectedDir, make_vec(12.9898f, 78.233f, 37.719f))) * 43758.5453f;
+    const float phase = phaseRaw - floorf(phaseRaw);
+    const float angle = 6.2831853f * phase;
+    const float3 lobeOffset = add3(mul3(tangent, cosf(angle)), mul3(bitangent, sinf(angle)));
+    const float3 broadened = normalize3(add3(add3(reflectedDir, mul3(lobeOffset, 0.85f * spread)), mul3(normal, 0.18f * spread)));
+    return normalize3(lerp3(reflectedDir, broadened, spread));
 }
 
+)"
+R"(
 static __forceinline__ __device__ float3 sampleDiffuseTexture(const MeshMaterialGpu material, const float2 texcoord)
 {
     if (material.hasTexture == 0 || material.textureWidth == 0u || material.textureHeight == 0u || params.meshTexturePixels == nullptr)
@@ -400,8 +436,22 @@ static __forceinline__ __device__ float3 progressiveBounce(
     }
     else if (material.materialType == MaterialDielectric)
     {
-        bounceDir = normalize3(reflect3(rayDirection, normal));
-        throughput = lerp3(make_vec(1.0f, 1.0f, 1.0f), material.color, 0.25f);
+        const float frontFace = dot3(rayDirection, normal) < 0.0f ? 1.0f : 0.0f;
+        const float3 orientedNormal = frontFace > 0.5f ? normal : mul3(normal, -1.0f);
+        const float eta = frontFace > 0.5f ? 1.0f / safeMaterialIor(material.ior) : safeMaterialIor(material.ior);
+        const float cosTheta = saturate1(dot3(mul3(rayDirection, -1.0f), orientedNormal));
+        const float fresnel = dielectricFresnel(cosTheta, material.ior);
+        const float chooseReflection = random01(seed);
+        float3 refractedDir{};
+        if (chooseReflection < fresnel || !refract3(rayDirection, orientedNormal, eta, refractedDir))
+        {
+            bounceDir = roughReflectionDir(normalize3(reflect3(rayDirection, orientedNormal)), orientedNormal, material.roughness);
+        }
+        else
+        {
+            bounceDir = refractedDir;
+        }
+        throughput = lerp3(make_vec(1.0f, 1.0f, 1.0f), material.color, 0.22f);
     }
     else
     {
@@ -462,7 +512,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
     const float ambient = 0.14f;
     const float diffuseShadowFloor = 0.34f;
     const float mirrorShadowFloor = 0.50f;
-    const float roughness = fmaxf(saturate1(material.roughness), 0.02f);
+    const float roughness = safeMaterialRoughness(material.roughness);
     const float shadowFloor = material.materialType == MaterialMirror || material.materialType == MaterialMetal || material.materialType == MaterialDielectric
         ? mirrorShadowFloor
         : diffuseShadowFloor;
@@ -538,11 +588,10 @@ static __forceinline__ __device__ float3 shadeMaterial(
         if (depth < static_cast<unsigned int>(params.maxDepth))
         {
             const float frontFace = dot3(rayDirection, normal) < 0.0f ? 1.0f : 0.0f;
-            const float eta = frontFace > 0.5f ? 1.0f / fmaxf(material.ior, 1.01f) : fmaxf(material.ior, 1.01f);
+            const float eta = frontFace > 0.5f ? 1.0f / safeMaterialIor(material.ior) : safeMaterialIor(material.ior);
             const float3 orientedNormal = frontFace > 0.5f ? normal : mul3(normal, -1.0f);
-            const float cosTheta = fminf(dot3(mul3(rayDirection, -1.0f), orientedNormal), 1.0f);
-            const float f0 = (material.ior - 1.0f) / (material.ior + 1.0f);
-            const float fresnel = fresnelSchlick(cosTheta, f0 * f0);
+            const float cosTheta = saturate1(dot3(mul3(rayDirection, -1.0f), orientedNormal));
+            const float fresnel = dielectricFresnel(cosTheta, material.ior);
 
             const float3 reflectedDir = roughReflectionDir(normalize3(reflect3(rayDirection, orientedNormal)), orientedNormal, roughness);
             const float3 reflectedColor = traceRadiance(
@@ -556,7 +605,8 @@ static __forceinline__ __device__ float3 shadeMaterial(
 
             float3 transmittedColor = localColor;
             float3 refractedDir{};
-            if (refract3(rayDirection, orientedNormal, eta, refractedDir))
+            const bool refracted = refract3(rayDirection, orientedNormal, eta, refractedDir);
+            if (refracted)
             {
                 transmittedColor = traceRadiance(
                     params.handle,
@@ -568,12 +618,13 @@ static __forceinline__ __device__ float3 shadeMaterial(
                     optixGetPayload_4() ^ 0x27d4eb2fu);
             }
 
+            const float reflectionMix = refracted ? fresnel : 1.0f;
             const float opacity = saturate1(material.alpha);
             const float3 tint = lerp3(make_vec(1.0f, 1.0f, 1.0f), material.color, 0.35f);
             const float3 glassColor = lerp3(
                 make_vec(transmittedColor.x * tint.x, transmittedColor.y * tint.y, transmittedColor.z * tint.z),
                 reflectedColor,
-                fminf(1.0f, fresnel + roughness * 0.25f));
+                fminf(1.0f, reflectionMix + roughness * 0.18f));
             localColor = lerp3(glassColor, localColor, opacity * 0.18f);
         }
     }

@@ -143,6 +143,68 @@ inline float ggxClampRoughness(const float roughness)
     return roughness < 0.045f ? 0.045f : (roughness > 1.0f ? 1.0f : roughness);
 }
 
+inline float clampMaterialRoughnessShared(const float roughness)
+{
+    return roughness < 0.02f ? 0.02f : (roughness > 1.0f ? 1.0f : roughness);
+}
+
+inline float clampMaterialIorShared(const float ior)
+{
+    return ior < 1.01f ? 1.01f : (ior > 2.8f ? 2.8f : ior);
+}
+
+inline float dielectricF0FromIor(const float ior)
+{
+    const float safeIor = clampMaterialIorShared(ior);
+    const float f0 = (safeIor - 1.0f) / (safeIor + 1.0f);
+    return f0 * f0;
+}
+
+inline float dielectricFresnelSchlick(const float cosTheta, const float ior)
+{
+    const float f0 = dielectricF0FromIor(ior);
+    const float m = clamp01(1.0f - cosTheta);
+    const float m2 = m * m;
+    return f0 + (1.0f - f0) * m2 * m2 * m;
+}
+
+inline float dotShared(const float3 a, const float3 b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+inline float3 addShared(const float3 a, const float3 b)
+{
+    return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+inline float3 mulShared(const float3 a, const float b)
+{
+    return make_float3(a.x * b, a.y * b, a.z * b);
+}
+
+inline float3 normalizeShared(const float3 v)
+{
+    const float len = std::sqrt(dotShared(v, v));
+    return len > 0.0f ? mulShared(v, 1.0f / len) : make_float3(0.0f, 0.0f, 0.0f);
+}
+
+inline bool refractDirection(const float3 incident, const float3 normal, const float eta, float3& refracted)
+{
+    const float safeEta = eta < 0.01f ? 0.01f : (eta > 8.0f ? 8.0f : eta);
+    const float cosi = ggxClampDot(-dotShared(incident, normal));
+    const float sin2Theta = 1.0f - cosi * cosi;
+    const float k = 1.0f - safeEta * safeEta * sin2Theta;
+    if (k < 0.0f)
+    {
+        refracted = make_float3(0.0f, 0.0f, 0.0f);
+        return false;
+    }
+
+    refracted = normalizeShared(addShared(mulShared(incident, safeEta), mulShared(normal, safeEta * cosi - std::sqrt(k))));
+    return true;
+}
+
 inline float ggxDistribution(const float nDotH, const float roughness)
 {
     const float alpha = ggxClampRoughness(roughness);

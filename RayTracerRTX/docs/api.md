@@ -252,7 +252,7 @@ Declared in `src/common/rtx_shared.h`.
 | `MaterialDiffuse` | Local diffuse shading with shadow and specular component |
 | `MaterialMirror` | Recursive mirror reflection with depth limit |
 | `MaterialMetal` | Tinted reflective material with roughness-controlled reflection |
-| `MaterialDielectric` | Simple glass/dielectric approximation with Fresnel and refraction |
+| `MaterialDielectric` | Simplified glass/dielectric model with Schlick Fresnel, IOR refraction and total internal reflection handling |
 
 ### `RenderQuality`
 
@@ -266,10 +266,14 @@ Declared in `src/common/rtx_shared.h`.
 Direct lighting for diffuse, mirror, and metal materials uses a physically
 motivated GGX/Trowbridge-Reitz microfacet BRDF. The shader evaluates the normal
 distribution term `D`, Smith geometry term `G`, and Schlick Fresnel `F`, with
-clamped roughness and dot products to avoid NaN/Inf values. `Kd` maps to
-baseColor, `Ks` tints the specular approximation, `Ns` maps to roughness, and
-material names containing `metal` use metallic shading. This is a physically
-motivated material model with the limited material inputs listed above.
+clamped roughness and dot products to avoid NaN/Inf values. Glass materials use
+Schlick Fresnel from `ior`, trace refraction rays, and fall back to reflection
+when total internal reflection occurs. Rough mirror and metal reflections use a
+deterministic broadened reflection direction so roughness has a visible effect
+in real-time mode. `Kd` maps to baseColor, `Ks` tints the specular
+approximation, `Ns` maps to roughness, and material names containing `metal`
+use metallic shading. This is a physically motivated material model with the
+limited material inputs listed above, not a full physically correct renderer.
 
 ### `SphereMaterial`
 

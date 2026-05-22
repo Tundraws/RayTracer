@@ -99,9 +99,9 @@ flowchart TD
     NormalMap --> MeshMaterial
     MeshClosestHit --> MeshMaterial{"Mesh material type"}
     MeshMaterial --> MeshDiffuse["GGX direct lighting + shadow"]
-    MeshMaterial --> MeshMirror["Mirror reflection ray"]
-    MeshMaterial --> MeshMetal["Metallic GGX + tinted reflection"]
-    MeshMaterial --> MeshGlass["Dielectric Fresnel/refraction approximation"]
+    MeshMaterial --> MeshMirror["Mirror reflection ray + roughness broadening"]
+    MeshMaterial --> MeshMetal["Metallic GGX + tinted rough reflection"]
+    MeshMaterial --> MeshGlass["Dielectric Fresnel + refraction + internal reflection"]
     MeshMirror --> Depth
     MeshMetal --> Depth
     MeshGlass --> Depth

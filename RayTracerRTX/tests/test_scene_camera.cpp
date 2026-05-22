@@ -243,6 +243,33 @@ void testGgxMathHelpers(TestContext& t)
     const float fFacing = ggxFresnelSchlick(1.0f, f0);
     t.expect(almostEqual(fFacing, f0), "Schlick Fresnel should equal F0 at normal incidence.");
     t.expect(fGrazing > fFacing, "Schlick Fresnel should increase at grazing angles.");
+
+    const float glassF0 = dielectricF0FromIor(1.5f);
+    const float glassFacing = dielectricFresnelSchlick(1.0f, 1.5f);
+    const float glassGrazing = dielectricFresnelSchlick(0.0f, 1.5f);
+    t.expect(glassF0 > 0.03f && glassF0 < 0.05f, "Dielectric F0 should be plausible for IOR 1.5.");
+    t.expect(almostEqual(glassFacing, glassF0), "Dielectric Fresnel should match F0 at normal incidence.");
+    t.expect(glassGrazing > glassFacing && glassGrazing <= 1.0f, "Dielectric Fresnel should increase toward grazing angles.");
+
+    float3 refracted{};
+    const bool airToGlass = refractDirection(
+        make_float3(0.0f, -1.0f, 0.0f),
+        make_float3(0.0f, 1.0f, 0.0f),
+        1.0f / 1.5f,
+        refracted);
+    t.expect(airToGlass, "Refraction should work at normal incidence.");
+    t.expect(almostEqual(refracted.y, -1.0f), "Normal-incidence refraction should keep direction.");
+
+    const bool totalInternalReflection = refractDirection(
+        normalizeShared(make_float3(0.95f, -0.31f, 0.0f)),
+        make_float3(0.0f, 1.0f, 0.0f),
+        1.5f,
+        refracted);
+    t.expect(!totalInternalReflection, "Refraction helper should detect total internal reflection.");
+    t.expect(almostEqual(clampMaterialRoughnessShared(-5.0f), 0.02f), "Shared roughness clamp should clamp low values.");
+    t.expect(almostEqual(clampMaterialRoughnessShared(5.0f), 1.0f), "Shared roughness clamp should clamp high values.");
+    t.expect(almostEqual(clampMaterialIorShared(0.1f), 1.01f), "Shared IOR clamp should clamp low values.");
+    t.expect(almostEqual(clampMaterialIorShared(9.0f), 2.8f), "Shared IOR clamp should clamp high values.");
 }
 
 void testObjLoaderMultipleMaterials(TestContext& t)
