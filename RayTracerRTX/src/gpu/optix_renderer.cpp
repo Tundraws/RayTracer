@@ -791,6 +791,34 @@ void OptixRenderer::createScene(const SceneState& scene)
     rebuildAccelerationStructure();
 }
 
+void OptixRenderer::syncMeshInstanceTransforms(const SceneState& scene)
+{
+    std::vector<MeshObject> renderMeshObjects = scene.meshObjects;
+    if (renderMeshObjects.empty() && !isEmptyMesh(scene.mesh))
+    {
+        MeshObject legacyMeshObject;
+        legacyMeshObject.assetReference = "legacy SceneState::mesh";
+        legacyMeshObject.mesh = scene.mesh;
+        renderMeshObjects.push_back(std::move(legacyMeshObject));
+    }
+
+    std::vector<std::array<float, 12>> transforms;
+    transforms.reserve(renderMeshObjects.size());
+    for (const MeshObject& object : renderMeshObjects)
+    {
+        if (isEmptyMesh(object.mesh) || !hasValidMeshMaterialIndices(object.mesh))
+        {
+            continue;
+        }
+        transforms.push_back(object.transform);
+    }
+
+    if (transforms.size() == meshInstanceTransforms.size())
+    {
+        meshInstanceTransforms = std::move(transforms);
+    }
+}
+
 void OptixRenderer::rebuildAccelerationStructure()
 {
     CUdeviceptr dSphereTempBuffer = 0;
@@ -1225,6 +1253,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
         cudaMemcpyHostToDevice,
         stream));
 
+    syncMeshInstanceTransforms(scene);
     rebuildAccelerationStructure();
 
     LaunchParams params{};

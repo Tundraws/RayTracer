@@ -728,27 +728,34 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
 
         ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435"));
         bool positionChanged = false;
-        positionChanged = ImGui::SliderFloat("X##mesh_pos_x", &position[0], -50.0f, 50.0f, "%.2f") || positionChanged;
-        positionChanged = ImGui::SliderFloat("Y##mesh_pos_y", &position[1], -10.0f, 50.0f, "%.2f") || positionChanged;
-        positionChanged = ImGui::SliderFloat("Z##mesh_pos_z", &position[2], -50.0f, 50.0f, "%.2f") || positionChanged;
+        positionChanged = ImGui::DragFloat("X##mesh_pos_x", &position[0], 0.02f, -50.0f, 50.0f, "%.2f") || positionChanged;
+        positionChanged = ImGui::DragFloat("Y##mesh_pos_y", &position[1], 0.02f, -10.0f, 50.0f, "%.2f") || positionChanged;
+        positionChanged = ImGui::DragFloat("Z##mesh_pos_z", &position[2], 0.02f, -50.0f, 50.0f, "%.2f") || positionChanged;
         if (positionChanged)
         {
             transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
         }
         ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442"));
-        if (ImGui::DragFloat3("##mesh_rotation", rotation, 0.5f, -360.0f, 360.0f, "%.1f"))
+        bool rotationChanged = false;
+        rotationChanged = ImGui::DragFloat("X##mesh_rot_x", &rotation[0], 0.25f, -360.0f, 360.0f, "%.1f") || rotationChanged;
+        rotationChanged = ImGui::DragFloat("Y##mesh_rot_y", &rotation[1], 0.25f, -360.0f, 360.0f, "%.1f") || rotationChanged;
+        rotationChanged = ImGui::DragFloat("Z##mesh_rot_z", &rotation[2], 0.25f, -360.0f, 360.0f, "%.1f") || rotationChanged;
+        if (rotationChanged)
         {
             transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
         }
         ImGui::TextUnformatted(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431"));
-        if (ImGui::DragFloat3("##mesh_scale", scale, 0.02f, 0.05f, 20.0f, "%.2f"))
+        bool scaleChanged = false;
+        scaleChanged = ImGui::DragFloat("X##mesh_scale_x", &scale[0], 0.01f, 0.05f, 20.0f, "%.2f") || scaleChanged;
+        scaleChanged = ImGui::DragFloat("Y##mesh_scale_y", &scale[1], 0.01f, 0.05f, 20.0f, "%.2f") || scaleChanged;
+        scaleChanged = ImGui::DragFloat("Z##mesh_scale_z", &scale[2], 0.01f, 0.05f, 20.0f, "%.2f") || scaleChanged;
+        if (scaleChanged)
         {
             transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
         }
         if (transformChanged)
         {
             appState.progressiveSamples = 0;
-            appState.rendererSceneRebuildRequested = true;
         }
     }
 

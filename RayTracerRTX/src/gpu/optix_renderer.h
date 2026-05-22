@@ -49,6 +49,7 @@ private:
     void createSbt();
     void ensureSphereResources(const struct SceneState& scene);
     void ensureEnvironmentResources(const struct SceneState& scene);
+    void syncMeshInstanceTransforms(const struct SceneState& scene);
     void rebuildAccelerationStructure();
     void initializeDenoiser();
     void releaseDenoiser();
