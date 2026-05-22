@@ -592,6 +592,10 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     {
         panelFlags |= ImGuiWindowFlags_NoMove;
     }
+    if (appState.cursorCaptured)
+    {
+        panelFlags |= ImGuiWindowFlags_NoInputs;
+    }
     ImGui::Begin(
         u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C \u0441\u0446\u0435\u043D\u044B"),
         &appState.imguiPanelVisible,
@@ -723,7 +727,11 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
 
         ImGui::TextUnformatted(u8c(u8"\u041F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435"));
-        if (ImGui::DragFloat3("##mesh_position", position, 0.05f, -50.0f, 50.0f, "%.2f"))
+        bool positionChanged = false;
+        positionChanged = ImGui::SliderFloat("X##mesh_pos_x", &position[0], -50.0f, 50.0f, "%.2f") || positionChanged;
+        positionChanged = ImGui::SliderFloat("Y##mesh_pos_y", &position[1], -10.0f, 50.0f, "%.2f") || positionChanged;
+        positionChanged = ImGui::SliderFloat("Z##mesh_pos_z", &position[2], -50.0f, 50.0f, "%.2f") || positionChanged;
+        if (positionChanged)
         {
             transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
         }
@@ -1008,6 +1016,11 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int)
     }
 
     if (button != GLFW_MOUSE_BUTTON_LEFT)
+    {
+        return;
+    }
+
+    if (!state->cursorCaptured && ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantCaptureMouse)
     {
         return;
     }
