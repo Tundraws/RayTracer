@@ -67,6 +67,7 @@ struct AppState
     int scenePresetIndex = 0;
     std::string lastUiMessage;
     bool lastUiMessageIsError = false;
+    bool rendererSceneRebuildRequested = false;
 };
 
 struct FrameStats
@@ -449,6 +450,7 @@ bool applyScenePreset(AppState& appState, const int index)
 
     appState.scenePresetIndex = index;
     appState.progressiveSamples = 0;
+    appState.rendererSceneRebuildRequested = true;
     return true;
 }
 
@@ -468,6 +470,7 @@ bool resetCurrentPresetView(AppState& appState)
     {
         saveCurrentScenePreset(appState);
         appState.progressiveSamples = 0;
+        appState.rendererSceneRebuildRequested = true;
     }
     return reset;
 }
@@ -520,6 +523,7 @@ bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPat
 
     appState.scenePresetIndex = newPresetIndex;
     appState.progressiveSamples = 0;
+    appState.rendererSceneRebuildRequested = true;
     appState.lastUiMessage = "Модель загружена: " + meshPath.filename().string();
     appState.lastUiMessageIsError = false;
     return true;
@@ -1356,6 +1360,17 @@ void run_optix_app(const ApplicationOptions& options)
         }
 
         processInput(window, appState, deltaTimeSec);
+        if (appState.rendererSceneRebuildRequested)
+        {
+            renderer.destroy();
+            renderer.setRenderSize(gWidth, gHeight);
+            renderer.initialize(appState.scene);
+            renderer.setRenderQuality(appState.renderQuality);
+            renderer.setRenderMode(appState.renderMode);
+            renderer.setDenoiserEnabled(appState.denoiserEnabled);
+            appState.progressiveSamples = 0;
+            appState.rendererSceneRebuildRequested = false;
+        }
 
         const auto hostFrameStart = std::chrono::steady_clock::now();
         float gpuTimeMs = 0.0f;
