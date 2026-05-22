@@ -1,0 +1,24 @@
+newmtl mat_matte_clay
+Kd 0.72 0.42 0.32
+Ks 0.08 0.06 0.05
+Ns 32
+d 1.0
+
+newmtl mat_metal_blue
+Kd 0.22 0.44 0.82
+Ks 0.9 0.95 1.0
+Ns 180
+d 1.0
+
+newmtl mat_glass_clear
+Kd 0.70 0.90 1.0
+Ks 1.0 1.0 1.0
+Ns 220
+Ni 1.45
+d 0.35
+
+newmtl mat_mirror_silver
+Kd 0.82 0.84 0.86
+Ks 1.0 1.0 1.0
+Ns 400
+d 1.0

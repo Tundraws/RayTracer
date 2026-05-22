@@ -19,8 +19,14 @@ RUN test -f README.md \
     && test -f RayTracerRTX/assets/meshes/textured_demo.mtl \
     && test -f RayTracerRTX/assets/meshes/material_showcase.obj \
     && test -f RayTracerRTX/assets/meshes/material_showcase.mtl \
+    && test -f RayTracerRTX/assets/meshes/demo_shapes.mtl \
+    && test -f RayTracerRTX/assets/meshes/low_poly_crystal.obj \
+    && test -f RayTracerRTX/assets/meshes/simple_column.obj \
+    && test -f RayTracerRTX/assets/meshes/block_arch.obj \
     && test -f RayTracerRTX/assets/meshes/minimal_gltf.gltf \
     && test -f RayTracerRTX/assets/meshes/minimal_gltf.bin \
+    && test -f RayTracerRTX/assets/meshes/gltf_diamond.gltf \
+    && test -f RayTracerRTX/assets/meshes/gltf_diamond.bin \
     && test -f RayTracerRTX/assets/meshes/checker.ppm \
     && test -f RayTracerRTX/assets/meshes/checker_normal.ppm \
     && test -f RayTracerRTX/assets/meshes/studio_env.ppm \
@@ -28,7 +34,9 @@ RUN test -f README.md \
     && test -f RayTracerRTX/assets/scenes/textured_scene.json \
     && test -f RayTracerRTX/assets/scenes/textured_cube_scene.json \
     && test -f RayTracerRTX/assets/scenes/multi_mesh_scene.json \
+    && test -f RayTracerRTX/assets/scenes/obj_shapes_scene.json \
     && test -f RayTracerRTX/assets/scenes/gltf_scene.json \
+    && test -f RayTracerRTX/assets/scenes/gltf_diamond_scene.json \
     && test -f RayTracerRTX/assets/scenes/material_showcase_scene.json \
     && test -f RayTracerRTX/assets/scenes/path_tracing_demo_scene.json \
     && test -f RayTracerRTX/src/app/mesh.cpp \
@@ -50,6 +58,8 @@ RUN test -f README.md \
     && grep -q "TexturedCourseworkCube" RayTracerRTX/assets/meshes/textured_cube.obj \
     && grep -q "mat_glass_blue" RayTracerRTX/assets/meshes/material_showcase.mtl \
     && grep -q "MinimalGltfTriangle" RayTracerRTX/assets/meshes/minimal_gltf.gltf \
+    && grep -q "LowPolyCrystal" RayTracerRTX/assets/meshes/low_poly_crystal.obj \
+    && grep -q "GltfDiamond" RayTracerRTX/assets/meshes/gltf_diamond.gltf \
     && grep -q "Small lat-long environment map" RayTracerRTX/assets/meshes/studio_env.ppm \
     && grep -q "OptiX" RayTracerRTX/README.md \
     && grep -q "__raygen__rg" RayTracerRTX/src/gpu/optix_device_programs.h

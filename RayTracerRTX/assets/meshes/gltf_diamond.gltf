@@ -1,0 +1,58 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "RayTracerRTX coursework glTF diamond fixture"
+  },
+  "buffers": [
+    {
+      "uri": "gltf_diamond.bin",
+      "byteLength": 192
+    }
+  ],
+  "bufferViews": [
+    { "buffer": 0, "byteOffset": 0, "byteLength": 72 },
+    { "buffer": 0, "byteOffset": 72, "byteLength": 72 },
+    { "buffer": 0, "byteOffset": 144, "byteLength": 48 }
+  ],
+  "accessors": [
+    { "bufferView": 0, "componentType": 5126, "count": 6, "type": "VEC3" },
+    { "bufferView": 1, "componentType": 5126, "count": 6, "type": "VEC3" },
+    { "bufferView": 2, "componentType": 5123, "count": 24, "type": "SCALAR" }
+  ],
+  "materials": [
+    {
+      "name": "mat_metal_gltf_diamond",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [0.25, 0.65, 1.0, 1.0],
+        "metallicFactor": 1.0,
+        "roughnessFactor": 0.18
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "GltfDiamond",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1
+          },
+          "indices": 2,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "translation": [0.0, 0.0, 0.0],
+      "scale": [1.4, 1.4, 1.4]
+    }
+  ],
+  "scenes": [
+    { "nodes": [0] }
+  ],
+  "scene": 0
+}

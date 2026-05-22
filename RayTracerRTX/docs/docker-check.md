@@ -33,8 +33,14 @@ driver integration. GPU execution is verified separately by the native
 - `RayTracerRTX/assets/meshes/textured_demo.mtl`
 - `RayTracerRTX/assets/meshes/material_showcase.obj`
 - `RayTracerRTX/assets/meshes/material_showcase.mtl`
+- `RayTracerRTX/assets/meshes/demo_shapes.mtl`
+- `RayTracerRTX/assets/meshes/low_poly_crystal.obj`
+- `RayTracerRTX/assets/meshes/simple_column.obj`
+- `RayTracerRTX/assets/meshes/block_arch.obj`
 - `RayTracerRTX/assets/meshes/minimal_gltf.gltf`
 - `RayTracerRTX/assets/meshes/minimal_gltf.bin`
+- `RayTracerRTX/assets/meshes/gltf_diamond.gltf`
+- `RayTracerRTX/assets/meshes/gltf_diamond.bin`
 - `RayTracerRTX/assets/meshes/checker.ppm`
 - `RayTracerRTX/assets/meshes/checker_normal.ppm`
 - `RayTracerRTX/assets/meshes/studio_env.ppm`
@@ -42,9 +48,11 @@ driver integration. GPU execution is verified separately by the native
 - `RayTracerRTX/assets/scenes/textured_scene.json`
 - `RayTracerRTX/assets/scenes/textured_cube_scene.json`
 - `RayTracerRTX/assets/scenes/multi_mesh_scene.json`
+- `RayTracerRTX/assets/scenes/obj_shapes_scene.json`
 - `RayTracerRTX/assets/scenes/material_showcase_scene.json`
 - `RayTracerRTX/assets/scenes/path_tracing_demo_scene.json`
 - `RayTracerRTX/assets/scenes/gltf_scene.json`
+- `RayTracerRTX/assets/scenes/gltf_diamond_scene.json`
 - `RayTracerRTX/src/app/obj_loader.*`
 - `RayTracerRTX/src/app/gltf_loader.*`
 - `RayTracerRTX/src/app/scene_config.*`

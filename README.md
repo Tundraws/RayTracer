@@ -66,9 +66,11 @@ RayTracerRTX - учебный трассировщик лучей в реаль�
 ```powershell
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\demo_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\multi_mesh_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\obj_shapes_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\material_showcase_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\path_tracing_demo_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\gltf_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\gltf_diamond_scene.json
 ```
 
 Если ничего не передавать, программа запустит стандартную демонстрационную сцену.

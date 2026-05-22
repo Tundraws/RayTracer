@@ -1,0 +1,42 @@
+{
+  "camera": {
+    "position": [0.0, 3.2, -10.5],
+    "yaw": 90.0,
+    "pitch": -8.0,
+    "fov": 52.0
+  },
+  "light": {
+    "position": [1.5, 8.0, -5.5],
+    "intensity": 1.05,
+    "size": 2.2
+  },
+  "environment": {
+    "type": "map",
+    "path": "../meshes/studio_env.ppm",
+    "intensity": 0.85
+  },
+  "render": {
+    "exposure": 0.72,
+    "skyIntensity": 0.75
+  },
+  "meshObjects": [
+    {
+      "path": "../meshes/low_poly_crystal.obj",
+      "position": [-3.0, 0.0, 0.0],
+      "rotation": [0.0, 25.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "path": "../meshes/simple_column.obj",
+      "position": [0.0, 0.0, 0.2],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.9, 0.9, 0.9]
+    },
+    {
+      "path": "../meshes/block_arch.obj",
+      "position": [3.2, 0.0, 0.0],
+      "rotation": [0.0, -18.0, 0.0],
+      "scale": [0.75, 0.75, 0.75]
+    }
+  ]
+}
