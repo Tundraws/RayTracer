@@ -77,10 +77,22 @@ struct SceneBuildResult
     std::vector<std::string> warnings;
 };
 
+class AssetCache;
+
 SceneConfigResult loadSceneConfigFile(const std::filesystem::path& path);
+SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::filesystem::path& baseDirectory, AssetCache& assets);
 SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::filesystem::path& baseDirectory);
+SceneBuildResult buildSceneFromMeshPath(const std::filesystem::path& meshPath, AssetCache& assets);
 SceneBuildResult buildSceneFromMeshPath(const std::filesystem::path& meshPath);
 SceneBuildResult buildDefaultSceneInput();
+bool reloadScenePresetFromConfig(
+    const std::filesystem::path& configPath,
+    SceneBuildResult& preset,
+    SceneState& scene,
+    CameraState& camera,
+    AssetCache& assets,
+    bool& accumulationResetRequested,
+    std::string& error);
 bool applyScenePresetByIndex(const std::vector<SceneBuildResult>& presets, int index, SceneState& scene, CameraState& camera);
 bool saveScenePresetByIndex(std::vector<SceneBuildResult>& presets, int index, const SceneState& scene, const CameraState& camera);
 bool resetSceneViewFromPreset(const SceneBuildResult& preset, SceneState& scene, CameraState& camera);

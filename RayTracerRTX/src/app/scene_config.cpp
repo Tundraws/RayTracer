@@ -1,6 +1,6 @@
 #include "scene_config.h"
 
-#include "gltf_loader.h"
+#include "asset_cache.h"
 #include "obj_loader.h"
 
 #include <algorithm>
@@ -766,27 +766,6 @@ std::filesystem::path resolvePath(const std::filesystem::path& path, const std::
     return baseDirectory / path;
 }
 
-std::string lowerExtension(const std::filesystem::path& path)
-{
-    std::string extension = path.extension().string();
-    std::transform(extension.begin(), extension.end(), extension.begin(), [](const unsigned char ch)
-    {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return extension;
-}
-
-ObjLoadResult loadMeshByExtension(const std::filesystem::path& path)
-{
-    const std::string extension = lowerExtension(path);
-    if (extension == ".gltf" || extension == ".glb")
-    {
-        GltfLoadResult loaded = loadGltfMesh(path);
-        return ObjLoadResult{loaded.ok, std::move(loaded.mesh), loaded.error};
-    }
-    return loadObjMesh(path);
-}
-
 std::map<std::string, SceneMaterialConfig> makeMaterialMap(const std::vector<SceneMaterialConfig>& materials)
 {
     std::map<std::string, SceneMaterialConfig> materialMap;
@@ -1185,7 +1164,7 @@ SceneBuildResult buildDefaultSceneInput()
     return result;
 }
 
-SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::filesystem::path& baseDirectory)
+SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::filesystem::path& baseDirectory, AssetCache& assets)
 {
     SceneBuildResult result = buildDefaultSceneInput();
     if (!result.ok)
@@ -1258,7 +1237,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     for (const MeshObjectConfig& object : config.meshObjects)
     {
         const std::filesystem::path meshPath = resolvePath(object.meshPath, baseDirectory);
-        const ObjLoadResult loaded = loadMeshByExtension(meshPath);
+        const ObjLoadResult& loaded = assets.loadMesh(meshPath);
         if (!loaded.ok)
         {
             result.ok = false;
@@ -1292,13 +1271,63 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     return result;
 }
 
-SceneBuildResult buildSceneFromMeshPath(const std::filesystem::path& meshPath)
+SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::filesystem::path& baseDirectory)
+{
+    AssetCache assets;
+    return buildSceneFromConfig(config, baseDirectory, assets);
+}
+
+SceneBuildResult buildSceneFromMeshPath(const std::filesystem::path& meshPath, AssetCache& assets)
 {
     SceneConfig config;
     MeshObjectConfig meshObject;
     meshObject.meshPath = meshPath;
     config.meshObjects.push_back(std::move(meshObject));
-    return buildSceneFromConfig(config, {});
+    return buildSceneFromConfig(config, {}, assets);
+}
+
+SceneBuildResult buildSceneFromMeshPath(const std::filesystem::path& meshPath)
+{
+    AssetCache assets;
+    return buildSceneFromMeshPath(meshPath, assets);
+}
+
+bool reloadScenePresetFromConfig(
+    const std::filesystem::path& configPath,
+    SceneBuildResult& preset,
+    SceneState& scene,
+    CameraState& camera,
+    AssetCache& assets,
+    bool& accumulationResetRequested,
+    std::string& error)
+{
+    accumulationResetRequested = false;
+    error.clear();
+    if (configPath.empty())
+    {
+        error = "Scene preset has no source config path.";
+        return false;
+    }
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    if (!config.ok)
+    {
+        error = config.error;
+        return false;
+    }
+
+    SceneBuildResult reloaded = buildSceneFromConfig(config.config, configPath.parent_path(), assets);
+    if (!reloaded.ok)
+    {
+        error = reloaded.error;
+        return false;
+    }
+
+    preset = reloaded;
+    scene = reloaded.scene;
+    camera = reloaded.camera;
+    accumulationResetRequested = true;
+    return true;
 }
 
 bool applyScenePresetByIndex(const std::vector<SceneBuildResult>& presets, const int index, SceneState& scene, CameraState& camera)

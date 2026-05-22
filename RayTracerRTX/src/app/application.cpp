@@ -1,6 +1,7 @@
 #include "application.h"
 
 #include "../gpu/optix_renderer.h"
+#include "asset_cache.h"
 #include "camera.h"
 #include "material.h"
 #include "scene.h"
@@ -64,6 +65,8 @@ struct AppState
     std::vector<SceneBuildResult> scenePresets;
     std::vector<SceneBuildResult> scenePresetDefaults;
     std::vector<std::wstring> scenePresetNames;
+    std::vector<std::filesystem::path> scenePresetConfigPaths;
+    AssetCache assetCache;
     int scenePresetIndex = 0;
     std::string lastUiMessage;
     bool lastUiMessageIsError = false;
@@ -84,7 +87,7 @@ struct FrameStats
     std::chrono::steady_clock::time_point lastUpdate = std::chrono::steady_clock::now();
 };
 
-void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name);
+void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath = {});
 
 float3 add3(const float3 a, const float3 b)
 {
@@ -555,7 +558,7 @@ std::optional<std::filesystem::path> openMeshFileDialog(GLFWwindow* window)
 
 bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPath)
 {
-    SceneBuildResult loaded = buildSceneFromMeshPath(meshPath);
+    SceneBuildResult loaded = buildSceneFromMeshPath(meshPath, appState.assetCache);
     if (!loaded.ok)
     {
         appState.lastUiMessage = loaded.error.empty() ? "Не удалось загрузить модель." : loaded.error;
@@ -579,6 +582,53 @@ bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPat
     appState.progressiveSamples = 0;
     appState.rendererSceneRebuildRequested = true;
     appState.lastUiMessage = "Модель загружена: " + meshPath.filename().string();
+    appState.lastUiMessageIsError = false;
+    return true;
+}
+
+bool reloadCurrentSceneConfig(AppState& appState)
+{
+    if (!hasPresetIndex(appState, appState.scenePresetIndex) ||
+        appState.scenePresetIndex >= static_cast<int>(appState.scenePresetConfigPaths.size()))
+    {
+        appState.lastUiMessage = "РЈ С‚РµРєСѓС‰РµР№ СЃС†РµРЅС‹ РЅРµС‚ JSON-С„Р°Р№Р»Р° РґР»СЏ РїРµСЂРµР·Р°РіСЂСѓР·РєРё.";
+        appState.lastUiMessageIsError = true;
+        return false;
+    }
+
+    const std::filesystem::path configPath = appState.scenePresetConfigPaths[static_cast<size_t>(appState.scenePresetIndex)];
+    if (configPath.empty())
+    {
+        appState.lastUiMessage = "РЈ С‚РµРєСѓС‰РµР№ СЃС†РµРЅС‹ РЅРµС‚ JSON-С„Р°Р№Р»Р° РґР»СЏ РїРµСЂРµР·Р°РіСЂСѓР·РєРё.";
+        appState.lastUiMessageIsError = true;
+        return false;
+    }
+
+    bool resetAccumulation = false;
+    std::string error;
+    SceneBuildResult& preset = appState.scenePresets[static_cast<size_t>(appState.scenePresetIndex)];
+    const bool reloaded = reloadScenePresetFromConfig(
+        configPath,
+        preset,
+        appState.scene,
+        appState.camera,
+        appState.assetCache,
+        resetAccumulation,
+        error);
+    if (!reloaded)
+    {
+        appState.lastUiMessage = error.empty() ? "РќРµ СѓРґР°Р»РѕСЃСЊ РїРµСЂРµР·Р°РіСЂСѓР·РёС‚СЊ СЃС†РµРЅСѓ." : error;
+        appState.lastUiMessageIsError = true;
+        return false;
+    }
+
+    appState.scenePresetDefaults[static_cast<size_t>(appState.scenePresetIndex)] = preset;
+    if (resetAccumulation)
+    {
+        appState.progressiveSamples = 0;
+    }
+    appState.rendererSceneRebuildRequested = true;
+    appState.lastUiMessage = "РЎС†РµРЅР° РїРµСЂРµР·Р°РіСЂСѓР¶РµРЅР°: " + configPath.filename().string();
     appState.lastUiMessageIsError = false;
     return true;
 }
@@ -677,6 +727,23 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         resetCurrentPresetView(appState))
     {
         appState.progressiveSamples = 0;
+    }
+    const bool canReloadSceneConfig =
+        hasPresetIndex(appState, appState.scenePresetIndex) &&
+        appState.scenePresetIndex < static_cast<int>(appState.scenePresetConfigPaths.size()) &&
+        !appState.scenePresetConfigPaths[static_cast<size_t>(appState.scenePresetIndex)].empty();
+    if (!canReloadSceneConfig)
+    {
+        ImGui::BeginDisabled();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(u8c(u8"F5 JSON")) && canReloadSceneConfig)
+    {
+        reloadCurrentSceneConfig(appState);
+    }
+    if (!canReloadSceneConfig)
+    {
+        ImGui::EndDisabled();
     }
     if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C OBJ/glTF...")))
     {
@@ -1253,6 +1320,14 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     }
     cWasDown = cIsDown;
 
+    static bool f5WasDown = false;
+    const bool f5IsDown = glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS;
+    if (f5IsDown && !f5WasDown)
+    {
+        reloadCurrentSceneConfig(appState);
+    }
+    f5WasDown = f5IsDown;
+
     static bool qWasDown = false;
     const bool qIsDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
     if (qIsDown && !qWasDown)
@@ -1366,7 +1441,7 @@ std::filesystem::path findSceneAsset(const std::string& fileName)
     return {};
 }
 
-void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name)
+void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath)
 {
     if (!preset.ok)
     {
@@ -1376,6 +1451,7 @@ void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring na
     appState.scenePresetDefaults.push_back(preset);
     appState.scenePresets.push_back(std::move(preset));
     appState.scenePresetNames.push_back(std::move(name));
+    appState.scenePresetConfigPaths.push_back(std::move(configPath));
 }
 
 void addSceneConfigPreset(AppState& appState, const std::string& fileName, const std::wstring& name)
@@ -1391,19 +1467,20 @@ void addSceneConfigPreset(AppState& appState, const std::string& fileName, const
     {
         return;
     }
-    addScenePreset(appState, buildSceneFromConfig(config.config, path.parent_path()), name);
+    addScenePreset(appState, buildSceneFromConfig(config.config, path.parent_path(), appState.assetCache), name, path);
 }
 } // namespace
 
 void run_optix_app(const ApplicationOptions& options)
 {
+    AppState appState;
     SceneBuildResult initial = buildDefaultSceneInput();
     if (!options.sceneConfigPath.empty())
     {
         const SceneConfigResult config = loadSceneConfigFile(options.sceneConfigPath);
         if (config.ok)
         {
-            initial = buildSceneFromConfig(config.config, options.sceneConfigPath.parent_path());
+            initial = buildSceneFromConfig(config.config, options.sceneConfigPath.parent_path(), appState.assetCache);
         }
         else
         {
@@ -1412,7 +1489,7 @@ void run_optix_app(const ApplicationOptions& options)
     }
     else if (!options.meshPath.empty())
     {
-        SceneBuildResult meshScene = buildSceneFromMeshPath(options.meshPath);
+        SceneBuildResult meshScene = buildSceneFromMeshPath(options.meshPath, appState.assetCache);
         if (meshScene.ok)
         {
             initial = std::move(meshScene);
@@ -1460,7 +1537,6 @@ void run_optix_app(const ApplicationOptions& options)
     glfwGetFramebufferSize(window, &gWidth, &gHeight);
     glViewport(0, 0, gWidth, gHeight);
 
-    AppState appState;
     appState.camera = initial.camera;
     appState.scene = initial.scene;
     const bool hasExplicitInput = !options.sceneConfigPath.empty() || !options.meshPath.empty();

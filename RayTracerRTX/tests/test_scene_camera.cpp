@@ -1,4 +1,5 @@
 #include "../src/app/camera.h"
+#include "../src/app/asset_cache.h"
 #include "../src/app/gltf_loader.h"
 #include "../src/app/image_loader.h"
 #include "../src/app/material.h"
@@ -1548,6 +1549,93 @@ void testSceneConfigFallbackDemoScene(TestContext& t)
     t.expect(scene.scene.lightIntensity > 0.0f, "Default scene input should keep light intensity.");
 }
 
+void testAssetCacheReusesMeshPath(TestContext& t)
+{
+    const std::filesystem::path objPath = findDemoObjAsset();
+    t.expect(!objPath.empty(), "Demo OBJ asset should exist for mesh cache test.");
+    if (objPath.empty())
+    {
+        return;
+    }
+
+    AssetCache cache;
+    const ObjLoadResult& first = cache.loadMesh(objPath);
+    const ObjLoadResult& second = cache.loadMesh(objPath);
+
+    t.expect(first.ok, "First cached mesh load should succeed.");
+    t.expect(second.ok, "Second cached mesh load should succeed.");
+    t.expect(cache.meshLoadCount(objPath) == 1, "Cache should load the same mesh path only once.");
+    t.expect(first.mesh.vertices.size() == second.mesh.vertices.size(), "Cached mesh result should be reused.");
+}
+
+void testAssetCacheReusesTexturePath(TestContext& t)
+{
+    const std::filesystem::path texturePath = writeFixtureBinaryFile("asset_cache_texture.png", tinyPngBytes());
+    AssetCache cache;
+
+    const MeshTexture* first = cache.loadTexture(texturePath, "baseColor");
+    const MeshTexture* second = cache.loadTexture(texturePath, "baseColor");
+
+    t.expect(first != nullptr, "First cached texture load should succeed.");
+    t.expect(second != nullptr, "Second cached texture load should succeed.");
+    t.expect(first == second, "Texture cache should return the stored texture object.");
+    t.expect(cache.textureLoadCount(texturePath, "baseColor") == 1, "Cache should load the same texture path only once.");
+}
+
+void testSceneReloadValidUpdatesScene(TestContext& t)
+{
+    writeFixtureFile(
+        "reload_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vn 0 0 1\n"
+        "f 1//1 2//1 3//1\n");
+
+    const std::filesystem::path configPath = writeFixtureFile(
+        "reload_valid_scene.json",
+        "{\n"
+        "  \"camera\": {\"position\": [1.0, 2.0, 3.0], \"yaw\": 25.0, \"pitch\": -5.0, \"fov\": 55.0},\n"
+        "  \"light\": {\"position\": [4.0, 5.0, -6.0]},\n"
+        "  \"meshObjects\": [{\"path\": \"reload_mesh.obj\"}]\n"
+        "}\n");
+    SceneBuildResult preset = buildDefaultSceneInput();
+    SceneState scene = preset.scene;
+    CameraState camera = preset.camera;
+    AssetCache cache;
+    bool reset = false;
+    std::string error;
+
+    const bool reloaded = reloadScenePresetFromConfig(configPath, preset, scene, camera, cache, reset, error);
+
+    t.expect(reloaded, "Reloading a valid scene config should succeed.");
+    t.expect(error.empty(), "Valid reload should not produce an error.");
+    t.expect(reset, "Valid reload should request accumulation reset.");
+    t.expect(almostEqual(scene.lightPosition.x, 4.0f), "Reload should update scene light.");
+    t.expect(almostEqual(camera.position.z, 3.0f), "Reload should update camera.");
+}
+
+void testSceneReloadInvalidKeepsPreviousScene(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile("reload_invalid_scene.json", "{ invalid json\n");
+    SceneBuildResult preset = buildDefaultSceneInput();
+    SceneState scene = preset.scene;
+    CameraState camera = preset.camera;
+    scene.lightPosition = make_float3(9.0f, 8.0f, 7.0f);
+    camera.yaw = 12.0f;
+    AssetCache cache;
+    bool reset = true;
+    std::string error;
+
+    const bool reloaded = reloadScenePresetFromConfig(configPath, preset, scene, camera, cache, reset, error);
+
+    t.expect(!reloaded, "Reloading an invalid scene config should fail cleanly.");
+    t.expect(!error.empty(), "Invalid reload should report an error.");
+    t.expect(!reset, "Invalid reload should not request accumulation reset.");
+    t.expect(almostEqual(scene.lightPosition.x, 9.0f), "Invalid reload should keep previous scene.");
+    t.expect(almostEqual(camera.yaw, 12.0f), "Invalid reload should keep previous camera.");
+}
+
 void testToggleMaterial(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2428,6 +2516,10 @@ int main(int argc, char** argv)
     runTest("Scene preset session edits persist", testScenePresetSessionEditsPersist);
     runTest("Scene preset save invalid index safe", testScenePresetSaveInvalidIndexSafe);
     runTest("Scene config fallback demo scene", testSceneConfigFallbackDemoScene);
+    runTest("Asset cache reuses mesh path", testAssetCacheReusesMeshPath);
+    runTest("Asset cache reuses texture path", testAssetCacheReusesTexturePath);
+    runTest("Scene reload valid updates scene", testSceneReloadValidUpdatesScene);
+    runTest("Scene reload invalid keeps previous scene", testSceneReloadInvalidKeepsPreviousScene);
 
     ++testsRun;
     if (runGpuSmokeTest(t))

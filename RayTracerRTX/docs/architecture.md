@@ -15,11 +15,16 @@ flowchart LR
     App --> Camera["CameraState / updateCameraBasis"]
     SceneConfig --> JsonMaterials["JSON material inputs"]
     SceneConfig --> MeshObject["MeshObject + transform"]
-    MeshObject --> ObjLoader
+    SceneConfig --> AssetCache["AssetManager / AssetCache"]
+    AssetCache --> MeshCache["Mesh cache by path"]
+    AssetCache --> TextureCache["Texture cache by path"]
+    MeshObject --> AssetCache
+    MeshCache --> ObjLoader
     ObjLoader["ObjLoader"] --> MeshData["MeshData"]
     ObjLoader --> Textures["map_Kd / normal PPM textures"]
     ObjLoader --> Tangents["Tangent basis"]
     Textures --> MeshData
+    TextureCache --> Textures
     Tangents --> MeshData
     MeshData --> MeshObject
     MeshObject --> Scene
@@ -54,7 +59,8 @@ sequenceDiagram
     participant User
     participant Args as CLI / JSON scene config
     participant App as GLFW application
-    participant ObjLoader as ObjLoader
+    participant Cache as AssetManager / AssetCache
+    participant ObjLoader as OBJ/glTF loaders
     participant Scene as SceneState
     participant Renderer as OptixRenderer
     participant CUDA as CUDA buffers
@@ -62,12 +68,15 @@ sequenceDiagram
     participant GPU as RTX GPU
 
     User->>Args: Optional --mesh or --scene input
-    Args->>ObjLoader: Resolve OBJ/glTF mesh path(s) and transforms
+    Args->>Cache: Resolve OBJ/glTF mesh path(s), textures and transforms
     Args->>Scene: Apply camera and light config
     User->>App: Keyboard and mouse input
-    ObjLoader->>Scene: Load MeshObject list with OBJ or glTF data, tangents, materials, textures and transforms
+    Cache->>ObjLoader: Load missing mesh/texture assets once per path
+    ObjLoader-->>Cache: MeshData with tangents, materials, textures
+    Cache->>Scene: Build MeshObject list from cached assets and transforms
     App->>Scene: Move sphere, light, or toggle material
     App->>Scene: Tune exposure, sky intensity, light intensity, area light, and environment
+    App->>Cache: F5 reload current JSON scene config, keeping previous scene on failure
     App->>Renderer: Optional P toggle for progressive accumulation
     App->>Renderer: Optional N toggle for OptiX denoiser
     App->>Renderer: Optional Q cycle for quality mode

@@ -34,6 +34,10 @@ selected mesh object cycling with `B`, selected mesh material preset cycling
 with `V`, and selected sphere material preset cycling with `M`.
 Pressing `C` restores the current preset camera and light without changing the
 active preset.
+Pressing `F5` reloads the current JSON-backed scene preset from disk. If reload
+fails, the previous in-memory scene remains active and the panel shows the
+error. Successful reloads reset progressive accumulation and request renderer
+GAS/IAS rebuild.
 Pressing `Q` cycles rendering quality modes: Low, Medium, High, and
 PathTracing. Quality controls max reflection depth, direct shadow rays,
 primary samples per pixel, progressive mode, and denoiser use.
@@ -148,8 +152,13 @@ selection, texture enable/disable for textured mesh materials, exposure, sky
 intensity, light intensity, material-specific roughness/transparency/IOR tuning, quality mode,
 progressive mode and denoiser toggle. It also provides a Windows file dialog
 button for loading an additional `.obj`, `.gltf`, or `.glb` model as a runtime scene
-preset. UI widgets are not unit-tested directly; the underlying state helpers
-are covered by tests.
+preset, plus a compact F5 reload button for JSON-backed presets. UI widgets are
+not unit-tested directly; the underlying state helpers are covered by tests.
+
+Scene config construction uses `AssetCache` as a small asset manager layer:
+mesh assets are cached by normalized path, and standalone image texture loads
+can be cached by path and texture type. The cache keeps repeated mesh references
+from re-reading the same OBJ/glTF/GLB asset during scene construction.
 
 Preset helpers `applyScenePresetByIndex(...)` and
 `resetSceneViewFromPreset(...)` keep runtime scene switching and reset behavior
