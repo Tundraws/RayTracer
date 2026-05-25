@@ -84,6 +84,7 @@ struct AppState
     float imguiPanelHeight = 680.0f;
     int editorPrimitiveToAdd = BuiltInMeshCube;
     int editorObjectKind = EditorObjectSphere;
+    int environmentMode = SceneEnvironmentOpen;
 };
 
 struct FrameStats
@@ -225,6 +226,44 @@ const char* builtInPrimitiveNameUtf8(const int primitiveType)
     default:
         return u8c(u8"\u041A\u0443\u0431");
     }
+}
+
+const char* environmentModeNameUtf8(const int mode)
+{
+    switch (mode)
+    {
+    case SceneEnvironmentRoom:
+        return u8c(u8"\u041A\u043E\u043C\u043D\u0430\u0442\u0430");
+    case SceneEnvironmentEmpty:
+        return u8c(u8"\u041F\u0443\u0441\u0442\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
+    case SceneEnvironmentOpen:
+    default:
+        return u8c(u8"\u041E\u0442\u043A\u0440\u044B\u0442\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
+    }
+}
+
+bool environmentModeCombo(const char* id, int& mode)
+{
+    const int modes[] = {SceneEnvironmentOpen, SceneEnvironmentRoom, SceneEnvironmentEmpty};
+    bool changed = false;
+    if (ImGui::BeginCombo(id, environmentModeNameUtf8(mode)))
+    {
+        for (const int candidate : modes)
+        {
+            const bool selected = mode == candidate;
+            if (ImGui::Selectable(environmentModeNameUtf8(candidate), selected))
+            {
+                mode = candidate;
+                changed = true;
+            }
+            if (selected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    return changed;
 }
 
 bool builtInPrimitiveCombo(const char* id, int& primitiveType)
@@ -973,6 +1012,24 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
 
         if (ImGui::BeginTabItem(u8c(u8"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440")))
         {
+            ImGui::SeparatorText(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"));
+            environmentModeCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##environment_mode"), appState.environmentMode);
+            if (ImGui::Button(u8c(u8"\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u043E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435")))
+            {
+                const bool changed = applySceneEnvironmentMode(scene, appState.environmentMode);
+                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
+                appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                refreshMeshSelection();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(u8c(u8"\u0421\u043B\u0443\u0436\u0435\u0431\u043D\u044B\u0439 \u043F\u043E\u043B")))
+            {
+                scene.showGroundPlane = !scene.showGroundPlane;
+                appState.progressiveSamples = 0;
+            }
+            ImGui::TextWrapped("%s", u8c(u8"\u041F\u043E\u043B \u0438 \u0441\u0442\u0435\u043D\u044B \u0441\u043E\u0437\u0434\u0430\u044E\u0442\u0441\u044F \u043A\u0430\u043A \u043E\u0431\u044B\u0447\u043D\u044B\u0435 mesh-\u043F\u0430\u043D\u0435\u043B\u0438: \u0438\u0445 \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C, \u0441\u0434\u0432\u0438\u043D\u0443\u0442\u044C, \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043C\u0430\u0441\u0448\u0442\u0430\u0431 \u0438 \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B."));
+
+            ImGui::SeparatorText(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u044B"));
             builtInPrimitiveCombo(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C##editor_add_type"), appState.editorPrimitiveToAdd);
             if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442")))
             {
@@ -990,10 +1047,44 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 }
                 appState.progressiveSamples = added ? 0 : appState.progressiveSamples;
             }
+            if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u043C\u043E\u0434\u0435\u043B\u0438")))
+            {
+                const bool changed = removeAllMeshObjects(scene);
+                appState.editorObjectKind = EditorObjectSphere;
+                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
+                appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                refreshMeshSelection();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(u8c(u8"\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0441\u0446\u0435\u043D\u0443")))
+            {
+                const bool changed = clearSceneObjects(scene);
+                appState.editorObjectKind = EditorObjectSphere;
+                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
+                appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                refreshMeshSelection();
+            }
+            if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0441\u0444\u0435\u0440\u044B")))
+            {
+                const bool changed = removeAllSpheres(scene);
+                appState.editorObjectKind = scene.meshObjects.empty() ? EditorObjectSphere : EditorObjectMesh;
+                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(u8c(u8"\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u0431\u0430\u0437\u043E\u0432\u044B\u0435")))
+            {
+                const bool changed = restoreDefaultSceneObjects(scene);
+                appState.editorObjectKind = EditorObjectSphere;
+                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
+                appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                refreshMeshSelection();
+            }
             ImGui::SeparatorText(u8c(u8"\u0412\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 \u043E\u0431\u044A\u0435\u043A\u0442"));
             const std::string editorLabel = appState.editorObjectKind == EditorObjectMesh && !scene.meshObjects.empty()
                 ? meshObjectLabel(scene.meshObjects[static_cast<size_t>(std::max(0, std::min(scene.selectedMeshObject, static_cast<int>(scene.meshObjects.size()) - 1)))], scene.selectedMeshObject)
-                : std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1);
+                : (scene.spheres.empty()
+                    ? std::string(u8c(u8"\u041D\u0435\u0442 \u0441\u0444\u0435\u0440"))
+                    : std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1));
             if (ImGui::BeginCombo(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442##editor_selected"), editorLabel.c_str()))
             {
                 for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
@@ -1051,7 +1142,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     appState.progressiveSamples = addSphere(scene) ? 0 : appState.progressiveSamples;
                 }
                 ImGui::SameLine();
-                const bool canRemoveSphere = scene.spheres.size() > 1;
+                const bool canRemoveSphere = !scene.spheres.empty();
                 if (!canRemoveSphere)
                 {
                     ImGui::BeginDisabled();
@@ -1121,7 +1212,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 {
                     selectedMeshObject->displayName = nameBuffer;
                 }
-                const bool canRemoveMesh = scene.meshObjects.size() > 1;
+                const bool canRemoveMesh = !scene.meshObjects.empty();
                 if (!canRemoveMesh)
                 {
                     ImGui::BeginDisabled();

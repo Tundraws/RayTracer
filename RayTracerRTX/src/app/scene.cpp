@@ -96,7 +96,10 @@ void syncCompatibilityMesh(SceneState& scene)
     if (!scene.meshObjects.empty())
     {
         scene.mesh = scene.meshObjects[0].mesh;
+        return;
     }
+
+    scene.mesh = {};
 }
 
 MeshObject makeBuiltInMeshObject(MeshData mesh, std::string name, const float3 position, const float3 rotation, const float3 scale)
@@ -110,6 +113,63 @@ MeshObject makeBuiltInMeshObject(MeshData mesh, std::string name, const float3 p
     object.scale = scale;
     updateMeshObjectTransform(object);
     return object;
+}
+
+bool isEnvironmentObject(const MeshObject& object)
+{
+    return object.assetReference.rfind("environment:", 0) == 0;
+}
+
+MeshObject makeEnvironmentPanel(
+    std::string displayName,
+    const float3 position,
+    const float3 rotation,
+    const float3 scale,
+    const float3 color)
+{
+    MeshData mesh = createPlaneMesh();
+    for (MeshMaterial& material : mesh.materials)
+    {
+        material.name = displayName;
+        material.color = color;
+        material.materialType = MaterialDiffuse;
+        material.roughness = 0.64f;
+        material.alpha = 1.0f;
+    }
+
+    MeshObject panel = makeBuiltInMeshObject(
+        std::move(mesh),
+        "environment:" + displayName,
+        position,
+        rotation,
+        scale);
+    panel.displayName = std::move(displayName);
+    return panel;
+}
+
+void removeEnvironmentObjects(SceneState& scene)
+{
+    scene.meshObjects.erase(
+        std::remove_if(scene.meshObjects.begin(), scene.meshObjects.end(), isEnvironmentObject),
+        scene.meshObjects.end());
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+}
+
+void addEditableFloor(SceneState& scene)
+{
+    scene.meshObjects.insert(
+        scene.meshObjects.begin(),
+        makeEnvironmentPanel(
+            "Пол",
+            make_float3(0.0f, 0.0f, 0.0f),
+            make_float3(0.0f, 0.0f, 0.0f),
+            make_float3(18.0f, 1.0f, 18.0f),
+            make_float3(0.48f, 0.50f, 0.48f)));
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
 }
 
 float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
@@ -202,6 +262,8 @@ SceneState makeDefaultScene()
     defaultMeshObject.displayName = "Demo OBJ";
     defaultMeshObject.mesh = scene.mesh;
     scene.meshObjects = {std::move(defaultMeshObject)};
+    addEditableFloor(scene);
+    scene.mesh = scene.meshObjects.size() > 1 ? scene.meshObjects[1].mesh : scene.mesh;
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
     scene.exposure = 0.82f;
     scene.skyIntensity = 0.78f;
@@ -209,9 +271,11 @@ SceneState makeDefaultScene()
     scene.areaLightRadius = 0.0f;
     scene.environmentIntensity = 1.0f;
     scene.environmentType = "gradient";
+    scene.showGroundPlane = false;
     scene.selectedSphere = 0;
-    scene.selectedMeshObject = 0;
+    scene.selectedMeshObject = scene.meshObjects.size() > 1 ? 1 : 0;
     scene.selectedMeshMaterial = 0;
+    clampScene(scene);
     return scene;
 }
 
@@ -314,7 +378,7 @@ bool addSphere(SceneState& scene)
 bool removeSelectedSphere(SceneState& scene)
 {
     clampScene(scene);
-    if (scene.spheres.size() <= 1)
+    if (scene.spheres.empty())
     {
         return false;
     }
@@ -330,7 +394,7 @@ bool removeSelectedSphere(SceneState& scene)
     {
         scene.materials.erase(scene.materials.begin() + index);
     }
-    scene.selectedSphere = std::min(index, static_cast<int>(scene.spheres.size()) - 1);
+    scene.selectedSphere = scene.spheres.empty() ? 0 : std::min(index, static_cast<int>(scene.spheres.size()) - 1);
     clampScene(scene);
     return true;
 }
@@ -642,7 +706,7 @@ bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
 
 bool removeSelectedMeshObject(SceneState& scene)
 {
-    if (scene.meshObjects.size() <= 1)
+    if (scene.meshObjects.empty())
     {
         clampScene(scene);
         return false;
@@ -656,9 +720,88 @@ bool removeSelectedMeshObject(SceneState& scene)
     scene.meshObjects.erase(scene.meshObjects.begin() + scene.selectedMeshObject);
     if (scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
     {
-        scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+        scene.selectedMeshObject = scene.meshObjects.empty() ? 0 : static_cast<int>(scene.meshObjects.size()) - 1;
     }
     scene.selectedMeshMaterial = 0;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+    return true;
+}
+
+bool removeAllSpheres(SceneState& scene)
+{
+    const bool changed = !scene.spheres.empty() || !scene.materials.empty();
+    scene.spheres.clear();
+    scene.materials.clear();
+    scene.selectedSphere = 0;
+    clampScene(scene);
+    return changed;
+}
+
+bool removeAllMeshObjects(SceneState& scene)
+{
+    const bool changed = !scene.meshObjects.empty() || !isEmptyMesh(scene.mesh);
+    scene.meshObjects.clear();
+    scene.mesh = {};
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+    clampScene(scene);
+    return changed;
+}
+
+bool clearSceneObjects(SceneState& scene)
+{
+    const bool spheresChanged = removeAllSpheres(scene);
+    const bool meshesChanged = removeAllMeshObjects(scene);
+    const bool changed = spheresChanged || meshesChanged;
+    scene.showGroundPlane = false;
+    clampScene(scene);
+    return changed;
+}
+
+bool restoreDefaultSceneObjects(SceneState& scene)
+{
+    const SceneState defaults = makeDefaultScene();
+    scene.spheres = defaults.spheres;
+    scene.materials = defaults.materials;
+    scene.meshObjects = defaults.meshObjects;
+    scene.mesh = defaults.mesh;
+    scene.showGroundPlane = defaults.showGroundPlane;
+    scene.selectedSphere = defaults.selectedSphere;
+    scene.selectedMeshObject = defaults.selectedMeshObject;
+    scene.selectedMeshMaterial = defaults.selectedMeshMaterial;
+    clampScene(scene);
+    return true;
+}
+
+bool applySceneEnvironmentMode(SceneState& scene, const int environmentMode)
+{
+    removeEnvironmentObjects(scene);
+    scene.showGroundPlane = false;
+
+    if (environmentMode == SceneEnvironmentOpen)
+    {
+        addEditableFloor(scene);
+    }
+    else if (environmentMode == SceneEnvironmentRoom)
+    {
+        scene.meshObjects.insert(scene.meshObjects.begin(), {
+            makeEnvironmentPanel("Пол", make_float3(0.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 18.0f), make_float3(0.46f, 0.48f, 0.46f)),
+            makeEnvironmentPanel("Задняя стена", make_float3(0.0f, 4.5f, -9.0f), make_float3(90.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 9.0f), make_float3(0.54f, 0.56f, 0.58f)),
+            makeEnvironmentPanel("Левая стена", make_float3(-9.0f, 4.5f, 0.0f), make_float3(0.0f, 0.0f, -90.0f), make_float3(18.0f, 1.0f, 9.0f), make_float3(0.52f, 0.50f, 0.48f)),
+            makeEnvironmentPanel("Правая стена", make_float3(9.0f, 4.5f, 0.0f), make_float3(0.0f, 0.0f, 90.0f), make_float3(18.0f, 1.0f, 9.0f), make_float3(0.48f, 0.50f, 0.54f)),
+            makeEnvironmentPanel("Потолок", make_float3(0.0f, 9.0f, 0.0f), make_float3(180.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 18.0f), make_float3(0.50f, 0.50f, 0.49f))
+        });
+        scene.selectedMeshObject = 0;
+        scene.selectedMeshMaterial = 0;
+        syncCompatibilityMesh(scene);
+        clampScene(scene);
+    }
+    else if (environmentMode != SceneEnvironmentEmpty)
+    {
+        return false;
+    }
+
     syncCompatibilityMesh(scene);
     clampScene(scene);
     return true;

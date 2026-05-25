@@ -105,6 +105,7 @@ private:
     unsigned int accumulationSampleCount = 0;
     int renderMode = RenderModeRealtime;
     int renderQuality = RenderQualityHigh;
+    bool showGroundPlane = false;
     bool denoiserEnabled = false;
     bool denoiserAvailable = false;
     std::size_t lastAccumulationSignature = 0;

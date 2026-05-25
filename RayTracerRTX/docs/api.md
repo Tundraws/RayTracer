@@ -88,7 +88,7 @@ Declared in `src/app/scene.h`.
 | `makeDefaultScene()` | Creates the initial scene with spheres, materials and light |
 | `clampScene(SceneState&)` | Keeps objects inside supported bounds |
 | `addSphere(SceneState&)` | Appends a sphere, copies the selected sphere material and selects the new sphere |
-| `removeSelectedSphere(SceneState&)` | Removes the selected sphere while keeping at least one sphere in the scene |
+| `removeSelectedSphere(SceneState&)` | Removes the selected sphere; empty sphere lists are valid |
 | `setSelectedSphereRadius(SceneState&, float)` | Changes selected sphere radius with clamping |
 | `setSelectedSphereColor(SceneState&, float3)` | Changes selected sphere color with clamping |
 | `moveSelectedSphere(SceneState&, float3)` | Moves selected sphere and applies bounds |
@@ -97,7 +97,12 @@ Declared in `src/app/scene.h`.
 | `selectNextMeshObject(SceneState&)` | Selects the next mesh object for HUD/material editing |
 | `cycleSelectedMeshMaterialPreset(SceneState&)` | Cycles selected mesh material through diffuse, mirror, metal and dielectric presets |
 | `addBuiltInMeshPrimitive(SceneState&, int)` | Adds a built-in mesh primitive: cube, pyramid, or finite plane/panel |
-| `removeSelectedMeshObject(SceneState&)` | Removes selected mesh object while keeping at least one mesh object for renderer stability |
+| `removeSelectedMeshObject(SceneState&)` | Removes selected mesh object; empty mesh object lists are valid |
+| `removeAllSpheres(SceneState&)` | Removes all analytic spheres and their materials |
+| `removeAllMeshObjects(SceneState&)` | Removes all mesh objects and clears the compatibility mesh |
+| `clearSceneObjects(SceneState&)` | Removes all visible objects while keeping camera/light settings |
+| `restoreDefaultSceneObjects(SceneState&)` | Restores the default editable objects |
+| `applySceneEnvironmentMode(SceneState&, int)` | Creates editable environment panels: open floor, room panels, or empty environment |
 | `moveLight(SceneState&, float3)` | Moves the light and applies bounds |
 | `setSceneExposure(SceneState&, float)` | Sets tone-mapping exposure with clamping |
 | `setSceneSkyIntensity(SceneState&, float)` | Sets environment-light intensity with clamping |
@@ -120,6 +125,10 @@ The built-in cube, pyramid and plane/panel are not separate GPU primitive
 types. They use the same `MeshData` path as imported OBJ/glTF geometry. The
 plane is intentionally finite, so it can represent floors, walls, ceilings and
 other editable rectangular surfaces.
+
+The visible floor in the default editor scene is also a finite mesh panel. The
+older renderer-side service plane is hidden by default and is kept only as a
+compatibility fallback.
 
 ## OBJ Mesh API
 

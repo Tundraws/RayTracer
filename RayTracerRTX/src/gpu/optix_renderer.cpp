@@ -560,28 +560,40 @@ void OptixRenderer::createContext()
 
 void OptixRenderer::createScene(const SceneState& scene)
 {
-    sphereFlags.assign(scene.spheres.size(), OPTIX_GEOMETRY_FLAG_NONE);
+    showGroundPlane = scene.showGroundPlane;
+    sphereFlags.assign(std::max<std::size_t>(1u, scene.spheres.size()), OPTIX_GEOMETRY_FLAG_NONE);
     std::vector<float3> centers;
     std::vector<float> radii;
-    centers.reserve(scene.spheres.size());
-    radii.reserve(scene.spheres.size());
+    centers.reserve(std::max<std::size_t>(1u, scene.spheres.size()));
+    radii.reserve(std::max<std::size_t>(1u, scene.spheres.size()));
 
     for (const SphereGeometry& sphere : scene.spheres)
     {
         centers.push_back(sphere.center);
         radii.push_back(sphere.radius);
     }
+    if (centers.empty())
+    {
+        centers.push_back(make_float3(0.0f, -100000.0f, 0.0f));
+        radii.push_back(0.001f);
+    }
+
+    std::vector<SphereMaterial> sphereMaterials = scene.materials;
+    if (sphereMaterials.empty())
+    {
+        sphereMaterials.push_back(SphereMaterial{});
+    }
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dSphereCenters), centers.size() * sizeof(float3)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dSphereCenters), centers.data(), centers.size() * sizeof(float3), cudaMemcpyHostToDevice));
-    sphereBufferCapacity = centers.size();
+    sphereBufferCapacity = std::max<std::size_t>(1u, scene.spheres.size());
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dSphereRadii), radii.size() * sizeof(float)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dSphereRadii), radii.data(), radii.size() * sizeof(float), cudaMemcpyHostToDevice));
 
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMaterials), scene.materials.size() * sizeof(SphereMaterial)));
-    CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMaterials), scene.materials.data(), scene.materials.size() * sizeof(SphereMaterial), cudaMemcpyHostToDevice));
-    materialBufferCapacity = scene.materials.size();
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMaterials), sphereMaterials.size() * sizeof(SphereMaterial)));
+    CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMaterials), sphereMaterials.data(), sphereMaterials.size() * sizeof(SphereMaterial), cudaMemcpyHostToDevice));
+    materialBufferCapacity = std::max<std::size_t>(1u, scene.materials.size());
 
     std::vector<MeshObject> renderMeshObjects = scene.meshObjects;
     if (renderMeshObjects.empty() && !isEmptyMesh(scene.mesh))
@@ -707,6 +719,18 @@ void OptixRenderer::createScene(const SceneState& scene)
     }
     meshTexturePixelCount = static_cast<unsigned int>(meshTexturePixels.size());
     meshObjectCount = static_cast<unsigned int>(meshObjectsGpu.size());
+    if (meshVertices.empty())
+    {
+        meshVertices.push_back(MeshVertexGpu{});
+    }
+    if (meshTriangles.empty())
+    {
+        meshTriangles.push_back(MeshTriangleGpu{});
+    }
+    if (meshObjectsGpu.empty())
+    {
+        meshObjectsGpu.push_back(MeshObjectGpu{});
+    }
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshVertices), meshVertices.size() * sizeof(MeshVertexGpu)));
     CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dMeshVertices), meshVertices.data(), meshVertices.size() * sizeof(MeshVertexGpu), cudaMemcpyHostToDevice));
@@ -725,7 +749,7 @@ void OptixRenderer::createScene(const SceneState& scene)
     sphereBuildInput.type = OPTIX_BUILD_INPUT_TYPE_SPHERES;
     sphereBuildInput.sphereArray.vertexBuffers = &dSphereCenters;
     sphereBuildInput.sphereArray.radiusBuffers = &dSphereRadii;
-    sphereBuildInput.sphereArray.numVertices = static_cast<unsigned int>(scene.spheres.size());
+    sphereBuildInput.sphereArray.numVertices = static_cast<unsigned int>(std::max<std::size_t>(1u, scene.spheres.size()));
     sphereBuildInput.sphereArray.singleRadius = 0;
     sphereBuildInput.sphereArray.radiusStrideInBytes = sizeof(float);
     sphereBuildInput.sphereArray.flags = sphereFlags.data();
@@ -937,6 +961,7 @@ void OptixRenderer::rebuildAccelerationStructure()
     instances[1].instanceId = 1u;
     instances[1].sbtOffset = 2u;
     instances[1].traversableHandle = planeGasHandle;
+    instances[1].visibilityMask = showGroundPlane ? 255u : 0u;
     for (unsigned int i = 0; i < meshObjectCount; ++i)
     {
         OptixInstance& instance = instances[2u + i];
@@ -1153,7 +1178,9 @@ void OptixRenderer::ensureSphereResources(const SceneState& scene)
 {
     const std::size_t sphereCount = scene.spheres.size();
     const std::size_t materialCount = scene.materials.size();
-    if (sphereCount == sphereBufferCapacity && materialCount == materialBufferCapacity)
+    const std::size_t safeSphereCount = std::max<std::size_t>(1u, sphereCount);
+    const std::size_t safeMaterialCount = std::max<std::size_t>(1u, materialCount);
+    if (safeSphereCount == sphereBufferCapacity && safeMaterialCount == materialBufferCapacity)
     {
         return;
     }
@@ -1182,13 +1209,11 @@ void OptixRenderer::ensureSphereResources(const SceneState& scene)
         dMaterials = 0;
     }
 
-    const std::size_t safeSphereCount = std::max<std::size_t>(1u, sphereCount);
-    const std::size_t safeMaterialCount = std::max<std::size_t>(1u, materialCount);
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dSphereCenters), safeSphereCount * sizeof(float3)));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dSphereRadii), safeSphereCount * sizeof(float)));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMaterials), safeMaterialCount * sizeof(SphereMaterial)));
-    sphereBufferCapacity = sphereCount;
-    materialBufferCapacity = materialCount;
+    sphereBufferCapacity = safeSphereCount;
+    materialBufferCapacity = safeMaterialCount;
 
     sphereFlags.assign(safeSphereCount, OPTIX_GEOMETRY_FLAG_NONE);
     sphereBuildInput.sphereArray.vertexBuffers = &dSphereCenters;
@@ -1268,8 +1293,19 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
         centers.push_back(sphere.center);
         radii.push_back(sphere.radius);
     }
+    if (centers.empty())
+    {
+        centers.push_back(make_float3(0.0f, -100000.0f, 0.0f));
+        radii.push_back(0.001f);
+    }
+    std::vector<SphereMaterial> sphereMaterials = scene.materials;
+    if (sphereMaterials.empty())
+    {
+        sphereMaterials.push_back(SphereMaterial{});
+    }
     ensureSphereResources(scene);
     ensureEnvironmentResources(scene);
+    showGroundPlane = scene.showGroundPlane;
 
     CUDA_CHECK(cudaEventRecord(frameStart, stream));
 
@@ -1287,8 +1323,8 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
         stream));
     CUDA_CHECK(cudaMemcpyAsync(
         reinterpret_cast<void*>(dMaterials),
-        scene.materials.data(),
-        scene.materials.size() * sizeof(SphereMaterial),
+        sphereMaterials.data(),
+        sphereMaterials.size() * sizeof(SphereMaterial),
         cudaMemcpyHostToDevice,
         stream));
 

@@ -155,6 +155,7 @@ flowchart LR
 | Application loop | `src/app/maingpu.cpp`, `src/app/application.*` | Window creation, input, scene updates, presentation |
 | UI panel | `src/app/application.*` + Dear ImGui | Tabbed runtime controls for scene presets, editor objects, materials, light, quality, and diagnostics |
 | Built-in mesh primitives | `src/app/mesh.*` | Generates cube, pyramid, and finite plane/panel as `MeshData` triangles |
+| Environment presets | `src/app/scene.*` | Builds editable floor, wall and ceiling panels for open/room/empty scene modes |
 | Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*`, `src/app/gltf_loader.*` | Spheres, OBJ/glTF mesh data, materials, selected object, light movement and clamping |
 | Camera | `src/app/camera.*` | Camera state and basis vectors for ray generation |
 | Shared GPU data | `src/common/rtx_shared.h` | Host/device structures used by CUDA and OptiX |

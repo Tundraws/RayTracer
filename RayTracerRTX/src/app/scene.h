@@ -34,6 +34,13 @@ enum BuiltInMeshPrimitive
     BuiltInMeshPlane = 2
 };
 
+enum SceneEnvironmentMode
+{
+    SceneEnvironmentOpen = 0,
+    SceneEnvironmentRoom = 1,
+    SceneEnvironmentEmpty = 2
+};
+
 struct SceneState
 {
     std::vector<SphereGeometry> spheres;
@@ -49,6 +56,7 @@ struct SceneState
     std::string environmentType = "gradient";
     std::string environmentPath;
     MeshTexture environmentMap;
+    bool showGroundPlane = false;
     int selectedSphere = 0;
     int selectedMeshObject = 0;
     int selectedMeshMaterial = 0;
@@ -69,6 +77,11 @@ void cycleSelectedMeshMaterialPreset(SceneState& scene);
 void setSelectedMeshMaterialType(SceneState& scene, int materialType);
 bool addBuiltInMeshPrimitive(SceneState& scene, int primitiveType);
 bool removeSelectedMeshObject(SceneState& scene);
+bool removeAllSpheres(SceneState& scene);
+bool removeAllMeshObjects(SceneState& scene);
+bool clearSceneObjects(SceneState& scene);
+bool restoreDefaultSceneObjects(SceneState& scene);
+bool applySceneEnvironmentMode(SceneState& scene, int environmentMode);
 bool setSelectedMeshPosition(SceneState& scene, float3 position);
 bool setSelectedMeshRotation(SceneState& scene, float3 rotation);
 bool setSelectedMeshScale(SceneState& scene, float3 scale);

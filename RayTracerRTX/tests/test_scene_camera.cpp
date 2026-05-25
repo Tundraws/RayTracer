@@ -1257,8 +1257,61 @@ void testRemoveSelectedMeshObjectSafe(TestContext& t)
     const size_t countAfterAdd = scene.meshObjects.size();
     t.expect(removeSelectedMeshObject(scene), "Removing selected mesh should succeed when more than one object exists.");
     t.expect(scene.meshObjects.size() == countAfterAdd - 1, "Removing selected mesh should shrink mesh object list.");
-    t.expect(!removeSelectedMeshObject(scene), "Removing last mesh object should fail safely.");
-    t.expect(!scene.meshObjects.empty(), "Safe remove should keep at least one mesh object.");
+    while (!scene.meshObjects.empty())
+    {
+        t.expect(removeSelectedMeshObject(scene), "Removing remaining mesh objects should succeed.");
+    }
+    t.expect(!removeSelectedMeshObject(scene), "Removing from an empty mesh list should fail safely.");
+    t.expect(scene.meshObjects.empty(), "All mesh objects should be removable.");
+    t.expect(isEmptyMesh(scene.mesh), "Compatibility mesh should be empty when no mesh objects remain.");
+}
+
+void testSceneClearHelpers(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+
+    t.expect(removeAllSpheres(scene), "Removing all spheres should report a change.");
+    t.expect(scene.spheres.empty(), "All spheres should be removed.");
+    t.expect(scene.materials.empty(), "All sphere materials should be removed.");
+
+    t.expect(removeAllMeshObjects(scene), "Removing all mesh objects should report a change.");
+    t.expect(scene.meshObjects.empty(), "All mesh objects should be removed.");
+    t.expect(isEmptyMesh(scene.mesh), "Compatibility mesh should be empty after removing all mesh objects.");
+
+    t.expect(!removeAllSpheres(scene), "Removing all spheres twice should report no change.");
+    t.expect(!removeAllMeshObjects(scene), "Removing all mesh objects twice should report no change.");
+}
+
+void testRestoreDefaultSceneObjects(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    clearSceneObjects(scene);
+
+    t.expect(restoreDefaultSceneObjects(scene), "Restoring default objects should succeed.");
+    t.expect(!scene.spheres.empty(), "Default spheres should be restored.");
+    t.expect(!scene.meshObjects.empty(), "Default mesh objects should be restored.");
+    t.expect(!scene.showGroundPlane, "Default scene should use editable mesh floor instead of service plane.");
+}
+
+void testEnvironmentModes(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    clearSceneObjects(scene);
+
+    t.expect(applySceneEnvironmentMode(scene, SceneEnvironmentOpen), "Open environment should apply.");
+    t.expect(scene.meshObjects.size() == 1, "Open environment should create one editable floor panel.");
+    t.expect(scene.meshObjects[0].displayName == "Пол", "Open environment panel should be named floor.");
+    t.expect(!scene.showGroundPlane, "Open environment should hide service plane.");
+
+    t.expect(applySceneEnvironmentMode(scene, SceneEnvironmentRoom), "Room environment should apply.");
+    t.expect(scene.meshObjects.size() == 5, "Room environment should create floor, walls and ceiling.");
+    t.expect(!scene.showGroundPlane, "Room environment should hide service plane.");
+
+    t.expect(applySceneEnvironmentMode(scene, SceneEnvironmentEmpty), "Empty environment should apply.");
+    t.expect(scene.meshObjects.empty(), "Empty environment should remove environment panels.");
+    t.expect(!scene.showGroundPlane, "Empty environment should keep service plane hidden.");
+
+    t.expect(!applySceneEnvironmentMode(scene, 999), "Invalid environment mode should fail safely.");
 }
 
 void testSceneConfigLoadsValidScene(TestContext& t)
@@ -1863,6 +1916,11 @@ void testSetSelectedSphereMaterialTypeInvalidIndexSafe(TestContext& t)
 void testSelectedMeshChanges(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
+    while (scene.meshObjects.size() > 1)
+    {
+        scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+        removeSelectedMeshObject(scene);
+    }
     MeshObject copy = scene.meshObjects[0];
     copy.assetReference = "copy";
     scene.meshObjects.push_back(copy);
@@ -1951,14 +2009,15 @@ void testSelectedMeshTransformInvalidSafe(TestContext& t)
 
     const bool moved = setSelectedMeshPosition(scene, make_float3(100.0f, -100.0f, 100.0f));
     const bool scaled = setSelectedMeshScale(scene, make_float3(-1.0f, 100.0f, 0.0f));
+    const int clampedIndex = static_cast<int>(scene.meshObjects.size()) - 1;
 
     t.expect(moved, "Invalid selected mesh should clamp before position edit.");
     t.expect(scaled, "Invalid selected mesh should clamp before scale edit.");
-    t.expect(scene.selectedMeshObject == 0, "Invalid selected mesh transform edit should clamp selected index.");
-    t.expect(almostEqual(scene.meshObjects[0].position.x, 50.0f), "Mesh position should clamp to max.");
-    t.expect(almostEqual(scene.meshObjects[0].position.y, -10.0f), "Mesh position should clamp to min Y.");
-    t.expect(almostEqual(scene.meshObjects[0].scale.x, 0.05f), "Mesh scale should clamp to min.");
-    t.expect(almostEqual(scene.meshObjects[0].scale.y, 100.0f), "Mesh scale should clamp to max.");
+    t.expect(scene.selectedMeshObject == clampedIndex, "Invalid selected mesh transform edit should clamp selected index.");
+    t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].position.x, 50.0f), "Mesh position should clamp to max.");
+    t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].position.y, -10.0f), "Mesh position should clamp to min Y.");
+    t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].scale.x, 0.05f), "Mesh scale should clamp to min.");
+    t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].scale.y, 100.0f), "Mesh scale should clamp to max.");
 }
 
 void testInvalidMeshSelectionSafe(TestContext& t)
@@ -2015,10 +2074,10 @@ void testRemoveLastSphereSafe(TestContext& t)
 
     const bool removed = removeSelectedSphere(scene);
 
-    t.expect(!removed, "Removing the final sphere should fail safely.");
-    t.expect(scene.spheres.size() == 1, "Final sphere should stay in the scene.");
-    t.expect(scene.materials.size() == 1, "Final sphere material should stay in the scene.");
-    t.expect(scene.selectedSphere == 0, "Selected sphere should stay valid when removal is blocked.");
+    t.expect(removed, "Removing the final sphere should now succeed.");
+    t.expect(scene.spheres.empty(), "Final sphere should be removed.");
+    t.expect(scene.materials.empty(), "Final sphere material should be removed.");
+    t.expect(scene.selectedSphere == 0, "Selected sphere index should stay safe when list is empty.");
 }
 
 void testRemovePenultimateSphereKeepsSelectionValid(TestContext& t)
@@ -2691,6 +2750,9 @@ int main(int argc, char** argv)
     runTest("Built-in plane mesh", testBuiltInPlaneMesh);
     runTest("Add built-in mesh primitives", testAddBuiltInMeshPrimitives);
     runTest("Remove selected mesh object safe", testRemoveSelectedMeshObjectSafe);
+    runTest("Scene clear helpers", testSceneClearHelpers);
+    runTest("Restore default scene objects", testRestoreDefaultSceneObjects);
+    runTest("Environment modes", testEnvironmentModes);
     runTest("Scene config loads valid scene", testSceneConfigLoadsValidScene);
     runTest("Scene config with multiple meshes loads", testSceneConfigMultipleMeshes);
     runTest("Scene config missing file", testSceneConfigMissingFile);
