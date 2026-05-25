@@ -1307,6 +1307,12 @@ void testEnvironmentModes(TestContext& t)
     t.expect(scene.meshObjects.size() == 5, "Room environment should create floor, walls and ceiling.");
     t.expect(!scene.showGroundPlane, "Room environment should hide service plane.");
 
+    t.expect(applySceneRoomDimensions(scene, 100.0f, 2.0f, 100.0f), "Room dimensions should apply with clamping.");
+    t.expect(scene.meshObjects.size() == 5, "Room resize should keep room panel count stable.");
+    t.expect(almostEqual(scene.meshObjects[0].scale.x, 80.0f), "Room width should clamp to max.");
+    t.expect(almostEqual(scene.meshObjects[0].scale.z, 4.0f), "Room depth should clamp to min.");
+    t.expect(almostEqual(scene.meshObjects[1].position.y, 20.0f), "Room wall height should clamp to max and update wall center.");
+
     t.expect(applySceneEnvironmentMode(scene, SceneEnvironmentEmpty), "Empty environment should apply.");
     t.expect(scene.meshObjects.empty(), "Empty environment should remove environment panels.");
     t.expect(!scene.showGroundPlane, "Empty environment should keep service plane hidden.");

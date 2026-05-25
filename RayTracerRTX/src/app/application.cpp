@@ -85,6 +85,9 @@ struct AppState
     int editorPrimitiveToAdd = BuiltInMeshCube;
     int editorObjectKind = EditorObjectSphere;
     int environmentMode = SceneEnvironmentOpen;
+    float roomWidth = 18.0f;
+    float roomDepth = 18.0f;
+    float roomHeight = 9.0f;
 };
 
 struct FrameStats
@@ -337,6 +340,32 @@ bool qualityCombo(const char* id, int& quality)
         ImGui::EndCombo();
     }
     return changed;
+}
+
+bool inputFloatClamped(const char* label, float& value, const float minValue, const float maxValue, const char* format = "%.2f")
+{
+    float edited = value;
+    if (!ImGui::InputFloat(label, &edited, 0.0f, 0.0f, format, ImGuiInputTextFlags_CharsDecimal))
+    {
+        return false;
+    }
+
+    value = clampf(edited, minValue, maxValue);
+    return true;
+}
+
+bool inputFloat3Clamped(const char* label, float values[3], const float3 minValue, const float3 maxValue, const char* format = "%.2f")
+{
+    float edited[3] = {values[0], values[1], values[2]};
+    if (!ImGui::InputFloat3(label, edited, format, ImGuiInputTextFlags_CharsDecimal))
+    {
+        return false;
+    }
+
+    values[0] = clampf(edited[0], minValue.x, maxValue.x);
+    values[1] = clampf(edited[1], minValue.y, maxValue.y);
+    values[2] = clampf(edited[2], minValue.z, maxValue.z);
+    return true;
 }
 
 std::string meshObjectLabel(const MeshObject& object, const int index)
@@ -1021,6 +1050,24 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
                 refreshMeshSelection();
             }
+            if (appState.environmentMode == SceneEnvironmentRoom)
+            {
+                float roomSize[3] = {appState.roomWidth, appState.roomDepth, appState.roomHeight};
+                if (inputFloat3Clamped(
+                        u8c(u8"\u0420\u0430\u0437\u043C\u0435\u0440 \u043A\u043E\u043C\u043D\u0430\u0442\u044B##room_size"),
+                        roomSize,
+                        make_float3(4.0f, 4.0f, 2.0f),
+                        make_float3(80.0f, 80.0f, 40.0f)))
+                {
+                    appState.roomWidth = roomSize[0];
+                    appState.roomDepth = roomSize[1];
+                    appState.roomHeight = roomSize[2];
+                    const bool changed = applySceneRoomDimensions(scene, appState.roomWidth, appState.roomDepth, appState.roomHeight);
+                    appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
+                    appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                    refreshMeshSelection();
+                }
+            }
             ImGui::SameLine();
             if (ImGui::Button(u8c(u8"\u0421\u043B\u0443\u0436\u0435\u0431\u043D\u044B\u0439 \u043F\u043E\u043B")))
             {
@@ -1136,7 +1183,11 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                         }
                     }
                     float pos[3] = {sphere.center.x, sphere.center.y, sphere.center.z};
-                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"), pos, 0.05f, -50.0f, 50.0f, "%.2f"))
+                    if (inputFloat3Clamped(
+                            u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"),
+                            pos,
+                            make_float3(-24.0f, 0.0f, -24.0f),
+                            make_float3(24.0f, 14.0f, 24.0f)))
                     {
                         const float oldRadius = sphere.radius;
                         sphere.center = make_float3(pos[0], pos[1], pos[2]);
@@ -1145,7 +1196,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                         appState.progressiveSamples = 0;
                     }
                     float radius = sphere.radius;
-                    if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"), &radius, 0.25f, 5.0f, "%.2f"))
+                    if (inputFloatClamped(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"), radius, 0.25f, 5.0f))
                     {
                         setSelectedSphereRadius(scene, radius);
                         appState.progressiveSamples = 0;
@@ -1184,15 +1235,28 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
                     float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
                     bool transformChanged = false;
-                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
+                    if (inputFloat3Clamped(
+                            u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"),
+                            position,
+                            make_float3(-50.0f, -10.0f, -50.0f),
+                            make_float3(50.0f, 50.0f, 50.0f)))
                     {
                         transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
                     }
-                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"), rotation, 0.8f, -360.0f, 360.0f, "%.1f"))
+                    if (inputFloat3Clamped(
+                            u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"),
+                            rotation,
+                            make_float3(-360.0f, -360.0f, -360.0f),
+                            make_float3(360.0f, 360.0f, 360.0f),
+                            "%.1f"))
                     {
                         transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
                     }
-                    if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.10f, 0.05f, 100.0f, "%.2f"))
+                    if (inputFloat3Clamped(
+                            u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"),
+                            scale,
+                            make_float3(0.05f, 0.05f, 0.05f),
+                            make_float3(100.0f, 100.0f, 100.0f)))
                     {
                         transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
                     }

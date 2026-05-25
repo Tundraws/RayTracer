@@ -172,6 +172,28 @@ void addEditableFloor(SceneState& scene)
     clampScene(scene);
 }
 
+void addRoomPanels(SceneState& scene, const float width, const float depth, const float height)
+{
+    const float safeWidth = clampScalar(width, 4.0f, 80.0f);
+    const float safeDepth = clampScalar(depth, 4.0f, 80.0f);
+    const float safeHeight = clampScalar(height, 2.0f, 40.0f);
+    const float halfWidth = safeWidth * 0.5f;
+    const float halfDepth = safeDepth * 0.5f;
+    const float halfHeight = safeHeight * 0.5f;
+
+    scene.meshObjects.insert(scene.meshObjects.begin(), {
+        makeEnvironmentPanel("Пол", make_float3(0.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 0.0f), make_float3(safeWidth, 1.0f, safeDepth), make_float3(0.46f, 0.48f, 0.46f)),
+        makeEnvironmentPanel("Задняя стена", make_float3(0.0f, halfHeight, -halfDepth), make_float3(90.0f, 0.0f, 0.0f), make_float3(safeWidth, 1.0f, safeHeight), make_float3(0.54f, 0.56f, 0.58f)),
+        makeEnvironmentPanel("Левая стена", make_float3(-halfWidth, halfHeight, 0.0f), make_float3(0.0f, 0.0f, -90.0f), make_float3(safeHeight, 1.0f, safeDepth), make_float3(0.52f, 0.50f, 0.48f)),
+        makeEnvironmentPanel("Правая стена", make_float3(halfWidth, halfHeight, 0.0f), make_float3(0.0f, 0.0f, 90.0f), make_float3(safeHeight, 1.0f, safeDepth), make_float3(0.48f, 0.50f, 0.54f)),
+        makeEnvironmentPanel("Потолок", make_float3(0.0f, safeHeight, 0.0f), make_float3(180.0f, 0.0f, 0.0f), make_float3(safeWidth, 1.0f, safeDepth), make_float3(0.50f, 0.50f, 0.49f))
+    });
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+}
+
 float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
 {
     return make_float3(
@@ -785,17 +807,7 @@ bool applySceneEnvironmentMode(SceneState& scene, const int environmentMode)
     }
     else if (environmentMode == SceneEnvironmentRoom)
     {
-        scene.meshObjects.insert(scene.meshObjects.begin(), {
-            makeEnvironmentPanel("Пол", make_float3(0.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 18.0f), make_float3(0.46f, 0.48f, 0.46f)),
-            makeEnvironmentPanel("Задняя стена", make_float3(0.0f, 4.5f, -9.0f), make_float3(90.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 9.0f), make_float3(0.54f, 0.56f, 0.58f)),
-            makeEnvironmentPanel("Левая стена", make_float3(-9.0f, 4.5f, 0.0f), make_float3(0.0f, 0.0f, -90.0f), make_float3(9.0f, 1.0f, 18.0f), make_float3(0.52f, 0.50f, 0.48f)),
-            makeEnvironmentPanel("Правая стена", make_float3(9.0f, 4.5f, 0.0f), make_float3(0.0f, 0.0f, 90.0f), make_float3(9.0f, 1.0f, 18.0f), make_float3(0.48f, 0.50f, 0.54f)),
-            makeEnvironmentPanel("Потолок", make_float3(0.0f, 9.0f, 0.0f), make_float3(180.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 18.0f), make_float3(0.50f, 0.50f, 0.49f))
-        });
-        scene.selectedMeshObject = 0;
-        scene.selectedMeshMaterial = 0;
-        syncCompatibilityMesh(scene);
-        clampScene(scene);
+        addRoomPanels(scene, 18.0f, 18.0f, 9.0f);
     }
     else if (environmentMode != SceneEnvironmentEmpty)
     {
@@ -804,6 +816,14 @@ bool applySceneEnvironmentMode(SceneState& scene, const int environmentMode)
 
     syncCompatibilityMesh(scene);
     clampScene(scene);
+    return true;
+}
+
+bool applySceneRoomDimensions(SceneState& scene, const float width, const float depth, const float height)
+{
+    removeEnvironmentObjects(scene);
+    scene.showGroundPlane = false;
+    addRoomPanels(scene, width, depth, height);
     return true;
 }
 

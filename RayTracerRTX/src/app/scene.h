@@ -82,6 +82,7 @@ bool removeAllMeshObjects(SceneState& scene);
 bool clearSceneObjects(SceneState& scene);
 bool restoreDefaultSceneObjects(SceneState& scene);
 bool applySceneEnvironmentMode(SceneState& scene, int environmentMode);
+bool applySceneRoomDimensions(SceneState& scene, float width, float depth, float height);
 bool setSelectedMeshPosition(SceneState& scene, float3 position);
 bool setSelectedMeshRotation(SceneState& scene, float3 rotation);
 bool setSelectedMeshScale(SceneState& scene, float3 scale);
