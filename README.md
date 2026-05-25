@@ -80,12 +80,15 @@ RayTracerRTX - учебный интерактивный трассировщи�
 Дополнительные примеры:
 
 ```powershell
-.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\textured_cube_scene.json
 .\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\material_showcase_scene.json
-.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\gltf_scene.json
+.\x64\Debug\RayTracerRTX.exe --scene RayTracerRTX\assets\scenes\textured_cube_scene.json
 ```
 
 Если параметры не переданы, запускается стандартная демонстрационная сцена.
+
+В переключателе сцен внутри приложения оставлены три понятных preset-сцены:
+базовая сцена, сцена материалов и сцена с одной полигональной моделью. Другие
+OBJ/glTF/GLB-модели пользователь добавляет через кнопку загрузки в панели.
 
 ## Управление
 

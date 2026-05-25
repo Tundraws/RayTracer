@@ -35,7 +35,8 @@ The progressive path currently uses a small stochastic sampler: per-pixel RNG,
 cosine-weighted matte bounces, rough reflection bounces for mirror/metal
 materials, a max-depth limit, and Russian roulette termination. It is still a
 coursework quality mode, not a full offline path tracer.
-The lightweight runtime controls also expose demo scene presets with `G`,
+The lightweight runtime controls also expose a short public preset list with `G`
+(base scene, material scene, and one mesh scene),
 selected mesh object cycling with `B`, selected mesh material preset cycling
 with `V`, and selected sphere material preset cycling with `M`.
 Pressing `C` restores the current preset camera and light without changing the
@@ -168,6 +169,10 @@ Scene config construction uses `AssetCache` as a small asset manager layer:
 mesh assets are cached by normalized path, and standalone image texture loads
 can be cached by path and texture type. The cache keeps repeated mesh references
 from re-reading the same OBJ/glTF/GLB asset during scene construction.
+
+The application keeps auxiliary JSON assets for tests and examples, but the
+runtime preset selector intentionally exposes only a small demonstration set so
+user-loaded OBJ/glTF/GLB models remain the main way to add extra content.
 
 Preset helpers `applyScenePresetByIndex(...)` and
 `resetSceneViewFromPreset(...)` keep runtime scene switching and reset behavior

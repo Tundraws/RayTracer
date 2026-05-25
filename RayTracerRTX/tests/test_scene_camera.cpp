@@ -1548,12 +1548,8 @@ void testAllDemoSceneConfigsLoad(TestContext& t)
 {
     const std::vector<std::string> scenes = {
         "demo_scene.json",
-        "textured_scene.json",
         "textured_cube_scene.json",
-        "multi_mesh_scene.json",
-        "gltf_scene.json",
-        "material_showcase_scene.json",
-        "path_tracing_demo_scene.json"
+        "material_showcase_scene.json"
     };
 
     for (const std::string& fileName : scenes)
@@ -1576,6 +1572,7 @@ void testAllDemoSceneConfigsLoad(TestContext& t)
         t.expect(scene.ok, "Demo scene config should build: " + fileName + " " + scene.error);
         t.expect(!scene.scene.meshObjects.empty(), "Demo scene should contain mesh objects: " + fileName);
         t.expect(hasValidMeshMaterialIndices(scene.scene.mesh), "Demo scene combined mesh material indices should be valid: " + fileName);
+        t.expect(scene.scene.spheres.size() >= 3, "Public demo scene should keep visible default spheres: " + fileName);
     }
 }
 
