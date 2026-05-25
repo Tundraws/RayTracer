@@ -1203,6 +1203,33 @@ void testDefaultSceneMeshGeometry(TestContext& t)
     t.expect(hasValidMeshMaterialIndices(scene.mesh), "Default mesh material indices should stay in range.");
 }
 
+void testBuiltInCubeMesh(TestContext& t)
+{
+    const MeshData mesh = createCubeMesh();
+    t.expect(mesh.vertices.size() == 24, "Built-in cube should use per-face vertices.");
+    t.expect(mesh.triangles.size() == 12, "Built-in cube should contain 12 triangles.");
+    t.expect(!isEmptyMesh(mesh), "Built-in cube should not be empty.");
+    t.expect(hasValidMeshMaterialIndices(mesh), "Built-in cube material indices should be valid.");
+}
+
+void testBuiltInPyramidMesh(TestContext& t)
+{
+    const MeshData mesh = createPyramidMesh();
+    t.expect(mesh.vertices.size() == 16, "Built-in pyramid should use face vertices.");
+    t.expect(mesh.triangles.size() == 6, "Built-in pyramid should contain base and side triangles.");
+    t.expect(!isEmptyMesh(mesh), "Built-in pyramid should not be empty.");
+    t.expect(hasValidMeshMaterialIndices(mesh), "Built-in pyramid material indices should be valid.");
+}
+
+void testBuiltInPlaneMesh(TestContext& t)
+{
+    const MeshData mesh = createPlaneMesh();
+    t.expect(mesh.vertices.size() == 4, "Built-in plane should contain 4 vertices.");
+    t.expect(mesh.triangles.size() == 2, "Built-in plane should contain 2 triangles.");
+    t.expect(!mesh.vertices.empty() && almostEqual(mesh.vertices[0].normal.y, 1.0f), "Built-in plane normal should point upward.");
+    t.expect(hasValidMeshMaterialIndices(mesh), "Built-in plane material indices should be valid.");
+}
+
 void testSceneConfigLoadsValidScene(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -2628,6 +2655,9 @@ int main(int argc, char** argv)
     runTest("Demo OBJ asset loads", testDemoObjAssetLoads);
     runTest("Textured cube asset loads", testTexturedCubeAssetLoads);
     runTest("Default scene mesh geometry", testDefaultSceneMeshGeometry);
+    runTest("Built-in cube mesh", testBuiltInCubeMesh);
+    runTest("Built-in pyramid mesh", testBuiltInPyramidMesh);
+    runTest("Built-in plane mesh", testBuiltInPlaneMesh);
     runTest("Scene config loads valid scene", testSceneConfigLoadsValidScene);
     runTest("Scene config with multiple meshes loads", testSceneConfigMultipleMeshes);
     runTest("Scene config missing file", testSceneConfigMissingFile);

@@ -63,3 +63,6 @@ struct MeshData
 
 bool isEmptyMesh(const MeshData& mesh);
 bool hasValidMeshMaterialIndices(const MeshData& mesh);
+MeshData createCubeMesh();
+MeshData createPyramidMesh();
+MeshData createPlaneMesh();

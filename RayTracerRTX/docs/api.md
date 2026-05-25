@@ -104,6 +104,21 @@ Declared in `src/app/scene.h`.
 | `adjustSceneSkyIntensity(SceneState&, float)` | Changes sky intensity from keyboard/HUD controls |
 | `adjustSceneLightIntensity(SceneState&, float)` | Changes light intensity from keyboard/HUD controls |
 
+### Built-In Mesh Primitives
+
+Declared in `src/app/mesh.h`.
+
+| Function | Responsibility |
+|---|---|
+| `createCubeMesh()` | Builds a cube as triangle `MeshData` with per-face normals |
+| `createPyramidMesh()` | Builds a pyramid as triangle `MeshData` |
+| `createPlaneMesh()` | Builds a finite rectangular panel from two triangles |
+
+The built-in cube, pyramid and plane/panel are not separate GPU primitive
+types. They use the same `MeshData` path as imported OBJ/glTF geometry. The
+plane is intentionally finite, so it can represent floors, walls, ceilings and
+other editable rectangular surfaces.
+
 ## OBJ Mesh API
 
 ### Scene Config
