@@ -102,7 +102,8 @@ void syncCompatibilityMesh(SceneState& scene)
 MeshObject makeBuiltInMeshObject(MeshData mesh, std::string name, const float3 position, const float3 rotation, const float3 scale)
 {
     MeshObject object;
-    object.assetReference = std::move(name);
+    object.assetReference = name;
+    object.displayName = std::move(name);
     object.mesh = std::move(mesh);
     object.position = position;
     object.rotation = rotation;
@@ -198,6 +199,7 @@ SceneState makeDefaultScene()
     scene.mesh = loadDefaultMesh();
     MeshObject defaultMeshObject;
     defaultMeshObject.assetReference = "assets/meshes/demo.obj";
+    defaultMeshObject.displayName = "Demo OBJ";
     defaultMeshObject.mesh = scene.mesh;
     scene.meshObjects = {std::move(defaultMeshObject)};
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
@@ -625,14 +627,6 @@ bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
             make_float3(xOffset, 0.02f, -2.6f),
             make_float3(0.0f, 0.0f, 0.0f),
             make_float3(3.0f, 1.0f, 3.0f)));
-    }
-    else if (primitiveType == BuiltInMeshRoom)
-    {
-        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room floor", make_float3(0.0f, 0.01f, 0.0f), make_float3(0.0f, 0.0f, 0.0f), make_float3(12.0f, 1.0f, 12.0f)));
-        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room back wall", make_float3(0.0f, 3.0f, 6.0f), make_float3(90.0f, 0.0f, 0.0f), make_float3(12.0f, 1.0f, 6.0f)));
-        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room left wall", make_float3(-6.0f, 3.0f, 0.0f), make_float3(0.0f, 0.0f, -90.0f), make_float3(12.0f, 1.0f, 6.0f)));
-        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room right wall", make_float3(6.0f, 3.0f, 0.0f), make_float3(0.0f, 0.0f, 90.0f), make_float3(12.0f, 1.0f, 6.0f)));
-        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room ceiling", make_float3(0.0f, 6.0f, 0.0f), make_float3(180.0f, 0.0f, 0.0f), make_float3(12.0f, 1.0f, 12.0f)));
     }
     else
     {

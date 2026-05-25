@@ -16,6 +16,7 @@ struct SphereGeometry
 struct MeshObject
 {
     std::string assetReference;
+    std::string displayName;
     MeshData mesh;
     float3 position = make_float3(0.0f, 0.0f, 0.0f);
     float3 rotation = make_float3(0.0f, 0.0f, 0.0f);
@@ -30,8 +31,7 @@ enum BuiltInMeshPrimitive
 {
     BuiltInMeshCube = 0,
     BuiltInMeshPyramid = 1,
-    BuiltInMeshPlane = 2,
-    BuiltInMeshRoom = 3
+    BuiltInMeshPlane = 2
 };
 
 struct SceneState

@@ -96,7 +96,7 @@ Declared in `src/app/scene.h`.
 | `cycleSelectedSphereMaterialPreset(SceneState&)` | Cycles selected sphere through diffuse, mirror, metal and dielectric presets |
 | `selectNextMeshObject(SceneState&)` | Selects the next mesh object for HUD/material editing |
 | `cycleSelectedMeshMaterialPreset(SceneState&)` | Cycles selected mesh material through diffuse, mirror, metal and dielectric presets |
-| `addBuiltInMeshPrimitive(SceneState&, int)` | Adds a built-in mesh primitive: cube, pyramid, finite plane/panel, or room preset |
+| `addBuiltInMeshPrimitive(SceneState&, int)` | Adds a built-in mesh primitive: cube, pyramid, or finite plane/panel |
 | `removeSelectedMeshObject(SceneState&)` | Removes selected mesh object while keeping at least one mesh object for renderer stability |
 | `moveLight(SceneState&, float3)` | Moves the light and applies bounds |
 | `setSceneExposure(SceneState&, float)` | Sets tone-mapping exposure with clamping |

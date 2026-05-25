@@ -1262,6 +1262,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
         applyMeshMaterialOverride(object, materialMap, objectMesh, result);
         MeshObject meshObject;
         meshObject.assetReference = meshPath.string();
+        meshObject.displayName = meshPath.filename().string().empty() ? meshPath.string() : meshPath.filename().string();
         meshObject.mesh = objectMesh;
         meshObject.position = object.transform.position;
         meshObject.rotation = object.transform.rotation;

@@ -1247,19 +1247,7 @@ void testAddBuiltInMeshPrimitives(TestContext& t)
     t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshPlane), "Editor helper should add plane/panel.");
     t.expect(scene.meshObjects.size() == initialCount + 3, "Plane add should append mesh object.");
     t.expect(scene.meshObjects.back().mesh.triangles.size() == 2, "Plane object should contain two triangles.");
-}
-
-void testAddRoomPresetMeshes(TestContext& t)
-{
-    SceneState scene = makeDefaultScene();
-    const size_t initialCount = scene.meshObjects.size();
-    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshRoom), "Editor helper should add room panels.");
-    t.expect(scene.meshObjects.size() == initialCount + 5, "Room preset should add floor, walls, and ceiling.");
-    for (size_t i = initialCount; i < scene.meshObjects.size(); ++i)
-    {
-        t.expect(scene.meshObjects[i].mesh.triangles.size() == 2, "Each room panel should be a two-triangle plane.");
-        t.expect(hasValidMeshMaterialIndices(scene.meshObjects[i].mesh), "Room panel material indices should be valid.");
-    }
+    t.expect(!scene.meshObjects.back().displayName.empty(), "Built-in mesh object should have editable display name.");
 }
 
 void testRemoveSelectedMeshObjectSafe(TestContext& t)
@@ -2702,7 +2690,6 @@ int main(int argc, char** argv)
     runTest("Built-in pyramid mesh", testBuiltInPyramidMesh);
     runTest("Built-in plane mesh", testBuiltInPlaneMesh);
     runTest("Add built-in mesh primitives", testAddBuiltInMeshPrimitives);
-    runTest("Add room preset meshes", testAddRoomPresetMeshes);
     runTest("Remove selected mesh object safe", testRemoveSelectedMeshObjectSafe);
     runTest("Scene config loads valid scene", testSceneConfigLoadsValidScene);
     runTest("Scene config with multiple meshes loads", testSceneConfigMultipleMeshes);
