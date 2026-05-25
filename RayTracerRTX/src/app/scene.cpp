@@ -788,8 +788,8 @@ bool applySceneEnvironmentMode(SceneState& scene, const int environmentMode)
         scene.meshObjects.insert(scene.meshObjects.begin(), {
             makeEnvironmentPanel("Пол", make_float3(0.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 18.0f), make_float3(0.46f, 0.48f, 0.46f)),
             makeEnvironmentPanel("Задняя стена", make_float3(0.0f, 4.5f, -9.0f), make_float3(90.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 9.0f), make_float3(0.54f, 0.56f, 0.58f)),
-            makeEnvironmentPanel("Левая стена", make_float3(-9.0f, 4.5f, 0.0f), make_float3(0.0f, 0.0f, -90.0f), make_float3(18.0f, 1.0f, 9.0f), make_float3(0.52f, 0.50f, 0.48f)),
-            makeEnvironmentPanel("Правая стена", make_float3(9.0f, 4.5f, 0.0f), make_float3(0.0f, 0.0f, 90.0f), make_float3(18.0f, 1.0f, 9.0f), make_float3(0.48f, 0.50f, 0.54f)),
+            makeEnvironmentPanel("Левая стена", make_float3(-9.0f, 4.5f, 0.0f), make_float3(0.0f, 0.0f, -90.0f), make_float3(9.0f, 1.0f, 18.0f), make_float3(0.52f, 0.50f, 0.48f)),
+            makeEnvironmentPanel("Правая стена", make_float3(9.0f, 4.5f, 0.0f), make_float3(0.0f, 0.0f, 90.0f), make_float3(9.0f, 1.0f, 18.0f), make_float3(0.48f, 0.50f, 0.54f)),
             makeEnvironmentPanel("Потолок", make_float3(0.0f, 9.0f, 0.0f), make_float3(180.0f, 0.0f, 0.0f), make_float3(18.0f, 1.0f, 18.0f), make_float3(0.50f, 0.50f, 0.49f))
         });
         scene.selectedMeshObject = 0;

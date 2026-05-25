@@ -1115,51 +1115,26 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             }
             ImGui::Separator();
 
-            if (!scene.spheres.empty())
+            if (appState.editorObjectKind == EditorObjectSphere)
             {
-                const std::string selectedSphereLabel = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1);
-                if (ImGui::BeginCombo(u8c(u8"\u0421\u0444\u0435\u0440\u0430"), selectedSphereLabel.c_str()))
+                if (scene.spheres.empty())
                 {
-                    for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
+                    ImGui::TextWrapped("%s", u8c(u8"\u0421\u0444\u0435\u0440\u044B \u043D\u0435\u0442. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0441\u0444\u0435\u0440\u0443 \u0447\u0435\u0440\u0435\u0437 \u0441\u043F\u0438\u0441\u043E\u043A \u0432\u044B\u0448\u0435."));
+                }
+                else
+                {
+                    clampScene(scene);
+                    SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
+                    ImGui::Text("%s %d", u8c(u8"\u0421\u0444\u0435\u0440\u0430"), scene.selectedSphere + 1);
+                    if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u0443\u044E")))
                     {
-                        const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1);
-                        const bool selected = i == scene.selectedSphere;
-                        if (ImGui::Selectable(label.c_str(), selected))
+                        appState.progressiveSamples = removeSelectedSphere(scene) ? 0 : appState.progressiveSamples;
+                        if (scene.spheres.empty() && !scene.meshObjects.empty())
                         {
-                            scene.selectedSphere = i;
-                            clampScene(scene);
-                        }
-                        if (selected)
-                        {
-                            ImGui::SetItemDefaultFocus();
+                            appState.editorObjectKind = EditorObjectMesh;
+                            refreshMeshSelection();
                         }
                     }
-                    ImGui::EndCombo();
-                }
-                if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C")))
-                {
-                    appState.editorObjectKind = EditorObjectSphere;
-                    appState.progressiveSamples = addSphere(scene) ? 0 : appState.progressiveSamples;
-                }
-                ImGui::SameLine();
-                const bool canRemoveSphere = !scene.spheres.empty();
-                if (!canRemoveSphere)
-                {
-                    ImGui::BeginDisabled();
-                }
-                if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C")))
-                {
-                    appState.progressiveSamples = removeSelectedSphere(scene) ? 0 : appState.progressiveSamples;
-                    appState.editorObjectKind = EditorObjectSphere;
-                }
-                if (!canRemoveSphere)
-                {
-                    ImGui::EndDisabled();
-                }
-                clampScene(scene);
-                if (scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.spheres.size()))
-                {
-                    SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
                     float pos[3] = {sphere.center.x, sphere.center.y, sphere.center.z};
                     if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"), pos, 0.05f, -50.0f, 50.0f, "%.2f"))
                     {
@@ -1175,78 +1150,57 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                         setSelectedSphereRadius(scene, radius);
                         appState.progressiveSamples = 0;
                     }
+                    drawSphereMaterialEditor();
                 }
             }
-
-            ImGui::SeparatorText(u8c(u8"\u041F\u043E\u043B\u0438\u0433\u043E\u043D\u0430\u043B\u044C\u043D\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C"));
-            const std::string selectedMeshLabel = scene.meshObjects.empty()
-                ? std::string(u8c(u8"\u041D\u0435\u0442"))
-                : std::string(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C ")) + std::to_string(scene.selectedMeshObject + 1);
-            if (ImGui::BeginCombo(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C"), selectedMeshLabel.c_str()))
+            else
             {
-                for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
+                refreshMeshSelection();
+                if (selectedMeshObject == nullptr)
                 {
-                    const std::string label = meshObjectLabel(scene.meshObjects[static_cast<size_t>(i)], i);
-                    const bool selected = i == scene.selectedMeshObject;
-                    if (ImGui::Selectable(label.c_str(), selected))
+                    ImGui::TextWrapped("%s", u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0435\u0439 \u043D\u0435\u0442. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043A\u0443\u0431, \u043F\u0438\u0440\u0430\u043C\u0438\u0434\u0443, \u043F\u0430\u043D\u0435\u043B\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 OBJ/glTF."));
+                }
+                else
+                {
+                    char nameBuffer[128]{};
+                    const std::string currentName = meshObjectLabel(*selectedMeshObject, scene.selectedMeshObject);
+                    std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", currentName.c_str());
+                    if (ImGui::InputText(u8c(u8"\u0418\u043C\u044F##mesh_name"), nameBuffer, sizeof(nameBuffer)))
                     {
-                        scene.selectedMeshObject = i;
-                        appState.editorObjectKind = EditorObjectMesh;
-                        scene.selectedMeshMaterial = 0;
-                        clampScene(scene);
+                        selectedMeshObject->displayName = nameBuffer;
+                    }
+                    if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u0443\u044E")))
+                    {
+                        const bool removed = removeSelectedMeshObject(scene);
+                        appState.progressiveSamples = removed ? 0 : appState.progressiveSamples;
+                        appState.rendererSceneRebuildRequested = removed || appState.rendererSceneRebuildRequested;
+                        if (scene.meshObjects.empty() && !scene.spheres.empty())
+                        {
+                            appState.editorObjectKind = EditorObjectSphere;
+                        }
                         refreshMeshSelection();
                     }
-                    if (selected)
+                    float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
+                    float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
+                    float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
+                    bool transformChanged = false;
+                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
                     {
-                        ImGui::SetItemDefaultFocus();
+                        transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
                     }
-                }
-                ImGui::EndCombo();
-            }
-            if (selectedMeshObject != nullptr)
-            {
-                char nameBuffer[128]{};
-                const std::string currentName = meshObjectLabel(*selectedMeshObject, scene.selectedMeshObject);
-                std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", currentName.c_str());
-                if (ImGui::InputText(u8c(u8"\u0418\u043C\u044F##mesh_name"), nameBuffer, sizeof(nameBuffer)))
-                {
-                    selectedMeshObject->displayName = nameBuffer;
-                }
-                const bool canRemoveMesh = !scene.meshObjects.empty();
-                if (!canRemoveMesh)
-                {
-                    ImGui::BeginDisabled();
-                }
-                if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u044C")))
-                {
-                    const bool removed = removeSelectedMeshObject(scene);
-                    appState.progressiveSamples = removed ? 0 : appState.progressiveSamples;
-                    appState.rendererSceneRebuildRequested = removed || appState.rendererSceneRebuildRequested;
-                    refreshMeshSelection();
-                }
-                if (!canRemoveMesh)
-                {
-                    ImGui::EndDisabled();
-                }
-                float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
-                float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
-                float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
-                bool transformChanged = false;
-                if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
-                {
-                    transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
-                }
-                if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"), rotation, 0.8f, -360.0f, 360.0f, "%.1f"))
-                {
-                    transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
-                }
-                if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.10f, 0.05f, 100.0f, "%.2f"))
-                {
-                    transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
-                }
-                if (transformChanged)
-                {
-                    appState.progressiveSamples = 0;
+                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"), rotation, 0.8f, -360.0f, 360.0f, "%.1f"))
+                    {
+                        transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
+                    }
+                    if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.10f, 0.05f, 100.0f, "%.2f"))
+                    {
+                        transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
+                    }
+                    if (transformChanged)
+                    {
+                        appState.progressiveSamples = 0;
+                    }
+                    drawMeshMaterialEditor();
                 }
             }
             ImGui::EndTabItem();
