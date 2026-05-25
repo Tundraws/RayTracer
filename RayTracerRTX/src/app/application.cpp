@@ -1149,14 +1149,13 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 {
                     transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
                 }
-                if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.05f, 0.05f, 20.0f, "%.2f"))
+                if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.10f, 0.05f, 100.0f, "%.2f"))
                 {
                     transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
                 }
                 if (transformChanged)
                 {
                     appState.progressiveSamples = 0;
-                    appState.rendererSceneRebuildRequested = true;
                 }
             }
             ImGui::EndTabItem();
@@ -1406,7 +1405,6 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
             const MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
             if (setSelectedMeshPosition(scene, add3(object.position, delta)))
             {
-                appState.rendererSceneRebuildRequested = true;
                 appState.progressiveSamples = 0;
             }
         }

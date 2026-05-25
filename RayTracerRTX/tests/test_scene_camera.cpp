@@ -1958,7 +1958,7 @@ void testSelectedMeshTransformInvalidSafe(TestContext& t)
     t.expect(almostEqual(scene.meshObjects[0].position.x, 50.0f), "Mesh position should clamp to max.");
     t.expect(almostEqual(scene.meshObjects[0].position.y, -10.0f), "Mesh position should clamp to min Y.");
     t.expect(almostEqual(scene.meshObjects[0].scale.x, 0.05f), "Mesh scale should clamp to min.");
-    t.expect(almostEqual(scene.meshObjects[0].scale.y, 20.0f), "Mesh scale should clamp to max.");
+    t.expect(almostEqual(scene.meshObjects[0].scale.y, 100.0f), "Mesh scale should clamp to max.");
 }
 
 void testInvalidMeshSelectionSafe(TestContext& t)

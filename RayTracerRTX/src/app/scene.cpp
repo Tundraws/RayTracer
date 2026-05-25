@@ -698,7 +698,7 @@ bool setSelectedMeshScale(SceneState& scene, const float3 scale)
         return false;
     }
 
-    object->scale = clamp3(scale, make_float3(0.05f, 0.05f, 0.05f), make_float3(20.0f, 20.0f, 20.0f));
+    object->scale = clamp3(scale, make_float3(0.05f, 0.05f, 0.05f), make_float3(100.0f, 100.0f, 100.0f));
     updateMeshObjectTransform(*object);
     return true;
 }

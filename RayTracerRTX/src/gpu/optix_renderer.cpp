@@ -898,23 +898,26 @@ void OptixRenderer::rebuildAccelerationStructure()
 
     for (size_t i = 0; i < meshBuildInputs.size(); ++i)
     {
-        CUdeviceptr dMeshTempBuffer = 0;
-        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshTempBuffer), meshGasSizes[i].tempSizeInBytes));
-        meshAccelOptions[i].operation = OPTIX_BUILD_OPERATION_BUILD;
-        OPTIX_CHECK(optixAccelBuild(
-            context,
-            stream,
-            &meshAccelOptions[i],
-            &meshBuildInputs[i],
-            1,
-            dMeshTempBuffer,
-            meshGasSizes[i].tempSizeInBytes,
-            dMeshGasBuffers[i],
-            meshGasSizes[i].outputSizeInBytes,
-            &meshGasHandles[i],
-            nullptr,
-            0));
-        CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dMeshTempBuffer)));
+        if (meshGasHandles[i] == 0)
+        {
+            CUdeviceptr dMeshTempBuffer = 0;
+            CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dMeshTempBuffer), meshGasSizes[i].tempSizeInBytes));
+            meshAccelOptions[i].operation = OPTIX_BUILD_OPERATION_BUILD;
+            OPTIX_CHECK(optixAccelBuild(
+                context,
+                stream,
+                &meshAccelOptions[i],
+                &meshBuildInputs[i],
+                1,
+                dMeshTempBuffer,
+                meshGasSizes[i].tempSizeInBytes,
+                dMeshGasBuffers[i],
+                meshGasSizes[i].outputSizeInBytes,
+                &meshGasHandles[i],
+                nullptr,
+                0));
+            CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dMeshTempBuffer)));
+        }
     }
 
     std::vector<OptixInstance> instances(2u + meshObjectCount);
