@@ -1230,6 +1230,49 @@ void testBuiltInPlaneMesh(TestContext& t)
     t.expect(hasValidMeshMaterialIndices(mesh), "Built-in plane material indices should be valid.");
 }
 
+void testAddBuiltInMeshPrimitives(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    const size_t initialCount = scene.meshObjects.size();
+
+    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshCube), "Editor helper should add cube.");
+    t.expect(scene.meshObjects.size() == initialCount + 1, "Cube add should append mesh object.");
+    t.expect(scene.selectedMeshObject == static_cast<int>(scene.meshObjects.size()) - 1, "Cube add should select new object.");
+    t.expect(hasValidMeshMaterialIndices(scene.meshObjects.back().mesh), "Cube object material indices should be valid.");
+
+    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshPyramid), "Editor helper should add pyramid.");
+    t.expect(scene.meshObjects.size() == initialCount + 2, "Pyramid add should append mesh object.");
+    t.expect(hasValidMeshMaterialIndices(scene.meshObjects.back().mesh), "Pyramid object material indices should be valid.");
+
+    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshPlane), "Editor helper should add plane/panel.");
+    t.expect(scene.meshObjects.size() == initialCount + 3, "Plane add should append mesh object.");
+    t.expect(scene.meshObjects.back().mesh.triangles.size() == 2, "Plane object should contain two triangles.");
+}
+
+void testAddRoomPresetMeshes(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    const size_t initialCount = scene.meshObjects.size();
+    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshRoom), "Editor helper should add room panels.");
+    t.expect(scene.meshObjects.size() == initialCount + 5, "Room preset should add floor, walls, and ceiling.");
+    for (size_t i = initialCount; i < scene.meshObjects.size(); ++i)
+    {
+        t.expect(scene.meshObjects[i].mesh.triangles.size() == 2, "Each room panel should be a two-triangle plane.");
+        t.expect(hasValidMeshMaterialIndices(scene.meshObjects[i].mesh), "Room panel material indices should be valid.");
+    }
+}
+
+void testRemoveSelectedMeshObjectSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshCube), "Remove test should add cube.");
+    const size_t countAfterAdd = scene.meshObjects.size();
+    t.expect(removeSelectedMeshObject(scene), "Removing selected mesh should succeed when more than one object exists.");
+    t.expect(scene.meshObjects.size() == countAfterAdd - 1, "Removing selected mesh should shrink mesh object list.");
+    t.expect(!removeSelectedMeshObject(scene), "Removing last mesh object should fail safely.");
+    t.expect(!scene.meshObjects.empty(), "Safe remove should keep at least one mesh object.");
+}
+
 void testSceneConfigLoadsValidScene(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile(
@@ -2658,6 +2701,9 @@ int main(int argc, char** argv)
     runTest("Built-in cube mesh", testBuiltInCubeMesh);
     runTest("Built-in pyramid mesh", testBuiltInPyramidMesh);
     runTest("Built-in plane mesh", testBuiltInPlaneMesh);
+    runTest("Add built-in mesh primitives", testAddBuiltInMeshPrimitives);
+    runTest("Add room preset meshes", testAddRoomPresetMeshes);
+    runTest("Remove selected mesh object safe", testRemoveSelectedMeshObjectSafe);
     runTest("Scene config loads valid scene", testSceneConfigLoadsValidScene);
     runTest("Scene config with multiple meshes loads", testSceneConfigMultipleMeshes);
     runTest("Scene config missing file", testSceneConfigMissingFile);

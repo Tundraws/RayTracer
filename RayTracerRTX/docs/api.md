@@ -96,6 +96,8 @@ Declared in `src/app/scene.h`.
 | `cycleSelectedSphereMaterialPreset(SceneState&)` | Cycles selected sphere through diffuse, mirror, metal and dielectric presets |
 | `selectNextMeshObject(SceneState&)` | Selects the next mesh object for HUD/material editing |
 | `cycleSelectedMeshMaterialPreset(SceneState&)` | Cycles selected mesh material through diffuse, mirror, metal and dielectric presets |
+| `addBuiltInMeshPrimitive(SceneState&, int)` | Adds a built-in mesh primitive: cube, pyramid, finite plane/panel, or room preset |
+| `removeSelectedMeshObject(SceneState&)` | Removes selected mesh object while keeping at least one mesh object for renderer stability |
 | `moveLight(SceneState&, float3)` | Moves the light and applies bounds |
 | `setSceneExposure(SceneState&, float)` | Sets tone-mapping exposure with clamping |
 | `setSceneSkyIntensity(SceneState&, float)` | Sets environment-light intensity with clamping |
@@ -167,10 +169,11 @@ and reuse the same clamping helpers as JSON parsing.
 
 The interactive app also includes a lightweight Dear ImGui panel rendered on top
 of the existing GLFW/OpenGL window. The panel is split into tabs: Scene,
-Objects, Materials, Light, Quality, and Diagnostics. These tabs call the same
+Editor, Materials, Light, Quality, and Diagnostics. These tabs call the same
 scene-state functions as the keyboard controls: scene preset selection,
 camera/light reset, mesh selection, sphere selection, sphere add/remove, sphere
-position/radius/color editing, selected mesh position/rotation/scale editing,
+position/radius/color editing, built-in mesh primitive creation, selected mesh
+removal, selected mesh position/rotation/scale editing,
 explicit material type selection, texture enable/disable for textured mesh
 materials, exposure, sky intensity, light intensity, area-light size,
 environment intensity, material-specific roughness/transparency/IOR tuning,

@@ -91,6 +91,26 @@ MeshObject* selectedMeshObject(SceneState& scene)
     return &scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
 }
 
+void syncCompatibilityMesh(SceneState& scene)
+{
+    if (!scene.meshObjects.empty())
+    {
+        scene.mesh = scene.meshObjects[0].mesh;
+    }
+}
+
+MeshObject makeBuiltInMeshObject(MeshData mesh, std::string name, const float3 position, const float3 rotation, const float3 scale)
+{
+    MeshObject object;
+    object.assetReference = std::move(name);
+    object.mesh = std::move(mesh);
+    object.position = position;
+    object.rotation = rotation;
+    object.scale = scale;
+    updateMeshObjectTransform(object);
+    return object;
+}
+
 float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
 {
     return make_float3(
@@ -574,6 +594,80 @@ void setSelectedMeshMaterialType(SceneState& scene, const int materialType)
         applyMaterialDefaults(objectMaterial);
     }
     syncSelectedMeshMaterialToCombined(scene);
+}
+
+bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
+{
+    const float xOffset = static_cast<float>(scene.meshObjects.size()) * 1.4f - 1.4f;
+    if (primitiveType == BuiltInMeshCube)
+    {
+        scene.meshObjects.push_back(makeBuiltInMeshObject(
+            createCubeMesh(),
+            "built-in cube",
+            make_float3(xOffset, 0.5f, -2.6f),
+            make_float3(0.0f, 25.0f, 0.0f),
+            make_float3(1.4f, 1.4f, 1.4f)));
+    }
+    else if (primitiveType == BuiltInMeshPyramid)
+    {
+        scene.meshObjects.push_back(makeBuiltInMeshObject(
+            createPyramidMesh(),
+            "built-in pyramid",
+            make_float3(xOffset, 0.0f, -2.6f),
+            make_float3(0.0f, -18.0f, 0.0f),
+            make_float3(1.4f, 1.4f, 1.4f)));
+    }
+    else if (primitiveType == BuiltInMeshPlane)
+    {
+        scene.meshObjects.push_back(makeBuiltInMeshObject(
+            createPlaneMesh(),
+            "built-in panel",
+            make_float3(xOffset, 0.02f, -2.6f),
+            make_float3(0.0f, 0.0f, 0.0f),
+            make_float3(3.0f, 1.0f, 3.0f)));
+    }
+    else if (primitiveType == BuiltInMeshRoom)
+    {
+        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room floor", make_float3(0.0f, 0.01f, 0.0f), make_float3(0.0f, 0.0f, 0.0f), make_float3(12.0f, 1.0f, 12.0f)));
+        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room back wall", make_float3(0.0f, 3.0f, 6.0f), make_float3(90.0f, 0.0f, 0.0f), make_float3(12.0f, 1.0f, 6.0f)));
+        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room left wall", make_float3(-6.0f, 3.0f, 0.0f), make_float3(0.0f, 0.0f, -90.0f), make_float3(12.0f, 1.0f, 6.0f)));
+        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room right wall", make_float3(6.0f, 3.0f, 0.0f), make_float3(0.0f, 0.0f, 90.0f), make_float3(12.0f, 1.0f, 6.0f)));
+        scene.meshObjects.push_back(makeBuiltInMeshObject(createPlaneMesh(), "room ceiling", make_float3(0.0f, 6.0f, 0.0f), make_float3(180.0f, 0.0f, 0.0f), make_float3(12.0f, 1.0f, 12.0f)));
+    }
+    else
+    {
+        return false;
+    }
+
+    scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+    scene.selectedMeshMaterial = 0;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+    return true;
+}
+
+bool removeSelectedMeshObject(SceneState& scene)
+{
+    if (scene.meshObjects.size() <= 1)
+    {
+        clampScene(scene);
+        return false;
+    }
+    if (scene.selectedMeshObject < 0 || scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
+    {
+        clampScene(scene);
+        return false;
+    }
+
+    scene.meshObjects.erase(scene.meshObjects.begin() + scene.selectedMeshObject);
+    if (scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
+    {
+        scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+    }
+    scene.selectedMeshMaterial = 0;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+    return true;
 }
 
 bool setSelectedMeshPosition(SceneState& scene, const float3 position)

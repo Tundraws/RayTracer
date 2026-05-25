@@ -75,6 +75,7 @@ struct AppState
     bool imguiPanelPinnedRight = true;
     float imguiPanelWidth = 360.0f;
     float imguiPanelHeight = 680.0f;
+    int editorPrimitiveToAdd = BuiltInMeshCube;
 };
 
 struct FrameStats
@@ -200,6 +201,48 @@ const char* materialTypeNameUtf8(const int materialType)
     default:
         return u8c(u8"\u041C\u0430\u0442\u043E\u0432\u044B\u0439");
     }
+}
+
+const char* builtInPrimitiveNameUtf8(const int primitiveType)
+{
+    switch (primitiveType)
+    {
+    case -1:
+        return u8c(u8"\u0421\u0444\u0435\u0440\u0430");
+    case BuiltInMeshPyramid:
+        return u8c(u8"\u041F\u0438\u0440\u0430\u043C\u0438\u0434\u0430");
+    case BuiltInMeshPlane:
+        return u8c(u8"\u041F\u043B\u043E\u0441\u043A\u043E\u0441\u0442\u044C/\u043F\u0430\u043D\u0435\u043B\u044C");
+    case BuiltInMeshRoom:
+        return u8c(u8"\u041A\u043E\u043C\u043D\u0430\u0442\u0430");
+    case BuiltInMeshCube:
+    default:
+        return u8c(u8"\u041A\u0443\u0431");
+    }
+}
+
+bool builtInPrimitiveCombo(const char* id, int& primitiveType)
+{
+    const int primitiveTypes[] = {-1, BuiltInMeshCube, BuiltInMeshPyramid, BuiltInMeshPlane, BuiltInMeshRoom};
+    bool changed = false;
+    if (ImGui::BeginCombo(id, builtInPrimitiveNameUtf8(primitiveType)))
+    {
+        for (const int type : primitiveTypes)
+        {
+            const bool selected = primitiveType == type;
+            if (ImGui::Selectable(builtInPrimitiveNameUtf8(type), selected))
+            {
+                primitiveType = type;
+                changed = true;
+            }
+            if (selected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    return changed;
 }
 
 bool materialTypeCombo(const char* id, int& materialType)
@@ -909,8 +952,26 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             ImGui::EndTabItem();
         }
 
-        if (ImGui::BeginTabItem(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u044B")))
+        if (ImGui::BeginTabItem(u8c(u8"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440")))
         {
+            builtInPrimitiveCombo(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C##editor_add_type"), appState.editorPrimitiveToAdd);
+            if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442")))
+            {
+                bool added = false;
+                if (appState.editorPrimitiveToAdd == -1)
+                {
+                    added = addSphere(scene);
+                }
+                else
+                {
+                    added = addBuiltInMeshPrimitive(scene, appState.editorPrimitiveToAdd);
+                    appState.rendererSceneRebuildRequested = added || appState.rendererSceneRebuildRequested;
+                    refreshMeshSelection();
+                }
+                appState.progressiveSamples = added ? 0 : appState.progressiveSamples;
+            }
+            ImGui::Separator();
+
             if (!scene.spheres.empty())
             {
                 const std::string selectedSphereLabel = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1);
@@ -998,6 +1059,22 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             }
             if (selectedMeshObject != nullptr)
             {
+                const bool canRemoveMesh = scene.meshObjects.size() > 1;
+                if (!canRemoveMesh)
+                {
+                    ImGui::BeginDisabled();
+                }
+                if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u044C")))
+                {
+                    const bool removed = removeSelectedMeshObject(scene);
+                    appState.progressiveSamples = removed ? 0 : appState.progressiveSamples;
+                    appState.rendererSceneRebuildRequested = removed || appState.rendererSceneRebuildRequested;
+                    refreshMeshSelection();
+                }
+                if (!canRemoveMesh)
+                {
+                    ImGui::EndDisabled();
+                }
                 float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
                 float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
                 float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};

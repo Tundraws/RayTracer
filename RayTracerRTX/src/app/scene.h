@@ -26,6 +26,14 @@ struct MeshObject
         0.0f, 0.0f, 1.0f, 0.0f};
 };
 
+enum BuiltInMeshPrimitive
+{
+    BuiltInMeshCube = 0,
+    BuiltInMeshPyramid = 1,
+    BuiltInMeshPlane = 2,
+    BuiltInMeshRoom = 3
+};
+
 struct SceneState
 {
     std::vector<SphereGeometry> spheres;
@@ -59,6 +67,8 @@ void setSelectedSphereMaterialType(SceneState& scene, int materialType);
 void selectNextMeshObject(SceneState& scene);
 void cycleSelectedMeshMaterialPreset(SceneState& scene);
 void setSelectedMeshMaterialType(SceneState& scene, int materialType);
+bool addBuiltInMeshPrimitive(SceneState& scene, int primitiveType);
+bool removeSelectedMeshObject(SceneState& scene);
 bool setSelectedMeshPosition(SceneState& scene, float3 position);
 bool setSelectedMeshRotation(SceneState& scene, float3 rotation);
 bool setSelectedMeshScale(SceneState& scene, float3 scale);
