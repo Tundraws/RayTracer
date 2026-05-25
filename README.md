@@ -34,6 +34,8 @@ RayTracerRTX - учебный трассировщик лучей в реаль�
 - CUDA Toolkit 13.1
 - NVIDIA OptiX SDK 9.1
 
+`NVIDIA Container Toolkit` для обычного запуска `RayTracerRTX.exe` не нужен. Он требуется только для GPU-программ внутри Docker-контейнеров. В этом проекте Docker используется для учебной проверки структуры, документации и CPU-тестов, а само RTX-приложение запускается напрямую в Windows.
+
 ## Как собрать
 
 1. Откройте `RayTracerRTX.sln` в Visual Studio 2022.
@@ -164,3 +166,26 @@ docker compose run --rm coursework-check
 по умолчанию. Если не удалось загрузить сам OBJ/glTF-файл или JSON-сцена
 содержит ошибку структуры, приложение пишет ошибку и оставляет предыдущую сцену
 или стандартную демонстрационную сцену.
+
+## Проверка запуска на другом Windows-компьютере
+
+Если проект скачан с GitHub на новый компьютер, сначала проверьте окружение:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check_windows_environment.ps1
+```
+
+Скрипт проверяет наличие RTX-драйвера, CUDA Toolkit 13.1, OptiX SDK 9.1, демо-сцен и файлов, которые нужны программе во время запуска. Это помогает быстро понять, проблема в коде проекта или в недостающих SDK/драйверах на компьютере.
+
+Для подготовки переносимой Release-папки после сборки проекта:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package_release.ps1
+```
+
+Скрипт создаёт `.release\RayTracerRTX-portable` и архив `.release\RayTracerRTX-portable.zip`. Внутри есть `run_release.ps1`, который задаёт путь к runtime-заголовкам проекта и запускает программу с демо-сценой. CUDA и OptiX всё равно должны быть установлены на целевом компьютере.
+
+В переносимой папке также есть две удобные кнопки:
+
+- `Check Environment.bat` - проверить зависимости;
+- `Run RayTracerRTX.bat` - запустить демо-сцену.

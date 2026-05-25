@@ -49,6 +49,11 @@ The practical dependency check is:
 6. Keep vendored GLFW files limited to the required include/library paths.
 7. Keep vendored Dear ImGui files limited to the required core and backend files.
 8. Keep vendored stb usage limited to `stb_image.h` for image decoding.
+9. Use `scripts/check_windows_environment.ps1` to diagnose Windows machines
+   before running the native RTX application.
+10. Use `scripts/package_release.ps1` to create a portable Release folder that
+   contains the executable, assets and project runtime headers. CUDA, OptiX and
+   the NVIDIA driver remain host dependencies.
 
 ## Security Controls
 

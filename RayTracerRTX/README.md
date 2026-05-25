@@ -146,6 +146,8 @@ Windows и позволяет добавить в демонстрацию `.obj
 - NVIDIA OptiX SDK 9.1;
 - NVIDIA RTX GPU.
 
+`NVIDIA Container Toolkit` для обычного запуска приложения не требуется. Он нужен только если запускать GPU-приложение внутри Docker-контейнера. RayTracerRTX запускается напрямую в Windows, поэтому для него важны драйвер NVIDIA, CUDA Toolkit и OptiX SDK.
+
 Откройте `RayTracerRTX.sln`, выберите `Debug|x64` или `Release|x64` и соберите проект.
 
 Если OptiX установлен не в стандартную папку, путь можно переопределить через `OptixSdkDir`.
@@ -210,3 +212,29 @@ OBJ, MTL, glTF, текстурами и картами окружения.
 - нет карты окружения - используется градиентное небо;
 - некорректная JSON-сцена или отсутствующая модель - приложение пишет ошибку и
   возвращается к предыдущей или стандартной сцене.
+
+## Проверка другого компьютера
+
+Перед запуском на новом Windows-компьютере удобно выполнить из корня репозитория:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check_windows_environment.ps1
+```
+
+Проверяются RTX-драйвер, CUDA Toolkit 13.1, OptiX SDK 9.1, демо-сцены и runtime-файлы проекта.
+
+После Release-сборки можно создать переносимую папку:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package_release.ps1
+```
+
+Готовая папка появится в `.release\RayTracerRTX-portable`, архив - в `.release\RayTracerRTX-portable.zip`. На другом компьютере внутри папки нужно запустить `check_windows_environment.ps1`, затем `run_release.ps1`.
+
+Для запуска без командной строки в этой папке есть:
+
+- `Check Environment.bat` - проверить зависимости;
+- `Run RayTracerRTX.bat` - запустить демо-сцену.
+
+
+Примечание для проверки: окно приложения создаётся через GLFW, а демонстрационные полигональные модели относятся к OBJ mesh pipeline.

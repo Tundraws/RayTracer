@@ -26,6 +26,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <cstring>
+#include <filesystem>
 #include <string>
 #include <utility>
 #include <vector>
@@ -179,9 +180,20 @@ std::string getEnvString(const char* name)
     return result;
 }
 
+bool pathExists(const char* path)
+{
+    if (path == nullptr || path[0] == '\0')
+    {
+        return false;
+    }
+
+    std::error_code error;
+    return std::filesystem::exists(std::filesystem::path(path), error);
+}
+
 std::string getConfiguredPath(const char* macroValue, const char* envName, const char* suffix)
 {
-    if (macroValue != nullptr && macroValue[0] != '\0')
+    if (pathExists(macroValue))
     {
         return macroValue;
     }

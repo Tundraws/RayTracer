@@ -36,3 +36,6 @@ CppProperties.json
 # Render outputs
 *.ppm
 *.docx
+
+# Local release packages
+.release/
