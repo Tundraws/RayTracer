@@ -728,6 +728,15 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     gImguiPanelY = panelPos.y;
     gImguiPanelWidth = panelSize.x;
     gImguiPanelHeight = panelSize.y;
+
+    if (appState.cursorCaptured)
+    {
+        ImGui::Text("FPS %.1f | GPU %.2f ms", stats.fps, stats.avgGpuMs);
+        ImGui::TextWrapped("%s", u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043A\u0430\u043C\u0435\u0440\u044B: \u043F\u0430\u043D\u0435\u043B\u044C \u043D\u0435 \u043F\u0440\u0438\u043D\u0438\u043C\u0430\u0435\u0442 \u0432\u0432\u043E\u0434. \u041B\u041A\u041C - \u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043A\u0443\u0440\u0441\u043E\u0440."));
+        ImGui::End();
+        return;
+    }
+
     ImGui::PushItemWidth(std::min(260.0f, std::max(170.0f, panelSize.x - 56.0f)));
 
     ImGui::Text("FPS %.1f | GPU %.2f ms", stats.fps, stats.avgGpuMs);
@@ -923,7 +932,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     {
         for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
         {
-            const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1);
+            const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1) + "##hier_sphere_" + std::to_string(i);
             const bool selected = appState.hierarchySelectionKind == HierarchySelectionSphere && scene.selectedSphere == i;
             if (ImGui::Selectable(label.c_str(), selected))
             {
@@ -938,7 +947,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         {
             const MeshObject& object = scene.meshObjects[static_cast<size_t>(i)];
             const bool isEnvironment = object.assetReference.rfind("environment:", 0) == 0;
-            const std::string label = (isEnvironment ? std::string(u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C: ")) : std::string{}) + meshObjectLabel(object, i);
+            const std::string label = (isEnvironment ? std::string(u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C: ")) : std::string{}) + meshObjectLabel(object, i) + "##hier_mesh_" + std::to_string(i);
             const bool selected = appState.hierarchySelectionKind == HierarchySelectionMesh && scene.selectedMeshObject == i;
             if (ImGui::Selectable(label.c_str(), selected))
             {
@@ -1015,6 +1024,31 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         if (ImGui::SliderFloat(u8c(u8"\u041D\u0435\u0431\u043E"), &skyIntensity, 0.0f, 3.0f, "%.2f"))
         {
             applySceneEditResult(appState, editor.setSkyIntensity(skyIntensity));
+        }
+
+        ImGui::SeparatorText(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u044B"));
+        builtInPrimitiveCombo(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C##primitive_add_combo"), appState.editorPrimitiveToAdd);
+        if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C##add_object")))
+        {
+            const SceneEditResult result = appState.editorPrimitiveToAdd == -1
+                ? editor.addSphere()
+                : editor.addMeshPrimitive(appState.editorPrimitiveToAdd);
+            applySceneEditResult(appState, result);
+            refreshMeshSelection();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(u8c(u8"\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C##clear_scene")))
+        {
+            applySceneEditResult(appState, editor.clearScene());
+            refreshMeshSelection();
+        }
+
+        ImGui::SeparatorText(u8c(u8"\u0420\u0435\u043D\u0434\u0435\u0440"));
+        int selectedQuality = appState.renderQuality;
+        if (qualityCombo(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E##scene_quality"), selectedQuality))
+        {
+            appState.renderQuality = selectedQuality;
+            applyQualityMode(appState);
         }
     }
     else if (appState.hierarchySelectionKind == HierarchySelectionCamera)
@@ -1105,28 +1139,6 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
     }
 
-    ImGui::Separator();
-    builtInPrimitiveCombo(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C"), appState.editorPrimitiveToAdd);
-    if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C")))
-    {
-        const SceneEditResult result = appState.editorPrimitiveToAdd == -1
-            ? editor.addSphere()
-            : editor.addMeshPrimitive(appState.editorPrimitiveToAdd);
-        applySceneEditResult(appState, result);
-        refreshMeshSelection();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button(u8c(u8"\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C")))
-    {
-        applySceneEditResult(appState, editor.clearScene());
-        refreshMeshSelection();
-    }
-    int selectedQuality = appState.renderQuality;
-    if (qualityCombo(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E"), selectedQuality))
-    {
-        appState.renderQuality = selectedQuality;
-        applyQualityMode(appState);
-    }
     if (!appState.lastUiMessage.empty())
     {
         ImGui::TextWrapped("%s: %s",
