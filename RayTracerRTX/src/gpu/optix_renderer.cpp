@@ -97,6 +97,36 @@ std::size_t makeAccumulationSignature(const SceneState& scene, const CameraState
     return seed;
 }
 
+std::size_t makeSphereGeometrySignature(const SceneState& scene)
+{
+    std::size_t seed = 1099511628211ull;
+    hashCombine(seed, scene.spheres.size());
+    for (const SphereGeometry& sphere : scene.spheres)
+    {
+        hashCombine(seed, hashFloat(sphere.center.x));
+        hashCombine(seed, hashFloat(sphere.center.y));
+        hashCombine(seed, hashFloat(sphere.center.z));
+        hashCombine(seed, hashFloat(sphere.radius));
+    }
+    return seed;
+}
+
+std::size_t makeInstanceSignature(const SceneState& scene)
+{
+    std::size_t seed = 1469598103934665603ull;
+    hashCombine(seed, scene.showGroundPlane ? 1u : 0u);
+    hashCombine(seed, scene.meshObjects.size());
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        hashCombine(seed, std::hash<std::string>{}(object.assetReference));
+        for (const float value : object.transform)
+        {
+            hashCombine(seed, hashFloat(value));
+        }
+    }
+    return seed;
+}
+
 template <typename T>
 struct SbtRecord
 {
@@ -849,6 +879,8 @@ void OptixRenderer::createScene(const SceneState& scene)
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dIasBuffer), iasSizes.outputSizeInBytes));
 
     rebuildAccelerationStructure();
+    lastSphereGeometrySignature = makeSphereGeometrySignature(scene);
+    lastInstanceSignature = makeInstanceSignature(scene);
 }
 
 void OptixRenderer::syncMeshInstanceTransforms(const SceneState& scene)
@@ -881,24 +913,7 @@ void OptixRenderer::syncMeshInstanceTransforms(const SceneState& scene)
 
 void OptixRenderer::rebuildAccelerationStructure()
 {
-    CUdeviceptr dSphereTempBuffer = 0;
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dSphereTempBuffer), sphereGasSizes.tempSizeInBytes));
-
-    sphereAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-    OPTIX_CHECK(optixAccelBuild(
-        context,
-        stream,
-        &sphereAccelOptions,
-        &sphereBuildInput,
-        1,
-        dSphereTempBuffer,
-        sphereGasSizes.tempSizeInBytes,
-        dSphereGasBuffer,
-        sphereGasSizes.outputSizeInBytes,
-        &sphereGasHandle,
-        nullptr,
-        0));
-
+    rebuildSphereAccelerationStructure();
     if (planeGasHandle == 0)
     {
         CUdeviceptr dPlaneTempBuffer = 0;
@@ -944,6 +959,33 @@ void OptixRenderer::rebuildAccelerationStructure()
         }
     }
 
+    rebuildInstanceAccelerationStructure();
+}
+
+void OptixRenderer::rebuildSphereAccelerationStructure()
+{
+    CUdeviceptr dSphereTempBuffer = 0;
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dSphereTempBuffer), sphereGasSizes.tempSizeInBytes));
+
+    sphereAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+    OPTIX_CHECK(optixAccelBuild(
+        context,
+        stream,
+        &sphereAccelOptions,
+        &sphereBuildInput,
+        1,
+        dSphereTempBuffer,
+        sphereGasSizes.tempSizeInBytes,
+        dSphereGasBuffer,
+        sphereGasSizes.outputSizeInBytes,
+        &sphereGasHandle,
+        nullptr,
+        0));
+    CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dSphereTempBuffer)));
+}
+
+void OptixRenderer::rebuildInstanceAccelerationStructure()
+{
     std::vector<OptixInstance> instances(2u + meshObjectCount);
     for (OptixInstance& instance : instances)
     {
@@ -1000,7 +1042,6 @@ void OptixRenderer::rebuildAccelerationStructure()
 
     CUDA_CHECK(cudaStreamSynchronize(stream));
     CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dIasTempBuffer)));
-    CUDA_CHECK(cudaFree(reinterpret_cast<void*>(dSphereTempBuffer)));
 }
 
 void OptixRenderer::createModule()
@@ -1329,7 +1370,20 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
         stream));
 
     syncMeshInstanceTransforms(scene);
-    rebuildAccelerationStructure();
+    const std::size_t sphereGeometrySignature = makeSphereGeometrySignature(scene);
+    const std::size_t instanceSignature = makeInstanceSignature(scene);
+    const bool sphereGeometryChanged = sphereGeometrySignature != lastSphereGeometrySignature || sphereGasHandle == 0;
+    const bool instancesChanged = instanceSignature != lastInstanceSignature || iasHandle == 0;
+    if (sphereGeometryChanged)
+    {
+        rebuildSphereAccelerationStructure();
+        lastSphereGeometrySignature = sphereGeometrySignature;
+    }
+    if (sphereGeometryChanged || instancesChanged)
+    {
+        rebuildInstanceAccelerationStructure();
+        lastInstanceSignature = instanceSignature;
+    }
 
     LaunchParams params{};
     params.image = dFrameBuffer;
@@ -1616,4 +1670,6 @@ void OptixRenderer::destroy()
         optixDeviceContextDestroy(context);
         context = nullptr;
     }
+    lastSphereGeometrySignature = 0;
+    lastInstanceSignature = 0;
 }

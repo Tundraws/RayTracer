@@ -51,6 +51,8 @@ private:
     void ensureEnvironmentResources(const struct SceneState& scene);
     void syncMeshInstanceTransforms(const struct SceneState& scene);
     void rebuildAccelerationStructure();
+    void rebuildSphereAccelerationStructure();
+    void rebuildInstanceAccelerationStructure();
     void initializeDenoiser();
     void releaseDenoiser();
     bool applyDenoiser(std::vector<uchar4>& hostPixels);
@@ -109,6 +111,8 @@ private:
     bool denoiserEnabled = false;
     bool denoiserAvailable = false;
     std::size_t lastAccumulationSignature = 0;
+    std::size_t lastSphereGeometrySignature = 0;
+    std::size_t lastInstanceSignature = 0;
     OptixDenoiser denoiser = nullptr;
     OptixDenoiserSizes denoiserSizes = {};
     OptixBuildInput sphereBuildInput = {};
