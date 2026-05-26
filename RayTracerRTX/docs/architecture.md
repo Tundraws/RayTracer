@@ -21,6 +21,8 @@ flowchart LR
     App --> Camera["CameraState / updateCameraBasis"]
     SceneConfig --> JsonMaterials["JSON material inputs"]
     SceneConfig --> MeshObject["MeshObject + transform"]
+    UI --> SceneGroups["SceneGroup editor selections"]
+    SceneGroups --> SceneEditor
     SceneConfig --> AssetCache["AssetManager / AssetCache"]
     AssetCache --> MeshCache["Mesh cache by path"]
     AssetCache --> TextureCache["Texture cache by path"]
@@ -167,6 +169,7 @@ flowchart LR
 | Scene editor | `src/app/scene_editor.*` | Applies scene edits through helper methods and reports `SceneDirtyFlags` for camera, material, transform, geometry, lighting, and render settings |
 | Renderer controller helpers | `src/app/renderer_controller.*` | Centralized accumulation invalidation, quality-mode application, and scene rebuild marking from dirty flags |
 | UI panel | `src/app/application.*` + Dear ImGui | Compact hierarchy/properties editor for selecting scene objects and editing scene, camera, light, sphere, mesh, material, and quality settings |
+| Scene groups | `src/app/scene.*`, `src/app/scene_editor.*` | Optional editor-level groups that reference spheres or mesh objects, expose group name/position/rotation/scale, and move child objects together without introducing a new GPU primitive |
 | Built-in mesh primitives | `src/app/mesh.*` | Generates cube, pyramid, and finite plane/panel as `MeshData` triangles |
 | Environment presets | `src/app/scene.*` | Builds editable floor, wall and ceiling panels for open/room/empty scene modes |
 | Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*`, `src/app/gltf_loader.*` | Spheres, OBJ/glTF mesh data, materials, selected object, light movement and clamping |

@@ -27,6 +27,21 @@ struct MeshObject
         0.0f, 0.0f, 1.0f, 0.0f};
 };
 
+struct SceneObjectRef
+{
+    int kind = 0;
+    int index = 0;
+};
+
+struct SceneGroup
+{
+    std::string name;
+    std::vector<SceneObjectRef> objects;
+    float3 position = make_float3(0.0f, 0.0f, 0.0f);
+    float3 rotation = make_float3(0.0f, 0.0f, 0.0f);
+    float3 scale = make_float3(1.0f, 1.0f, 1.0f);
+};
+
 enum BuiltInMeshPrimitive
 {
     BuiltInMeshCube = 0,
@@ -46,6 +61,7 @@ struct SceneState
     std::vector<SphereGeometry> spheres;
     std::vector<SphereMaterial> materials;
     std::vector<MeshObject> meshObjects;
+    std::vector<SceneGroup> groups;
     MeshData mesh;
     float3 lightPosition;
     float exposure = 0.82f;
@@ -60,6 +76,7 @@ struct SceneState
     int selectedSphere = 0;
     int selectedMeshObject = 0;
     int selectedMeshMaterial = 0;
+    int selectedGroup = 0;
 };
 
 SceneState makeDefaultScene();
@@ -88,6 +105,13 @@ bool applySceneRoomDimensions(SceneState& scene, float width, float depth, float
 bool setSelectedMeshPosition(SceneState& scene, float3 position);
 bool setSelectedMeshRotation(SceneState& scene, float3 rotation);
 bool setSelectedMeshScale(SceneState& scene, float3 scale);
+int findObjectGroupIndex(const SceneState& scene, SceneObjectRef ref);
+bool createSceneGroup(SceneState& scene, const std::vector<SceneObjectRef>& refs);
+bool ungroupSelectedSceneGroup(SceneState& scene);
+bool removeSelectedSceneGroup(SceneState& scene);
+bool setSelectedGroupPosition(SceneState& scene, float3 position);
+bool setSelectedGroupRotation(SceneState& scene, float3 rotation);
+bool setSelectedGroupScale(SceneState& scene, float3 scale);
 void moveLight(SceneState& scene, const float3 delta);
 void setSceneExposure(SceneState& scene, float value);
 void setSceneSkyIntensity(SceneState& scene, float value);

@@ -25,7 +25,8 @@ enum SceneHierarchySelectionKind
     SceneHierarchySelectionCamera = 1,
     SceneHierarchySelectionLight = 2,
     SceneHierarchySelectionSphere = 3,
-    SceneHierarchySelectionMesh = 4
+    SceneHierarchySelectionMesh = 4,
+    SceneHierarchySelectionGroup = 5
 };
 
 bool hasDirtyFlags(const SceneDirtyFlags& dirty);
@@ -72,6 +73,13 @@ public:
     SceneEditResult setSelectedMeshMaterialProperties(float3 color, float roughness, float ior, float alpha, bool textureEnabled);
     SceneEditResult setSelectedMeshMaterialType(int materialType);
     SceneEditResult cycleSelectedMeshMaterialPreset();
+
+    SceneEditResult createGroup(const std::vector<SceneObjectRef>& refs);
+    SceneEditResult ungroupSelectedGroup();
+    SceneEditResult removeSelectedGroup();
+    SceneEditResult setSelectedGroupPosition(float3 position);
+    SceneEditResult setSelectedGroupRotation(float3 rotation);
+    SceneEditResult setSelectedGroupScale(float3 scale);
 
     SceneEditResult setLightPosition(float3 position);
     SceneEditResult moveLight(float3 delta);

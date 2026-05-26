@@ -33,6 +33,11 @@ bool hasSelectedMesh(const SceneState& scene)
 {
     return scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size());
 }
+
+bool hasSelectedGroup(const SceneState& scene)
+{
+    return scene.selectedGroup >= 0 && scene.selectedGroup < static_cast<int>(scene.groups.size());
+}
 }
 
 bool hasDirtyFlags(const SceneDirtyFlags& dirty)
@@ -78,6 +83,18 @@ bool selectHierarchyObject(SceneState& scene, const int selectionKind, const int
         return true;
     }
 
+    if (selectionKind == SceneHierarchySelectionGroup)
+    {
+        if (index < 0 || index >= static_cast<int>(scene.groups.size()))
+        {
+            clampScene(scene);
+            return false;
+        }
+        scene.selectedGroup = index;
+        clampScene(scene);
+        return true;
+    }
+
     return selectionKind == SceneHierarchySelectionScene ||
         selectionKind == SceneHierarchySelectionCamera ||
         selectionKind == SceneHierarchySelectionLight;
@@ -88,10 +105,35 @@ bool selectPreviousSceneObject(SceneState& scene, int& selectionKind)
     clampScene(scene);
     const bool hasSpheres = !scene.spheres.empty();
     const bool hasMeshes = !scene.meshObjects.empty();
-    if (!hasSpheres && !hasMeshes)
+    const bool hasGroups = !scene.groups.empty();
+    if (!hasSpheres && !hasMeshes && !hasGroups)
     {
         selectionKind = SceneHierarchySelectionScene;
         return false;
+    }
+
+    if (selectionKind == SceneHierarchySelectionGroup && hasGroups)
+    {
+        if (scene.selectedGroup > 0)
+        {
+            --scene.selectedGroup;
+            return true;
+        }
+        if (hasMeshes)
+        {
+            scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+            scene.selectedMeshMaterial = 0;
+            selectionKind = SceneHierarchySelectionMesh;
+            return true;
+        }
+        if (hasSpheres)
+        {
+            scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
+            selectionKind = SceneHierarchySelectionSphere;
+            return true;
+        }
+        scene.selectedGroup = static_cast<int>(scene.groups.size()) - 1;
+        return true;
     }
 
     if (selectionKind == SceneHierarchySelectionMesh && hasMeshes)
@@ -366,6 +408,48 @@ SceneEditResult SceneEditor::setSelectedMeshRotation(const float3 rotation)
 SceneEditResult SceneEditor::setSelectedMeshScale(const float3 scale)
 {
     return makeTransformDirty(::setSelectedMeshScale(scene_, scale));
+}
+
+SceneEditResult SceneEditor::createGroup(const std::vector<SceneObjectRef>& refs)
+{
+    return makeRenderSettingsDirty(createSceneGroup(scene_, refs));
+}
+
+SceneEditResult SceneEditor::ungroupSelectedGroup()
+{
+    return makeRenderSettingsDirty(ungroupSelectedSceneGroup(scene_));
+}
+
+SceneEditResult SceneEditor::removeSelectedGroup()
+{
+    return makeGeometryDirty(removeSelectedSceneGroup(scene_));
+}
+
+SceneEditResult SceneEditor::setSelectedGroupPosition(const float3 position)
+{
+    if (!hasSelectedGroup(scene_))
+    {
+        return makeTransformDirty(false);
+    }
+    return makeTransformDirty(::setSelectedGroupPosition(scene_, position));
+}
+
+SceneEditResult SceneEditor::setSelectedGroupRotation(const float3 rotation)
+{
+    if (!hasSelectedGroup(scene_))
+    {
+        return makeTransformDirty(false);
+    }
+    return makeTransformDirty(::setSelectedGroupRotation(scene_, rotation));
+}
+
+SceneEditResult SceneEditor::setSelectedGroupScale(const float3 scale)
+{
+    if (!hasSelectedGroup(scene_))
+    {
+        return makeTransformDirty(false);
+    }
+    return makeTransformDirty(::setSelectedGroupScale(scene_, scale));
 }
 
 SceneEditResult SceneEditor::setSelectedMeshMaterialProperties(const float3 color, const float roughness, const float ior, const float alpha, const bool textureEnabled)

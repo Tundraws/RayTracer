@@ -12,7 +12,8 @@
 enum EditorObjectKind
 {
     EditorObjectSphere = 0,
-    EditorObjectMesh = 1
+    EditorObjectMesh = 1,
+    EditorObjectGroup = 2
 };
 
 enum HierarchySelectionKind
@@ -21,7 +22,8 @@ enum HierarchySelectionKind
     HierarchySelectionCamera = 1,
     HierarchySelectionLight = 2,
     HierarchySelectionSphere = 3,
-    HierarchySelectionMesh = 4
+    HierarchySelectionMesh = 4,
+    HierarchySelectionGroup = 5
 };
 
 struct AppState
@@ -57,6 +59,8 @@ struct AppState
     float roomHeight = 9.0f;
     int hierarchySelectionKind = HierarchySelectionScene;
     int hierarchySelectionIndex = 0;
+    std::vector<int> groupSelectionSpheres;
+    std::vector<int> groupSelectionMeshes;
 };
 
 struct FrameStats

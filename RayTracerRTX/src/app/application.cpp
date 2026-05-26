@@ -375,6 +375,16 @@ std::string selectedSceneObjectLabel(const SceneState& scene, const int selectio
             meshObjectLabel(object, scene.selectedMeshObject);
     }
 
+    if (selectionKind == SceneHierarchySelectionGroup &&
+        scene.selectedGroup >= 0 &&
+        scene.selectedGroup < static_cast<int>(scene.groups.size()))
+    {
+        const SceneGroup& group = scene.groups[static_cast<size_t>(scene.selectedGroup)];
+        return group.name.empty()
+            ? std::string(u8c(u8"\u0413\u0440\u0443\u043F\u043F\u0430 ")) + std::to_string(scene.selectedGroup + 1)
+            : std::string(u8c(u8"\u0413\u0440\u0443\u043F\u043F\u0430: ")) + group.name;
+    }
+
     if (selectionKind == SceneHierarchySelectionCamera)
     {
         return u8c(u8"\u041A\u0430\u043C\u0435\u0440\u0430");
@@ -1011,6 +1021,10 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 appState.editorObjectKind = EditorObjectMesh;
                 refreshMeshSelection();
             }
+            else if (kind == SceneHierarchySelectionGroup)
+            {
+                appState.editorObjectKind = EditorObjectGroup;
+            }
         }
     };
 
@@ -1027,6 +1041,11 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             appState.hierarchySelectionIndex = scene.selectedMeshObject;
             refreshMeshSelection();
         }
+        else if (appState.hierarchySelectionKind == SceneHierarchySelectionGroup)
+        {
+            appState.editorObjectKind = EditorObjectGroup;
+            appState.hierarchySelectionIndex = scene.selectedGroup;
+        }
     };
 
     const auto selectSafeObjectAfterDelete = [&]()
@@ -1040,11 +1059,42 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         {
             appState.hierarchySelectionKind = scene.spheres.empty() ? SceneHierarchySelectionScene : SceneHierarchySelectionSphere;
         }
+        else if (appState.hierarchySelectionKind == SceneHierarchySelectionGroup && scene.groups.empty())
+        {
+            if (!scene.meshObjects.empty())
+            {
+                appState.hierarchySelectionKind = SceneHierarchySelectionMesh;
+            }
+            else
+            {
+                appState.hierarchySelectionKind = scene.spheres.empty() ? SceneHierarchySelectionScene : SceneHierarchySelectionSphere;
+            }
+        }
         syncEditorKindFromHierarchy();
     };
 
     const float hierarchyWidth = std::min(190.0f, std::max(150.0f, panelSize.x * 0.36f));
     const float childHeight = std::max(300.0f, panelSize.y - 92.0f);
+    const auto selectionContains = [](const std::vector<int>& values, const int value)
+    {
+        return std::find(values.begin(), values.end(), value) != values.end();
+    };
+    const auto toggleSelectionValue = [](std::vector<int>& values, const int value, const bool enabled)
+    {
+        const auto found = std::find(values.begin(), values.end(), value);
+        if (enabled)
+        {
+            if (found == values.end())
+            {
+                values.push_back(value);
+            }
+        }
+        else if (found != values.end())
+        {
+            values.erase(found);
+        }
+    };
+
     ImGui::BeginChild("HierarchyPanel", ImVec2(hierarchyWidth, childHeight), true);
     ImGui::TextUnformatted(u8c(u8"\u0418\u0435\u0440\u0430\u0440\u0445\u0438\u044F"));
     if (ImGui::Selectable(u8c(u8"\u0421\u0446\u0435\u043D\u0430"), appState.hierarchySelectionKind == HierarchySelectionScene))
@@ -1063,6 +1113,21 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     {
         for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
         {
+            const int groupIndex = findObjectGroupIndex(scene, SceneObjectRef{SceneHierarchySelectionSphere, i});
+            bool checked = selectionContains(appState.groupSelectionSpheres, i);
+            if (groupIndex >= 0)
+            {
+                ImGui::BeginDisabled();
+            }
+            if (ImGui::Checkbox(("##group_select_sphere_" + std::to_string(i)).c_str(), &checked))
+            {
+                toggleSelectionValue(appState.groupSelectionSpheres, i, checked);
+            }
+            if (groupIndex >= 0)
+            {
+                ImGui::EndDisabled();
+            }
+            ImGui::SameLine();
             const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1) + "##hier_sphere_" + std::to_string(i);
             const bool selected = appState.hierarchySelectionKind == HierarchySelectionSphere && scene.selectedSphere == i;
             if (ImGui::Selectable(label.c_str(), selected))
@@ -1072,6 +1137,21 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
         for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
         {
+            const int groupIndex = findObjectGroupIndex(scene, SceneObjectRef{SceneHierarchySelectionMesh, i});
+            bool checked = selectionContains(appState.groupSelectionMeshes, i);
+            if (groupIndex >= 0)
+            {
+                ImGui::BeginDisabled();
+            }
+            if (ImGui::Checkbox(("##group_select_mesh_" + std::to_string(i)).c_str(), &checked))
+            {
+                toggleSelectionValue(appState.groupSelectionMeshes, i, checked);
+            }
+            if (groupIndex >= 0)
+            {
+                ImGui::EndDisabled();
+            }
+            ImGui::SameLine();
             const MeshObject& object = scene.meshObjects[static_cast<size_t>(i)];
             const bool isEnvironment = object.assetReference.rfind("environment:", 0) == 0;
             const std::string label = (isEnvironment ? std::string(u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C: ")) : std::string{}) + meshObjectLabel(object, i) + "##hier_mesh_" + std::to_string(i);
@@ -1079,6 +1159,23 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Selectable(label.c_str(), selected))
             {
                 selectHierarchy(SceneHierarchySelectionMesh, i);
+            }
+        }
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNodeEx(u8c(u8"\u0413\u0440\u0443\u043F\u043F\u044B"), ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (int i = 0; i < static_cast<int>(scene.groups.size()); ++i)
+        {
+            const SceneGroup& group = scene.groups[static_cast<size_t>(i)];
+            const std::string visibleName = group.name.empty()
+                ? std::string(u8c(u8"\u0413\u0440\u0443\u043F\u043F\u0430 ")) + std::to_string(i + 1)
+                : group.name;
+            const std::string label = visibleName + " (" + std::to_string(group.objects.size()) + ")##hier_group_" + std::to_string(i);
+            const bool selected = appState.hierarchySelectionKind == HierarchySelectionGroup && scene.selectedGroup == i;
+            if (ImGui::Selectable(label.c_str(), selected))
+            {
+                selectHierarchy(SceneHierarchySelectionGroup, i);
             }
         }
         ImGui::TreePop();
@@ -1185,6 +1282,51 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             ImGui::EndDisabled();
         }
 
+        std::vector<SceneObjectRef> groupRefs;
+        for (const int sphereIndex : appState.groupSelectionSpheres)
+        {
+            if (sphereIndex >= 0 &&
+                sphereIndex < static_cast<int>(scene.spheres.size()) &&
+                findObjectGroupIndex(scene, SceneObjectRef{SceneHierarchySelectionSphere, sphereIndex}) < 0)
+            {
+                groupRefs.push_back(SceneObjectRef{SceneHierarchySelectionSphere, sphereIndex});
+            }
+        }
+        for (const int meshIndex : appState.groupSelectionMeshes)
+        {
+            if (meshIndex >= 0 &&
+                meshIndex < static_cast<int>(scene.meshObjects.size()) &&
+                findObjectGroupIndex(scene, SceneObjectRef{SceneHierarchySelectionMesh, meshIndex}) < 0)
+            {
+                groupRefs.push_back(SceneObjectRef{SceneHierarchySelectionMesh, meshIndex});
+            }
+        }
+        ImGui::Text("%s: %zu", u8c(u8"\u0412\u044B\u0431\u0440\u0430\u043D\u043E \u0434\u043B\u044F \u0433\u0440\u0443\u043F\u043F\u044B"), groupRefs.size());
+        if (groupRefs.size() < 2)
+        {
+            ImGui::BeginDisabled();
+        }
+        if (ImGui::Button(u8c(u8"\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0433\u0440\u0443\u043F\u043F\u0443##create_group")))
+        {
+            applySceneEditResult(appState, editor.createGroup(groupRefs));
+            appState.groupSelectionSpheres.clear();
+            appState.groupSelectionMeshes.clear();
+            if (!scene.groups.empty())
+            {
+                selectHierarchy(SceneHierarchySelectionGroup, scene.selectedGroup);
+            }
+        }
+        if (groupRefs.size() < 2)
+        {
+            ImGui::EndDisabled();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043E\u0442\u043C\u0435\u0442\u043A\u0438##clear_group_selection")))
+        {
+            appState.groupSelectionSpheres.clear();
+            appState.groupSelectionMeshes.clear();
+        }
+
         ImGui::SeparatorText(u8c(u8"\u0420\u0435\u043D\u0434\u0435\u0440"));
         ImGui::Text("FPS: %.1f", stats.fps);
         ImGui::Text("CPU frame: %.2f ms", stats.avgHostMs);
@@ -1245,6 +1387,62 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         {
             scene.areaLightRadius = clampf(areaLightRadius, 0.0f, 8.0f);
             applySceneEditResult(appState, makeLightingDirty());
+        }
+    }
+    else if (appState.hierarchySelectionKind == HierarchySelectionGroup)
+    {
+        if (!scene.groups.empty() &&
+            scene.selectedGroup >= 0 &&
+            scene.selectedGroup < static_cast<int>(scene.groups.size()))
+        {
+            SceneGroup& group = scene.groups[static_cast<size_t>(scene.selectedGroup)];
+            char nameBuffer[128]{};
+            std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", group.name.c_str());
+            if (ImGui::InputText(u8c(u8"\u0418\u043C\u044F##group_name"), nameBuffer, sizeof(nameBuffer)))
+            {
+                group.name = nameBuffer;
+            }
+
+            ImGui::Text("%s: %zu", u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u043E\u0432"), group.objects.size());
+            float position[3] = {group.position.x, group.position.y, group.position.z};
+            float rotation[3] = {group.rotation.x, group.rotation.y, group.rotation.z};
+            float scale[3] = {group.scale.x, group.scale.y, group.scale.z};
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##group_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
+            {
+                applySceneEditResult(appState, editor.setSelectedGroupPosition(make_float3(position[0], position[1], position[2])));
+            }
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##group_rot"), rotation, 0.8f, -360.0f, 360.0f, "%.1f"))
+            {
+                applySceneEditResult(appState, editor.setSelectedGroupRotation(make_float3(rotation[0], rotation[1], rotation[2])));
+            }
+            if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##group_scale"), scale, 0.05f, 0.05f, 100.0f, "%.2f"))
+            {
+                applySceneEditResult(appState, editor.setSelectedGroupScale(make_float3(scale[0], scale[1], scale[2])));
+            }
+
+            if (ImGui::Button(u8c(u8"\u0420\u0430\u0437\u0433\u0440\u0443\u043F\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C##ungroup")))
+            {
+                applySceneEditResult(appState, editor.ungroupSelectedGroup());
+                selectSafeObjectAfterDelete();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0433\u0440\u0443\u043F\u043F\u0443 \u0438 \u043E\u0431\u044A\u0435\u043A\u0442\u044B##delete_group")))
+            {
+                applySceneEditResult(appState, editor.removeSelectedGroup());
+                appState.groupSelectionSpheres.clear();
+                appState.groupSelectionMeshes.clear();
+                selectSafeObjectAfterDelete();
+                ImGui::EndChild();
+                ImGui::PopItemWidth();
+                if (!appState.lastUiMessage.empty())
+                {
+                    ImGui::TextWrapped("%s: %s",
+                        appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
+                        appState.lastUiMessage.c_str());
+                }
+                ImGui::End();
+                return;
+            }
         }
     }
     else if (appState.hierarchySelectionKind == HierarchySelectionSphere)
@@ -1514,6 +1712,13 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
             const MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
             applySceneEditResult(appState, editor.setSelectedMeshPosition(add3(object.position, delta)));
         }
+        else if (appState.editorObjectKind == EditorObjectGroup &&
+            scene.selectedGroup >= 0 &&
+            scene.selectedGroup < static_cast<int>(scene.groups.size()))
+        {
+            const SceneGroup& group = scene.groups[static_cast<size_t>(scene.selectedGroup)];
+            applySceneEditResult(appState, editor.setSelectedGroupPosition(add3(group.position, delta)));
+        }
         else
         {
             applySceneEditResult(appState, editor.moveSelectedSphere(delta));
@@ -1594,6 +1799,11 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
         {
             appState.editorObjectKind = EditorObjectMesh;
             appState.hierarchySelectionIndex = scene.selectedMeshObject;
+        }
+        else if (appState.hierarchySelectionKind == SceneHierarchySelectionGroup)
+        {
+            appState.editorObjectKind = EditorObjectGroup;
+            appState.hierarchySelectionIndex = scene.selectedGroup;
         }
         applySceneEditResult(appState, makeRenderSettingsDirty());
     }

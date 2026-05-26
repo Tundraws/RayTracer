@@ -2369,6 +2369,107 @@ void testHierarchyPreviousSceneObjectCyclesSpheresAndMeshes(TestContext& t)
     t.expect(scene.selectedMeshObject == static_cast<int>(scene.meshObjects.size()) - 1, "Previous from first sphere should select last mesh object.");
 }
 
+void testSceneGroupCreatesFromObjects(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    clearSceneObjects(scene);
+    addSphere(scene);
+    addBuiltInMeshPrimitive(scene, BuiltInMeshCube);
+
+    const bool created = createSceneGroup(scene, {
+        SceneObjectRef{SceneHierarchySelectionSphere, 0},
+        SceneObjectRef{SceneHierarchySelectionMesh, 0}
+    });
+
+    t.expect(created, "Scene group should be created from two valid objects.");
+    t.expect(scene.groups.size() == 1, "Scene should contain one group.");
+    t.expect(scene.selectedGroup == 0, "Created group should become selected.");
+    t.expect(findObjectGroupIndex(scene, SceneObjectRef{SceneHierarchySelectionSphere, 0}) == 0, "Sphere should be assigned to the group.");
+    t.expect(findObjectGroupIndex(scene, SceneObjectRef{SceneHierarchySelectionMesh, 0}) == 0, "Mesh should be assigned to the group.");
+
+    const bool duplicateCreated = createSceneGroup(scene, {
+        SceneObjectRef{SceneHierarchySelectionSphere, 0},
+        SceneObjectRef{SceneHierarchySelectionMesh, 0}
+    });
+    t.expect(!duplicateCreated, "Already grouped objects should not create a second group.");
+}
+
+void testSceneGroupTransformMovesChildren(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    clearSceneObjects(scene);
+    addSphere(scene);
+    addBuiltInMeshPrimitive(scene, BuiltInMeshCube);
+    createSceneGroup(scene, {
+        SceneObjectRef{SceneHierarchySelectionSphere, 0},
+        SceneObjectRef{SceneHierarchySelectionMesh, 0}
+    });
+
+    const float3 sphereBefore = scene.spheres[0].center;
+    const float3 meshBefore = scene.meshObjects[0].position;
+    const float3 groupBefore = scene.groups[0].position;
+    const bool moved = setSelectedGroupPosition(scene, make_float3(groupBefore.x + 2.0f, groupBefore.y + 1.0f, groupBefore.z - 3.0f));
+
+    t.expect(moved, "Moving a group should report a change.");
+    t.expect(std::fabs(scene.spheres[0].center.x - (sphereBefore.x + 2.0f)) < 0.01f, "Group move should translate child sphere X.");
+    t.expect(std::fabs(scene.meshObjects[0].position.z - (meshBefore.z - 3.0f)) < 0.01f, "Group move should translate child mesh Z.");
+}
+
+void testSceneGroupUngroupKeepsObjects(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    clearSceneObjects(scene);
+    addSphere(scene);
+    addBuiltInMeshPrimitive(scene, BuiltInMeshCube);
+    createSceneGroup(scene, {
+        SceneObjectRef{SceneHierarchySelectionSphere, 0},
+        SceneObjectRef{SceneHierarchySelectionMesh, 0}
+    });
+
+    const bool ungrouped = ungroupSelectedSceneGroup(scene);
+
+    t.expect(ungrouped, "Ungroup should remove the selected group.");
+    t.expect(scene.groups.empty(), "Ungroup should leave no groups.");
+    t.expect(scene.spheres.size() == 1, "Ungroup should keep child sphere.");
+    t.expect(scene.meshObjects.size() == 1, "Ungroup should keep child mesh.");
+}
+
+void testSceneGroupDeleteRemovesChildren(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    clearSceneObjects(scene);
+    addSphere(scene);
+    addBuiltInMeshPrimitive(scene, BuiltInMeshCube);
+    createSceneGroup(scene, {
+        SceneObjectRef{SceneHierarchySelectionSphere, 0},
+        SceneObjectRef{SceneHierarchySelectionMesh, 0}
+    });
+
+    const bool removed = removeSelectedSceneGroup(scene);
+
+    t.expect(removed, "Deleting a group should report a change.");
+    t.expect(scene.groups.empty(), "Deleting a group should remove the group.");
+    t.expect(scene.spheres.empty(), "Deleting a group should remove child spheres.");
+    t.expect(scene.meshObjects.empty(), "Deleting a group should remove child meshes.");
+}
+
+void testSceneGroupPrunesDeletedObject(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    clearSceneObjects(scene);
+    addSphere(scene);
+    addSphere(scene);
+    createSceneGroup(scene, {
+        SceneObjectRef{SceneHierarchySelectionSphere, 0},
+        SceneObjectRef{SceneHierarchySelectionSphere, 1}
+    });
+
+    scene.selectedSphere = 0;
+    removeSelectedSphere(scene);
+
+    t.expect(scene.groups.empty(), "Group with fewer than two live objects should be pruned after deleting a child.");
+}
+
 void testAddSphereSelectsNewSphere(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3070,6 +3171,11 @@ int main(int argc, char** argv)
     runTest("Hierarchy select light", testHierarchySelectLight);
     runTest("Hierarchy invalid selection safe", testHierarchyInvalidSelectionSafe);
     runTest("Hierarchy previous scene object cycles spheres and meshes", testHierarchyPreviousSceneObjectCyclesSpheresAndMeshes);
+    runTest("Scene group creates from objects", testSceneGroupCreatesFromObjects);
+    runTest("Scene group transform moves children", testSceneGroupTransformMovesChildren);
+    runTest("Scene group ungroup keeps objects", testSceneGroupUngroupKeepsObjects);
+    runTest("Scene group delete removes children", testSceneGroupDeleteRemovesChildren);
+    runTest("Scene group prunes deleted object", testSceneGroupPrunesDeletedObject);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Add sphere duplicates selected and finds free spot", testAddSphereDuplicatesSelectedAndFindsFreeSpot);
     runTest("Add sphere uses support plane height", testAddSphereUsesSupportPlaneHeight);

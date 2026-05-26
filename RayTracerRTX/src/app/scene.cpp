@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <utility>
 
 #ifndef RAYTRACERRTX_SOURCE_DIR
@@ -16,6 +17,8 @@ namespace
 constexpr float kMinSphereRadius = 0.25f;
 constexpr float kMaxSphereRadius = 5.0f;
 constexpr float kPi = 3.14159265358979323846f;
+constexpr int kSceneObjectSphere = 3;
+constexpr int kSceneObjectMesh = 4;
 
 struct SceneFootprint
 {
@@ -32,6 +35,16 @@ float clampScalar(const float v, const float minV, const float maxV)
 float3 add3(const float3 a, const float3 b)
 {
     return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+float3 sub3(const float3 a, const float3 b)
+{
+    return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+float3 mul3(const float3 a, const float3 b)
+{
+    return make_float3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
 float radians(const float degrees)
@@ -378,6 +391,148 @@ bool selectedMeshMatchesPrimitive(const MeshObject& object, const int primitiveT
     return false;
 }
 
+bool sceneObjectRefEquals(const SceneObjectRef a, const SceneObjectRef b)
+{
+    return a.kind == b.kind && a.index == b.index;
+}
+
+bool isValidSceneObjectRef(const SceneState& scene, const SceneObjectRef ref)
+{
+    if (ref.kind == kSceneObjectSphere)
+    {
+        return ref.index >= 0 && ref.index < static_cast<int>(scene.spheres.size());
+    }
+    if (ref.kind == kSceneObjectMesh)
+    {
+        return ref.index >= 0 && ref.index < static_cast<int>(scene.meshObjects.size());
+    }
+    return false;
+}
+
+float3 objectPosition(const SceneState& scene, const SceneObjectRef ref)
+{
+    if (ref.kind == kSceneObjectSphere)
+    {
+        return scene.spheres[static_cast<size_t>(ref.index)].center;
+    }
+    return scene.meshObjects[static_cast<size_t>(ref.index)].position;
+}
+
+float3 averageObjectPosition(const SceneState& scene, const std::vector<SceneObjectRef>& refs)
+{
+    if (refs.empty())
+    {
+        return make_float3(0.0f, 0.0f, 0.0f);
+    }
+
+    float3 total = make_float3(0.0f, 0.0f, 0.0f);
+    int count = 0;
+    for (const SceneObjectRef ref : refs)
+    {
+        if (!isValidSceneObjectRef(scene, ref))
+        {
+            continue;
+        }
+        total = add3(total, objectPosition(scene, ref));
+        ++count;
+    }
+    if (count == 0)
+    {
+        return make_float3(0.0f, 0.0f, 0.0f);
+    }
+    const float invCount = 1.0f / static_cast<float>(count);
+    return make_float3(total.x * invCount, total.y * invCount, total.z * invCount);
+}
+
+void pruneSceneGroups(SceneState& scene)
+{
+    for (SceneGroup& group : scene.groups)
+    {
+        group.objects.erase(
+            std::remove_if(group.objects.begin(), group.objects.end(), [&](const SceneObjectRef ref)
+            {
+                return !isValidSceneObjectRef(scene, ref);
+            }),
+            group.objects.end());
+    }
+    scene.groups.erase(
+        std::remove_if(scene.groups.begin(), scene.groups.end(), [](const SceneGroup& group)
+        {
+            return group.objects.size() < 2;
+        }),
+        scene.groups.end());
+}
+
+void removeObjectFromGroupsAfterErase(SceneState& scene, const int kind, const int erasedIndex)
+{
+    for (SceneGroup& group : scene.groups)
+    {
+        group.objects.erase(
+            std::remove_if(group.objects.begin(), group.objects.end(), [&](SceneObjectRef& ref)
+            {
+                if (ref.kind != kind)
+                {
+                    return false;
+                }
+                if (ref.index == erasedIndex)
+                {
+                    return true;
+                }
+                if (ref.index > erasedIndex)
+                {
+                    --ref.index;
+                }
+                return false;
+            }),
+            group.objects.end());
+    }
+    pruneSceneGroups(scene);
+}
+
+void moveSceneObject(SceneState& scene, const SceneObjectRef ref, const float3 delta)
+{
+    if (ref.kind == kSceneObjectSphere)
+    {
+        SphereGeometry& sphere = scene.spheres[static_cast<size_t>(ref.index)];
+        sphere.center = add3(sphere.center, delta);
+    }
+    else if (ref.kind == kSceneObjectMesh)
+    {
+        MeshObject& object = scene.meshObjects[static_cast<size_t>(ref.index)];
+        object.position = add3(object.position, delta);
+        updateMeshObjectTransform(object);
+    }
+}
+
+void transformSceneObjectAroundPivot(
+    SceneState& scene,
+    const SceneObjectRef ref,
+    const float3 pivot,
+    const float3 rotationDelta,
+    const float3 scaleRatio)
+{
+    float3 relative = sub3(objectPosition(scene, ref), pivot);
+    relative = mul3(relative, scaleRatio);
+    relative = rotateEulerXyz(relative, rotationDelta);
+    const float3 nextPosition = add3(pivot, relative);
+
+    if (ref.kind == kSceneObjectSphere)
+    {
+        SphereGeometry& sphere = scene.spheres[static_cast<size_t>(ref.index)];
+        sphere.center = nextPosition;
+        const float radiusScale = std::max(0.1f, (std::fabs(scaleRatio.x) + std::fabs(scaleRatio.y) + std::fabs(scaleRatio.z)) / 3.0f);
+        sphere.radius *= radiusScale;
+    }
+    else if (ref.kind == kSceneObjectMesh)
+    {
+        MeshObject& object = scene.meshObjects[static_cast<size_t>(ref.index)];
+        object.position = nextPosition;
+        object.rotation = add3(object.rotation, rotationDelta);
+        object.scale = mul3(object.scale, scaleRatio);
+        updateMeshObjectTransform(object);
+    }
+}
+
 MeshObject makeEnvironmentPanel(
     std::string displayName,
     const float3 position,
@@ -677,6 +832,16 @@ void clampScene(SceneState& scene)
     {
         scene.selectedMeshMaterial = materialCount > 0 ? materialCount - 1 : 0;
     }
+
+    pruneSceneGroups(scene);
+    if (scene.selectedGroup < 0)
+    {
+        scene.selectedGroup = 0;
+    }
+    if (scene.selectedGroup >= static_cast<int>(scene.groups.size()))
+    {
+        scene.selectedGroup = scene.groups.empty() ? 0 : static_cast<int>(scene.groups.size()) - 1;
+    }
 }
 
 bool addSphere(SceneState& scene)
@@ -732,6 +897,7 @@ bool removeSelectedSphere(SceneState& scene)
     {
         scene.materials.erase(scene.materials.begin() + index);
     }
+    removeObjectFromGroupsAfterErase(scene, kSceneObjectSphere, index);
     scene.selectedSphere = scene.spheres.empty() ? 0 : std::min(index, static_cast<int>(scene.spheres.size()) - 1);
     clampScene(scene);
     return true;
@@ -1129,6 +1295,7 @@ bool removeSelectedMeshObject(SceneState& scene)
     }
 
     scene.meshObjects.erase(scene.meshObjects.begin() + scene.selectedMeshObject);
+    removeObjectFromGroupsAfterErase(scene, kSceneObjectMesh, scene.selectedMeshObject);
     if (scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
     {
         scene.selectedMeshObject = scene.meshObjects.empty() ? 0 : static_cast<int>(scene.meshObjects.size()) - 1;
@@ -1145,6 +1312,15 @@ bool removeAllSpheres(SceneState& scene)
     scene.spheres.clear();
     scene.materials.clear();
     scene.selectedSphere = 0;
+    for (SceneGroup& group : scene.groups)
+    {
+        group.objects.erase(
+            std::remove_if(group.objects.begin(), group.objects.end(), [](const SceneObjectRef ref)
+            {
+                return ref.kind == kSceneObjectSphere;
+            }),
+            group.objects.end());
+    }
     clampScene(scene);
     return changed;
 }
@@ -1156,6 +1332,15 @@ bool removeAllMeshObjects(SceneState& scene)
     scene.mesh = {};
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
+    for (SceneGroup& group : scene.groups)
+    {
+        group.objects.erase(
+            std::remove_if(group.objects.begin(), group.objects.end(), [](const SceneObjectRef ref)
+            {
+                return ref.kind == kSceneObjectMesh;
+            }),
+            group.objects.end());
+    }
     clampScene(scene);
     return changed;
 }
@@ -1176,6 +1361,7 @@ bool restoreDefaultSceneObjects(SceneState& scene)
     scene.spheres = defaults.spheres;
     scene.materials = defaults.materials;
     scene.meshObjects = defaults.meshObjects;
+    scene.groups.clear();
     scene.mesh = defaults.mesh;
     scene.showGroundPlane = defaults.showGroundPlane;
     scene.selectedSphere = defaults.selectedSphere;
@@ -1255,6 +1441,242 @@ bool setSelectedMeshScale(SceneState& scene, const float3 scale)
 
     object->scale = clamp3(scale, make_float3(0.05f, 0.05f, 0.05f), make_float3(100.0f, 100.0f, 100.0f));
     updateMeshObjectTransform(*object);
+    return true;
+}
+
+int findObjectGroupIndex(const SceneState& scene, const SceneObjectRef ref)
+{
+    for (int i = 0; i < static_cast<int>(scene.groups.size()); ++i)
+    {
+        const SceneGroup& group = scene.groups[static_cast<size_t>(i)];
+        const auto found = std::find_if(group.objects.begin(), group.objects.end(), [&](const SceneObjectRef groupRef)
+        {
+            return sceneObjectRefEquals(groupRef, ref);
+        });
+        if (found != group.objects.end())
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+bool createSceneGroup(SceneState& scene, const std::vector<SceneObjectRef>& refs)
+{
+    clampScene(scene);
+
+    std::vector<SceneObjectRef> filtered;
+    filtered.reserve(refs.size());
+    for (const SceneObjectRef ref : refs)
+    {
+        if (!isValidSceneObjectRef(scene, ref) || findObjectGroupIndex(scene, ref) >= 0)
+        {
+            continue;
+        }
+        const auto duplicate = std::find_if(filtered.begin(), filtered.end(), [&](const SceneObjectRef existing)
+        {
+            return sceneObjectRefEquals(existing, ref);
+        });
+        if (duplicate == filtered.end())
+        {
+            filtered.push_back(ref);
+        }
+    }
+
+    if (filtered.size() < 2)
+    {
+        return false;
+    }
+
+    SceneGroup group;
+    group.name = std::string("\xD0\x93\xD1\x80\xD1\x83\xD0\xBF\xD0\xBF\xD0\xB0 ") + std::to_string(scene.groups.size() + 1);
+    group.objects = std::move(filtered);
+    group.position = averageObjectPosition(scene, group.objects);
+    group.rotation = make_float3(0.0f, 0.0f, 0.0f);
+    group.scale = make_float3(1.0f, 1.0f, 1.0f);
+
+    scene.groups.push_back(std::move(group));
+    scene.selectedGroup = static_cast<int>(scene.groups.size()) - 1;
+    clampScene(scene);
+    return true;
+}
+
+bool ungroupSelectedSceneGroup(SceneState& scene)
+{
+    clampScene(scene);
+    if (scene.groups.empty() ||
+        scene.selectedGroup < 0 ||
+        scene.selectedGroup >= static_cast<int>(scene.groups.size()))
+    {
+        return false;
+    }
+
+    scene.groups.erase(scene.groups.begin() + scene.selectedGroup);
+    scene.selectedGroup = scene.groups.empty() ? 0 : std::min(scene.selectedGroup, static_cast<int>(scene.groups.size()) - 1);
+    clampScene(scene);
+    return true;
+}
+
+bool removeSelectedSceneGroup(SceneState& scene)
+{
+    clampScene(scene);
+    if (scene.groups.empty() ||
+        scene.selectedGroup < 0 ||
+        scene.selectedGroup >= static_cast<int>(scene.groups.size()))
+    {
+        return false;
+    }
+
+    const std::vector<SceneObjectRef> refs = scene.groups[static_cast<size_t>(scene.selectedGroup)].objects;
+    scene.groups.erase(scene.groups.begin() + scene.selectedGroup);
+
+    std::vector<int> sphereIndices;
+    std::vector<int> meshIndices;
+    for (const SceneObjectRef ref : refs)
+    {
+        if (ref.kind == kSceneObjectSphere && ref.index >= 0 && ref.index < static_cast<int>(scene.spheres.size()))
+        {
+            sphereIndices.push_back(ref.index);
+        }
+        else if (ref.kind == kSceneObjectMesh && ref.index >= 0 && ref.index < static_cast<int>(scene.meshObjects.size()))
+        {
+            meshIndices.push_back(ref.index);
+        }
+    }
+
+    std::sort(sphereIndices.begin(), sphereIndices.end(), std::greater<int>());
+    sphereIndices.erase(std::unique(sphereIndices.begin(), sphereIndices.end()), sphereIndices.end());
+    std::sort(meshIndices.begin(), meshIndices.end(), std::greater<int>());
+    meshIndices.erase(std::unique(meshIndices.begin(), meshIndices.end()), meshIndices.end());
+
+    for (const int meshIndex : meshIndices)
+    {
+        if (meshIndex < 0 || meshIndex >= static_cast<int>(scene.meshObjects.size()))
+        {
+            continue;
+        }
+        scene.meshObjects.erase(scene.meshObjects.begin() + meshIndex);
+        removeObjectFromGroupsAfterErase(scene, kSceneObjectMesh, meshIndex);
+    }
+
+    for (const int sphereIndex : sphereIndices)
+    {
+        if (sphereIndex < 0 || sphereIndex >= static_cast<int>(scene.spheres.size()))
+        {
+            continue;
+        }
+        scene.spheres.erase(scene.spheres.begin() + sphereIndex);
+        if (sphereIndex < static_cast<int>(scene.materials.size()))
+        {
+            scene.materials.erase(scene.materials.begin() + sphereIndex);
+        }
+        removeObjectFromGroupsAfterErase(scene, kSceneObjectSphere, sphereIndex);
+    }
+
+    scene.selectedSphere = scene.spheres.empty() ? 0 : std::min(scene.selectedSphere, static_cast<int>(scene.spheres.size()) - 1);
+    scene.selectedMeshObject = scene.meshObjects.empty() ? 0 : std::min(scene.selectedMeshObject, static_cast<int>(scene.meshObjects.size()) - 1);
+    scene.selectedMeshMaterial = 0;
+    scene.selectedGroup = scene.groups.empty() ? 0 : std::min(scene.selectedGroup, static_cast<int>(scene.groups.size()) - 1);
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+    return !refs.empty();
+}
+
+bool setSelectedGroupPosition(SceneState& scene, const float3 position)
+{
+    clampScene(scene);
+    if (scene.groups.empty() ||
+        scene.selectedGroup < 0 ||
+        scene.selectedGroup >= static_cast<int>(scene.groups.size()))
+    {
+        return false;
+    }
+
+    SceneGroup& group = scene.groups[static_cast<size_t>(scene.selectedGroup)];
+    const float3 clampedPosition = clamp3(position, make_float3(-50.0f, -10.0f, -50.0f), make_float3(50.0f, 50.0f, 50.0f));
+    const float3 delta = sub3(clampedPosition, group.position);
+    if (std::fabs(delta.x) < 0.0001f && std::fabs(delta.y) < 0.0001f && std::fabs(delta.z) < 0.0001f)
+    {
+        return false;
+    }
+
+    for (const SceneObjectRef ref : group.objects)
+    {
+        if (isValidSceneObjectRef(scene, ref))
+        {
+            moveSceneObject(scene, ref, delta);
+        }
+    }
+    group.position = clampedPosition;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+    return true;
+}
+
+bool setSelectedGroupRotation(SceneState& scene, const float3 rotation)
+{
+    clampScene(scene);
+    if (scene.groups.empty() ||
+        scene.selectedGroup < 0 ||
+        scene.selectedGroup >= static_cast<int>(scene.groups.size()))
+    {
+        return false;
+    }
+
+    SceneGroup& group = scene.groups[static_cast<size_t>(scene.selectedGroup)];
+    const float3 clampedRotation = clamp3(rotation, make_float3(-360.0f, -360.0f, -360.0f), make_float3(360.0f, 360.0f, 360.0f));
+    const float3 delta = sub3(clampedRotation, group.rotation);
+    if (std::fabs(delta.x) < 0.0001f && std::fabs(delta.y) < 0.0001f && std::fabs(delta.z) < 0.0001f)
+    {
+        return false;
+    }
+
+    for (const SceneObjectRef ref : group.objects)
+    {
+        if (isValidSceneObjectRef(scene, ref))
+        {
+            transformSceneObjectAroundPivot(scene, ref, group.position, delta, make_float3(1.0f, 1.0f, 1.0f));
+        }
+    }
+    group.rotation = clampedRotation;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+    return true;
+}
+
+bool setSelectedGroupScale(SceneState& scene, const float3 scale)
+{
+    clampScene(scene);
+    if (scene.groups.empty() ||
+        scene.selectedGroup < 0 ||
+        scene.selectedGroup >= static_cast<int>(scene.groups.size()))
+    {
+        return false;
+    }
+
+    SceneGroup& group = scene.groups[static_cast<size_t>(scene.selectedGroup)];
+    const float3 clampedScale = clamp3(scale, make_float3(0.05f, 0.05f, 0.05f), make_float3(100.0f, 100.0f, 100.0f));
+    const float3 ratio = make_float3(
+        clampedScale.x / std::max(0.05f, group.scale.x),
+        clampedScale.y / std::max(0.05f, group.scale.y),
+        clampedScale.z / std::max(0.05f, group.scale.z));
+    if (std::fabs(ratio.x - 1.0f) < 0.0001f &&
+        std::fabs(ratio.y - 1.0f) < 0.0001f &&
+        std::fabs(ratio.z - 1.0f) < 0.0001f)
+    {
+        return false;
+    }
+
+    for (const SceneObjectRef ref : group.objects)
+    {
+        if (isValidSceneObjectRef(scene, ref))
+        {
+            transformSceneObjectAroundPivot(scene, ref, group.position, make_float3(0.0f, 0.0f, 0.0f), ratio);
+        }
+    }
+    group.scale = clampedScale;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
     return true;
 }
 
