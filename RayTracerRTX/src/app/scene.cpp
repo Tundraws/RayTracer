@@ -692,6 +692,21 @@ void selectNextMeshObject(SceneState& scene)
     clampScene(scene);
 }
 
+void selectPreviousMeshObject(SceneState& scene)
+{
+    if (scene.meshObjects.empty())
+    {
+        scene.selectedMeshObject = 0;
+        scene.selectedMeshMaterial = 0;
+        return;
+    }
+
+    const int meshCount = static_cast<int>(scene.meshObjects.size());
+    scene.selectedMeshObject = (scene.selectedMeshObject - 1 + meshCount) % meshCount;
+    scene.selectedMeshMaterial = 0;
+    clampScene(scene);
+}
+
 void cycleSelectedMeshMaterialPreset(SceneState& scene)
 {
     if (scene.meshObjects.empty())

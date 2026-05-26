@@ -134,7 +134,6 @@ SceneEditResult makeMeshMaterialDirty(const bool changed)
 {
     SceneDirtyFlags dirty;
     dirty.material = true;
-    dirty.fullRebuild = true;
     return makeSceneEditResult(changed, dirty);
 }
 
@@ -212,7 +211,7 @@ SceneEditResult SceneEditor::setSelectedSphereRadius(const float radius)
     const SphereGeometry before = scene_.spheres[static_cast<size_t>(scene_.selectedSphere)];
     ::setSelectedSphereRadius(scene_, radius);
     const SphereGeometry after = scene_.spheres[static_cast<size_t>(scene_.selectedSphere)];
-    return makeGeometryDirty(!equalFloat(before.radius, after.radius) || !equal3(before.center, after.center));
+    return makeTransformDirty(!equalFloat(before.radius, after.radius) || !equal3(before.center, after.center));
 }
 
 SceneEditResult SceneEditor::setSelectedSphereColor(const float3 color)

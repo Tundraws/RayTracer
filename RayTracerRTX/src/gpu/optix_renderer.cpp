@@ -747,6 +747,7 @@ void OptixRenderer::createScene(const SceneState& scene)
     {
         meshTexturePixels.push_back(make_uchar4(255, 255, 255, 255));
     }
+    meshMaterialCache = meshMaterials;
     meshTexturePixelCount = static_cast<unsigned int>(meshTexturePixels.size());
     meshObjectCount = static_cast<unsigned int>(meshObjectsGpu.size());
     if (meshVertices.empty())
@@ -909,6 +910,64 @@ void OptixRenderer::syncMeshInstanceTransforms(const SceneState& scene)
     {
         meshInstanceTransforms = std::move(transforms);
     }
+}
+
+void OptixRenderer::syncMeshMaterials(const SceneState& scene)
+{
+    std::vector<const MeshMaterial*> currentMaterials;
+    if (!scene.meshObjects.empty())
+    {
+        for (const MeshObject& object : scene.meshObjects)
+        {
+            if (isEmptyMesh(object.mesh) || !hasValidMeshMaterialIndices(object.mesh))
+            {
+                continue;
+            }
+            for (const MeshMaterial& material : object.mesh.materials)
+            {
+                currentMaterials.push_back(&material);
+            }
+        }
+    }
+    else if (!isEmptyMesh(scene.mesh))
+    {
+        for (const MeshMaterial& material : scene.mesh.materials)
+        {
+            currentMaterials.push_back(&material);
+        }
+    }
+
+    if (currentMaterials.empty() || currentMaterials.size() != meshMaterialCache.size() || dMeshMaterials == 0)
+    {
+        return;
+    }
+
+    for (size_t i = 0; i < currentMaterials.size(); ++i)
+    {
+        const MeshMaterial& material = *currentMaterials[i];
+        MeshMaterialGpu& materialGpu = meshMaterialCache[i];
+        materialGpu.color = material.color;
+        materialGpu.materialType = material.materialType;
+        materialGpu.specularColor = material.specularColor;
+        materialGpu.roughness = material.roughness;
+        materialGpu.ior = material.ior;
+        materialGpu.alpha = material.alpha;
+        if (material.textureEnabled == 0)
+        {
+            materialGpu.hasTexture = 0;
+        }
+        else if (materialGpu.textureWidth > 0 && materialGpu.textureHeight > 0)
+        {
+            materialGpu.hasTexture = 1;
+        }
+    }
+
+    CUDA_CHECK(cudaMemcpyAsync(
+        reinterpret_cast<void*>(dMeshMaterials),
+        meshMaterialCache.data(),
+        meshMaterialCache.size() * sizeof(MeshMaterialGpu),
+        cudaMemcpyHostToDevice,
+        stream));
 }
 
 void OptixRenderer::rebuildAccelerationStructure()
@@ -1370,6 +1429,7 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
         stream));
 
     syncMeshInstanceTransforms(scene);
+    syncMeshMaterials(scene);
     const std::size_t sphereGeometrySignature = makeSphereGeometrySignature(scene);
     const std::size_t instanceSignature = makeInstanceSignature(scene);
     const bool sphereGeometryChanged = sphereGeometrySignature != lastSphereGeometrySignature || sphereGasHandle == 0;
@@ -1593,6 +1653,7 @@ void OptixRenderer::destroy()
     {
         cudaFree(reinterpret_cast<void*>(dMeshMaterials));
         dMeshMaterials = 0;
+        meshMaterialCache.clear();
     }
     if (dMeshObjects != 0)
     {

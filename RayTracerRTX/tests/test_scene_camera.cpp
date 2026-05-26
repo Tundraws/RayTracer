@@ -1972,6 +1972,25 @@ void testSelectedMeshChanges(TestContext& t)
     t.expect(scene.selectedMeshObject == 0, "Selected mesh object should wrap.");
 }
 
+void testSelectedMeshChangesBackward(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    while (scene.meshObjects.size() > 1)
+    {
+        scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+        removeSelectedMeshObject(scene);
+    }
+    MeshObject copy = scene.meshObjects[0];
+    copy.assetReference = "copy";
+    scene.meshObjects.push_back(copy);
+    scene.selectedMeshObject = 1;
+
+    selectPreviousMeshObject(scene);
+    t.expect(scene.selectedMeshObject == 0, "Selected mesh object should move backward.");
+    selectPreviousMeshObject(scene);
+    t.expect(scene.selectedMeshObject == 1, "Selected mesh object should wrap backward to the last object.");
+}
+
 void testSelectedMeshMaterialPresetCycle(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2115,7 +2134,8 @@ void testSceneEditorMeshMaterialPropertiesClamp(TestContext& t)
 
     t.expect(result.changed, "SceneEditor mesh material parameter edit should report a change.");
     t.expect(result.dirty.material, "SceneEditor mesh material parameter edit should set material dirty.");
-    t.expect(result.dirty.fullRebuild, "SceneEditor mesh material parameter edit should request renderer refresh.");
+    t.expect(!result.dirty.fullRebuild, "SceneEditor mesh material parameter edit should avoid full renderer rebuild.");
+    t.expect(!needsRendererSceneRebuild(result.dirty), "SceneEditor mesh material parameter edit should use cheap material sync.");
     t.expect(almostEqual(material.color.x, 0.0f), "Mesh material color should clamp low.");
     t.expect(almostEqual(material.color.y, 1.0f), "Mesh material color should clamp high.");
     t.expect(almostEqual(material.roughness, 1.0f), "Mesh material roughness should clamp high.");
@@ -2124,7 +2144,7 @@ void testSceneEditorMeshMaterialPropertiesClamp(TestContext& t)
     t.expect(material.textureEnabled == 0, "Mesh material texture toggle should be stored.");
 }
 
-void testSceneEditorMeshMaterialRequestsRebuild(TestContext& t)
+void testSceneEditorMeshMaterialAvoidsRebuild(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
     SceneEditor editor(scene);
@@ -2133,8 +2153,8 @@ void testSceneEditorMeshMaterialRequestsRebuild(TestContext& t)
 
     t.expect(result.changed, "SceneEditor mesh material edit should report a change.");
     t.expect(result.dirty.material, "SceneEditor mesh material edit should set material dirty.");
-    t.expect(result.dirty.fullRebuild, "SceneEditor mesh material edit should request renderer rebuild until mesh material upload is separated.");
-    t.expect(needsRendererSceneRebuild(result.dirty), "SceneEditor mesh material edit should currently require renderer rebuild.");
+    t.expect(!result.dirty.fullRebuild, "SceneEditor mesh material edit should not request full renderer rebuild.");
+    t.expect(!needsRendererSceneRebuild(result.dirty), "SceneEditor mesh material edit should use cheap renderer material upload.");
 }
 
 void testSceneEditorMeshTransformDirty(TestContext& t)
@@ -2148,6 +2168,19 @@ void testSceneEditorMeshTransformDirty(TestContext& t)
     t.expect(result.dirty.transform, "SceneEditor mesh position edit should set transform dirty.");
     t.expect(!result.dirty.geometry, "SceneEditor mesh position edit should not set geometry dirty.");
     t.expect(!needsRendererSceneRebuild(result.dirty), "SceneEditor transform edit should not require full scene rebuild.");
+}
+
+void testSceneEditorSphereRadiusAvoidsRebuild(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    SceneEditor editor(scene);
+
+    const SceneEditResult result = editor.setSelectedSphereRadius(1.75f);
+
+    t.expect(result.changed, "SceneEditor sphere radius edit should report a change.");
+    t.expect(result.dirty.transform, "SceneEditor sphere radius edit should set transform dirty.");
+    t.expect(!result.dirty.geometry, "SceneEditor sphere radius edit should avoid full geometry dirty flag.");
+    t.expect(!needsRendererSceneRebuild(result.dirty), "SceneEditor sphere radius edit should not request full renderer rebuild.");
 }
 
 void testSceneEditorAddMeshGeometryDirty(TestContext& t)
@@ -2911,6 +2944,7 @@ int main(int argc, char** argv)
     runTest("Set selected sphere material type", testSetSelectedSphereMaterialType);
     runTest("Set selected sphere material type invalid index", testSetSelectedSphereMaterialTypeInvalidIndexSafe);
     runTest("Selected mesh changes", testSelectedMeshChanges);
+    runTest("Selected mesh changes backward", testSelectedMeshChangesBackward);
     runTest("Selected mesh material preset cycle", testSelectedMeshMaterialPresetCycle);
     runTest("Set selected mesh material type", testSetSelectedMeshMaterialType);
     runTest("Set selected mesh material type invalid safe", testSetSelectedMeshMaterialTypeInvalidSafe);
@@ -2920,8 +2954,9 @@ int main(int argc, char** argv)
     runTest("SceneEditor material dirty", testSceneEditorMaterialDirty);
     runTest("SceneEditor material properties clamp", testSceneEditorMaterialPropertiesClamp);
     runTest("SceneEditor mesh material properties clamp", testSceneEditorMeshMaterialPropertiesClamp);
-    runTest("SceneEditor mesh material requests rebuild", testSceneEditorMeshMaterialRequestsRebuild);
+    runTest("SceneEditor mesh material avoids rebuild", testSceneEditorMeshMaterialAvoidsRebuild);
     runTest("SceneEditor mesh transform dirty", testSceneEditorMeshTransformDirty);
+    runTest("SceneEditor sphere radius avoids rebuild", testSceneEditorSphereRadiusAvoidsRebuild);
     runTest("SceneEditor add mesh geometry dirty", testSceneEditorAddMeshGeometryDirty);
     runTest("SceneEditor light dirty", testSceneEditorLightDirty);
     runTest("SceneEditor invalid edit safe", testSceneEditorInvalidEditSafe);

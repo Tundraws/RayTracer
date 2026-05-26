@@ -1100,6 +1100,22 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             applySceneEditResult(appState, editor.clearScene());
             refreshMeshSelection();
         }
+        if (scene.meshObjects.empty())
+        {
+            ImGui::BeginDisabled();
+        }
+        if (ImGui::Button(u8c(u8"\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C (B)##select_prev_mesh")))
+        {
+            selectPreviousMeshObject(scene);
+            appState.hierarchySelectionKind = HierarchySelectionMesh;
+            appState.editorObjectKind = EditorObjectMesh;
+            applySceneEditResult(appState, makeRenderSettingsDirty());
+            refreshMeshSelection();
+        }
+        if (scene.meshObjects.empty())
+        {
+            ImGui::EndDisabled();
+        }
 
         ImGui::SeparatorText(u8c(u8"\u0420\u0435\u043D\u0434\u0435\u0440"));
         ImGui::Text("FPS: %.1f", stats.fps);
@@ -1479,7 +1495,9 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool bIsDown = glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS;
     if (bIsDown && !bWasDown)
     {
-        selectNextMeshObject(scene);
+        selectPreviousMeshObject(scene);
+        appState.hierarchySelectionKind = HierarchySelectionMesh;
+        appState.editorObjectKind = EditorObjectMesh;
         applySceneEditResult(appState, makeRenderSettingsDirty());
     }
     bWasDown = bIsDown;

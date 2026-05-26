@@ -73,6 +73,7 @@ void toggleSelectedMaterial(SceneState& scene);
 void cycleSelectedSphereMaterialPreset(SceneState& scene);
 void setSelectedSphereMaterialType(SceneState& scene, int materialType);
 void selectNextMeshObject(SceneState& scene);
+void selectPreviousMeshObject(SceneState& scene);
 void cycleSelectedMeshMaterialPreset(SceneState& scene);
 void setSelectedMeshMaterialType(SceneState& scene, int materialType);
 void applySelectedMeshMaterialToWholeObject(SceneState& scene);

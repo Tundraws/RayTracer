@@ -50,6 +50,7 @@ private:
     void ensureSphereResources(const struct SceneState& scene);
     void ensureEnvironmentResources(const struct SceneState& scene);
     void syncMeshInstanceTransforms(const struct SceneState& scene);
+    void syncMeshMaterials(const struct SceneState& scene);
     void rebuildAccelerationStructure();
     void rebuildSphereAccelerationStructure();
     void rebuildInstanceAccelerationStructure();
@@ -99,6 +100,7 @@ private:
     std::vector<OptixAccelBuildOptions> meshAccelOptions;
     std::vector<OptixAccelBufferSizes> meshGasSizes;
     std::vector<std::array<float, 12>> meshInstanceTransforms;
+    std::vector<MeshMaterialGpu> meshMaterialCache;
     std::size_t sphereBufferCapacity = 0;
     std::size_t materialBufferCapacity = 0;
     std::size_t environmentPixelCapacity = 0;
