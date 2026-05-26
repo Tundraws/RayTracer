@@ -14,6 +14,9 @@ flowchart LR
     App --> Input["Input handling"]
     App --> UI["ImGui tabbed scene panel"]
     App --> AppState["AppState"]
+    UI --> SceneEditor["SceneEditor"]
+    Input --> SceneEditor
+    SceneEditor --> DirtyFlags["SceneDirtyFlags"]
     App --> Controller["RendererController helpers"]
     App --> Camera["CameraState / updateCameraBasis"]
     SceneConfig --> JsonMaterials["JSON material inputs"]
@@ -41,6 +44,7 @@ flowchart LR
     Controller --> Mode["Render mode toggle"]
     Controller --> Rebuild["Scene rebuild request"]
     Controller --> AccumReset["invalidateAccumulation"]
+    DirtyFlags --> Controller
     AppState --> Scene
     App --> Renderer["OptixRenderer"]
     App --> Mode["Render mode toggle"]
@@ -160,7 +164,8 @@ flowchart LR
 |---|---|---|
 | Application loop | `src/app/maingpu.cpp`, `src/app/application.*` | Window creation, input, scene updates, presentation |
 | Application state | `src/app/app_state.h` | Shared runtime state for camera, presets, UI selection, quality mode, and renderer rebuild requests |
-| Renderer controller helpers | `src/app/renderer_controller.*` | Centralized accumulation invalidation, quality-mode application, and scene rebuild marking |
+| Scene editor | `src/app/scene_editor.*` | Applies scene edits through helper methods and reports `SceneDirtyFlags` for camera, material, transform, geometry, lighting, and render settings |
+| Renderer controller helpers | `src/app/renderer_controller.*` | Centralized accumulation invalidation, quality-mode application, and scene rebuild marking from dirty flags |
 | UI panel | `src/app/application.*` + Dear ImGui | Tabbed runtime controls for scene presets, editor objects, materials, light, quality, and diagnostics |
 | Built-in mesh primitives | `src/app/mesh.*` | Generates cube, pyramid, and finite plane/panel as `MeshData` triangles |
 | Environment presets | `src/app/scene.*` | Builds editable floor, wall and ceiling panels for open/room/empty scene modes |

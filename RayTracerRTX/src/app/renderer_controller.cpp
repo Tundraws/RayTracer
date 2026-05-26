@@ -24,6 +24,20 @@ void markSceneEdited(AppState& appState, const bool changed, const bool rebuildS
     }
 }
 
+void applySceneEditResult(AppState& appState, const SceneEditResult& result)
+{
+    if (!result.changed)
+    {
+        return;
+    }
+
+    invalidateAccumulation(appState);
+    if (needsRendererSceneRebuild(result.dirty))
+    {
+        requestRendererSceneRebuild(appState);
+    }
+}
+
 void applyQualityMode(AppState& appState)
 {
     appState.renderQuality = clampRenderQuality(appState.renderQuality);

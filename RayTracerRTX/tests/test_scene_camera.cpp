@@ -7,6 +7,7 @@
 #include "../src/app/obj_loader.h"
 #include "../src/app/scene.h"
 #include "../src/app/scene_config.h"
+#include "../src/app/scene_editor.h"
 #if defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
 #include "../src/gpu/optix_renderer.h"
 #endif
@@ -2042,6 +2043,73 @@ void testInvalidMeshSelectionSafe(TestContext& t)
     t.expect(scene.selectedMeshObject == 0, "Empty mesh object list should keep selected mesh at zero.");
 }
 
+void testSceneEditorMaterialDirty(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    SceneEditor editor(scene);
+
+    const SceneEditResult result = editor.setSelectedSphereMaterialType(MaterialMetal);
+
+    t.expect(result.changed, "SceneEditor material edit should report a change.");
+    t.expect(result.dirty.material, "SceneEditor material edit should set material dirty.");
+    t.expect(!result.dirty.geometry, "SceneEditor material edit should not set geometry dirty.");
+    t.expect(!needsRendererSceneRebuild(result.dirty), "SceneEditor material edit should not require scene rebuild.");
+}
+
+void testSceneEditorMeshTransformDirty(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    SceneEditor editor(scene);
+
+    const SceneEditResult result = editor.setSelectedMeshPosition(make_float3(2.0f, 1.0f, -4.0f));
+
+    t.expect(result.changed, "SceneEditor mesh position edit should report a change.");
+    t.expect(result.dirty.transform, "SceneEditor mesh position edit should set transform dirty.");
+    t.expect(!result.dirty.geometry, "SceneEditor mesh position edit should not set geometry dirty.");
+    t.expect(!needsRendererSceneRebuild(result.dirty), "SceneEditor transform edit should not require full scene rebuild.");
+}
+
+void testSceneEditorAddMeshGeometryDirty(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    SceneEditor editor(scene);
+    const size_t beforeCount = scene.meshObjects.size();
+
+    const SceneEditResult result = editor.addMeshPrimitive(BuiltInMeshCube);
+
+    t.expect(result.changed, "SceneEditor add mesh should report a change.");
+    t.expect(result.dirty.geometry, "SceneEditor add mesh should set geometry dirty.");
+    t.expect(needsRendererSceneRebuild(result.dirty), "SceneEditor geometry edit should require scene rebuild.");
+    t.expect(scene.meshObjects.size() == beforeCount + 1, "SceneEditor should add one mesh object.");
+}
+
+void testSceneEditorLightDirty(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    SceneEditor editor(scene);
+
+    const SceneEditResult result = editor.setLightIntensity(scene.lightIntensity + 0.25f);
+
+    t.expect(result.changed, "SceneEditor light edit should report a change.");
+    t.expect(result.dirty.lighting, "SceneEditor light edit should set lighting dirty.");
+    t.expect(!result.dirty.geometry, "SceneEditor light edit should not set geometry dirty.");
+}
+
+void testSceneEditorInvalidEditSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.meshObjects.clear();
+    scene.selectedMeshObject = 999;
+    SceneEditor editor(scene);
+
+    const SceneEditResult transform = editor.setSelectedMeshPosition(make_float3(1.0f, 1.0f, 1.0f));
+    const SceneEditResult meshMaterial = editor.setSelectedMeshMaterialType(MaterialMetal);
+
+    t.expect(!transform.changed, "Invalid SceneEditor mesh transform should not report a change.");
+    t.expect(!meshMaterial.changed, "Invalid SceneEditor material edit should not report a change.");
+    t.expect(scene.meshObjects.empty(), "Invalid edit should not create mesh objects.");
+}
+
 void testAddSphereSelectsNewSphere(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2689,6 +2757,11 @@ int main(int argc, char** argv)
     runTest("Selected mesh transform controls", testSelectedMeshTransformControls);
     runTest("Selected mesh transform invalid safe", testSelectedMeshTransformInvalidSafe);
     runTest("Invalid mesh selection safe", testInvalidMeshSelectionSafe);
+    runTest("SceneEditor material dirty", testSceneEditorMaterialDirty);
+    runTest("SceneEditor mesh transform dirty", testSceneEditorMeshTransformDirty);
+    runTest("SceneEditor add mesh geometry dirty", testSceneEditorAddMeshGeometryDirty);
+    runTest("SceneEditor light dirty", testSceneEditorLightDirty);
+    runTest("SceneEditor invalid edit safe", testSceneEditorInvalidEditSafe);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
     runTest("Remove last sphere safe", testRemoveLastSphereSafe);

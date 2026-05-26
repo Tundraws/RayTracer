@@ -60,6 +60,9 @@
     <ClInclude Include="src\app\scene_config.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="src\app\scene_editor.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
     <ClInclude Include="src\common\rtx_shared.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -140,6 +143,9 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="src\app\scene_config.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\scene_editor.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="src\gpu\optix_renderer.cpp">

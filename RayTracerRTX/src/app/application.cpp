@@ -683,6 +683,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     }
 
     SceneState& scene = appState.scene;
+    SceneEditor editor(scene);
     const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
     const float displayWidth = std::max(1.0f, displaySize.x);
     const float displayHeight = std::max(1.0f, displaySize.y);
@@ -775,14 +776,14 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         int materialType = material.materialType;
         if (materialTypeCombo(u8c(u8"\u0422\u0438\u043F##sphere_material_type"), materialType))
         {
-            setSelectedSphereMaterialType(scene, materialType);
+            applySceneEditResult(appState, editor.setSelectedSphereMaterialType(materialType));
             changed = true;
         }
 
         float color[3] = {material.color.x, material.color.y, material.color.z};
         if (ImGui::ColorEdit3(material.materialType == MaterialDielectric ? u8c(u8"\u041E\u0442\u0442\u0435\u043D\u043E\u043A##sphere_color") : u8c(u8"\u0426\u0432\u0435\u0442##sphere_color"), color, ImGuiColorEditFlags_NoInputs))
         {
-            setSelectedSphereColor(scene, make_float3(color[0], color[1], color[2]));
+            applySceneEditResult(appState, editor.setSelectedSphereColor(make_float3(color[0], color[1], color[2])));
             changed = true;
         }
 
@@ -814,7 +815,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             material.roughness = clampf(material.roughness, 0.02f, 1.0f);
             material.ior = clampf(material.ior, 1.01f, 2.8f);
             material.alpha = clampf(material.alpha, 0.0f, 1.0f);
-            invalidateAccumulation(appState);
+            applySceneEditResult(appState, makeMaterialDirty());
         }
     };
 
@@ -830,7 +831,8 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         int materialType = meshMaterial->materialType;
         if (materialTypeCombo(u8c(u8"\u0422\u0438\u043F##mesh_material_type"), materialType))
         {
-            setSelectedMeshMaterialType(scene, materialType);
+            applySceneEditResult(appState, editor.setSelectedMeshMaterialType(materialType));
+            refreshMeshSelection();
             changed = true;
         }
 
@@ -879,8 +881,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             meshMaterial->ior = clampf(meshMaterial->ior, 1.01f, 2.8f);
             meshMaterial->alpha = clampf(meshMaterial->alpha, 0.0f, 1.0f);
             applySelectedMeshMaterialToWholeObject(scene);
-            invalidateAccumulation(appState);
-            requestRendererSceneRebuild(appState);
+            applySceneEditResult(appState, makeMaterialDirty());
         }
     };
 
@@ -916,7 +917,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             }
             if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B/\u0441\u0432\u0435\u0442\u0430")) && resetCurrentPresetView(appState))
             {
-                invalidateAccumulation(appState);
+                applySceneEditResult(appState, makeCameraDirty());
             }
             const bool canReloadSceneConfig =
                 hasPresetIndex(appState, appState.scenePresetIndex) &&
@@ -956,8 +957,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             environmentModeCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##environment_mode"), appState.environmentMode);
             if (ImGui::Button(u8c(u8"\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u043E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435")))
             {
-                const bool changed = applySceneEnvironmentMode(scene, appState.environmentMode);
-                markSceneEdited(appState, changed, true);
+                applySceneEditResult(appState, editor.applyEnvironmentMode(appState.environmentMode));
                 refreshMeshSelection();
             }
             if (appState.environmentMode == SceneEnvironmentRoom)
@@ -968,8 +968,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     appState.roomWidth = clampf(roomSize[0], 4.0f, 80.0f);
                     appState.roomDepth = clampf(roomSize[1], 4.0f, 80.0f);
                     appState.roomHeight = clampf(roomSize[2], 2.0f, 40.0f);
-                    const bool changed = applySceneRoomDimensions(scene, appState.roomWidth, appState.roomDepth, appState.roomHeight);
-                    markSceneEdited(appState, changed, true);
+                    applySceneEditResult(appState, editor.applyRoomDimensions(appState.roomWidth, appState.roomDepth, appState.roomHeight));
                     refreshMeshSelection();
                 }
             }
@@ -977,7 +976,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Button(u8c(u8"\u0421\u043B\u0443\u0436\u0435\u0431\u043D\u044B\u0439 \u043F\u043E\u043B")))
             {
                 scene.showGroundPlane = !scene.showGroundPlane;
-                invalidateAccumulation(appState);
+                applySceneEditResult(appState, makeRenderSettingsDirty());
             }
             ImGui::TextWrapped("%s", u8c(u8"\u041F\u043E\u043B \u0438 \u0441\u0442\u0435\u043D\u044B \u0441\u043E\u0437\u0434\u0430\u044E\u0442\u0441\u044F \u043A\u0430\u043A \u043E\u0431\u044B\u0447\u043D\u044B\u0435 mesh-\u043F\u0430\u043D\u0435\u043B\u0438: \u0438\u0445 \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C, \u0441\u0434\u0432\u0438\u043D\u0443\u0442\u044C, \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043C\u0430\u0441\u0448\u0442\u0430\u0431 \u0438 \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B."));
 
@@ -988,47 +987,46 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 bool added = false;
                 if (appState.editorPrimitiveToAdd == -1)
                 {
-                    added = addSphere(scene);
+                    const SceneEditResult result = editor.addSphere();
+                    added = result.changed;
+                    applySceneEditResult(appState, result);
                 }
                 else
                 {
-                    added = addBuiltInMeshPrimitive(scene, appState.editorPrimitiveToAdd);
+                    const SceneEditResult result = editor.addMeshPrimitive(appState.editorPrimitiveToAdd);
+                    added = result.changed;
+                    applySceneEditResult(appState, result);
                     appState.editorObjectKind = EditorObjectMesh;
-                    markSceneEdited(appState, added, true);
                     refreshMeshSelection();
-                }
-                if (appState.editorPrimitiveToAdd == -1)
-                {
-                    markSceneEdited(appState, added);
                 }
             }
             if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u043C\u043E\u0434\u0435\u043B\u0438")))
             {
-                const bool changed = removeAllMeshObjects(scene);
+                const SceneEditResult result = editor.removeAllMeshObjects();
                 appState.editorObjectKind = EditorObjectSphere;
-                markSceneEdited(appState, changed, true);
+                applySceneEditResult(appState, result);
                 refreshMeshSelection();
             }
             ImGui::SameLine();
             if (ImGui::Button(u8c(u8"\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0441\u0446\u0435\u043D\u0443")))
             {
-                const bool changed = clearSceneObjects(scene);
+                const SceneEditResult result = editor.clearScene();
                 appState.editorObjectKind = EditorObjectSphere;
-                markSceneEdited(appState, changed, true);
+                applySceneEditResult(appState, result);
                 refreshMeshSelection();
             }
             if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0441\u0444\u0435\u0440\u044B")))
             {
-                const bool changed = removeAllSpheres(scene);
+                const SceneEditResult result = editor.removeAllSpheres();
                 appState.editorObjectKind = scene.meshObjects.empty() ? EditorObjectSphere : EditorObjectMesh;
-                markSceneEdited(appState, changed);
+                applySceneEditResult(appState, result);
             }
             ImGui::SameLine();
             if (ImGui::Button(u8c(u8"\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u0431\u0430\u0437\u043E\u0432\u044B\u0435")))
             {
-                const bool changed = restoreDefaultSceneObjects(scene);
+                const SceneEditResult result = editor.restoreDefaultObjects();
                 appState.editorObjectKind = EditorObjectSphere;
-                markSceneEdited(appState, changed, true);
+                applySceneEditResult(appState, result);
                 refreshMeshSelection();
             }
             ImGui::SeparatorText(u8c(u8"\u0412\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 \u043E\u0431\u044A\u0435\u043A\u0442"));
@@ -1080,7 +1078,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     ImGui::Text("%s %d", u8c(u8"\u0421\u0444\u0435\u0440\u0430"), scene.selectedSphere + 1);
                     if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u0443\u044E")))
                     {
-                        markSceneEdited(appState, removeSelectedSphere(scene));
+                        applySceneEditResult(appState, editor.deleteSelectedSphere());
                         if (scene.spheres.empty() && !scene.meshObjects.empty())
                         {
                             appState.editorObjectKind = EditorObjectMesh;
@@ -1094,13 +1092,12 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                         sphere.center = make_float3(pos[0], pos[1], pos[2]);
                         sphere.radius = oldRadius;
                         clampScene(scene);
-                        invalidateAccumulation(appState);
+                        applySceneEditResult(appState, makeTransformDirty());
                     }
                     float radius = sphere.radius;
                     if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"), &radius, 0.25f, 5.0f, "%.2f"))
                     {
-                        setSelectedSphereRadius(scene, radius);
-                        invalidateAccumulation(appState);
+                        applySceneEditResult(appState, editor.setSelectedSphereRadius(radius));
                     }
                     drawSphereMaterialEditor();
                 }
@@ -1123,8 +1120,8 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     }
                     if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u0443\u044E")))
                     {
-                        const bool removed = removeSelectedMeshObject(scene);
-                        markSceneEdited(appState, removed, true);
+                        const SceneEditResult result = editor.deleteSelectedMeshObject();
+                        applySceneEditResult(appState, result);
                         if (scene.meshObjects.empty() && !scene.spheres.empty())
                         {
                             appState.editorObjectKind = EditorObjectSphere;
@@ -1134,22 +1131,20 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
                     float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
                     float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
-                    bool transformChanged = false;
                     if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
                     {
-                        transformChanged = setSelectedMeshPosition(scene, make_float3(position[0], position[1], position[2])) || transformChanged;
+                        const SceneEditResult result = editor.setSelectedMeshPosition(make_float3(position[0], position[1], position[2]));
+                        applySceneEditResult(appState, result);
                     }
                     if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"), rotation, 0.8f, -360.0f, 360.0f, "%.1f"))
                     {
-                        transformChanged = setSelectedMeshRotation(scene, make_float3(rotation[0], rotation[1], rotation[2])) || transformChanged;
+                        const SceneEditResult result = editor.setSelectedMeshRotation(make_float3(rotation[0], rotation[1], rotation[2]));
+                        applySceneEditResult(appState, result);
                     }
                     if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.10f, 0.05f, 100.0f, "%.2f"))
                     {
-                        transformChanged = setSelectedMeshScale(scene, make_float3(scale[0], scale[1], scale[2])) || transformChanged;
-                    }
-                    if (transformChanged)
-                    {
-                        invalidateAccumulation(appState);
+                        const SceneEditResult result = editor.setSelectedMeshScale(make_float3(scale[0], scale[1], scale[2]));
+                        applySceneEditResult(appState, result);
                     }
                     drawMeshMaterialEditor();
                 }
@@ -1172,27 +1167,37 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
 
         if (ImGui::BeginTabItem(u8c(u8"\u0421\u0432\u0435\u0442")))
         {
-            bool changed = false;
             float lightPosition[3] = {scene.lightPosition.x, scene.lightPosition.y, scene.lightPosition.z};
             if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F"), lightPosition, 0.05f, -40.0f, 40.0f, "%.2f"))
             {
-                scene.lightPosition = make_float3(lightPosition[0], std::max(6.0f, lightPosition[1]), lightPosition[2]);
-                clampScene(scene);
-                changed = true;
+                applySceneEditResult(appState, editor.setLightPosition(make_float3(lightPosition[0], std::max(6.0f, lightPosition[1]), lightPosition[2])));
             }
-            changed = ImGui::SliderFloat(u8c(u8"\u0421\u0438\u043B\u0430 \u0441\u0432\u0435\u0442\u0430"), &scene.lightIntensity, 0.0f, 5.0f, "%.2f") || changed;
-            changed = ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0437\u043C\u0435\u0440 area light"), &scene.areaLightRadius, 0.0f, 8.0f, "%.2f") || changed;
-            changed = ImGui::SliderFloat(u8c(u8"\u042F\u0440\u043A\u043E\u0441\u0442\u044C \u043D\u0435\u0431\u0430"), &scene.skyIntensity, 0.0f, 3.0f, "%.2f") || changed;
-            changed = ImGui::SliderFloat(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"), &scene.environmentIntensity, 0.0f, 4.0f, "%.2f") || changed;
-            changed = ImGui::SliderFloat(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"), &scene.exposure, 0.1f, 2.5f, "%.2f") || changed;
-            if (changed)
+            float lightIntensity = scene.lightIntensity;
+            if (ImGui::SliderFloat(u8c(u8"\u0421\u0438\u043B\u0430 \u0441\u0432\u0435\u0442\u0430"), &lightIntensity, 0.0f, 5.0f, "%.2f"))
             {
-                setSceneExposure(scene, scene.exposure);
-                setSceneSkyIntensity(scene, scene.skyIntensity);
-                setSceneLightIntensity(scene, scene.lightIntensity);
-                scene.areaLightRadius = clampf(scene.areaLightRadius, 0.0f, 8.0f);
-                scene.environmentIntensity = clampf(scene.environmentIntensity, 0.0f, 4.0f);
-                invalidateAccumulation(appState);
+                applySceneEditResult(appState, editor.setLightIntensity(lightIntensity));
+            }
+            float areaLightRadius = scene.areaLightRadius;
+            if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0437\u043C\u0435\u0440 area light"), &areaLightRadius, 0.0f, 8.0f, "%.2f"))
+            {
+                scene.areaLightRadius = clampf(areaLightRadius, 0.0f, 8.0f);
+                applySceneEditResult(appState, makeLightingDirty());
+            }
+            float skyIntensity = scene.skyIntensity;
+            if (ImGui::SliderFloat(u8c(u8"\u042F\u0440\u043A\u043E\u0441\u0442\u044C \u043D\u0435\u0431\u0430"), &skyIntensity, 0.0f, 3.0f, "%.2f"))
+            {
+                applySceneEditResult(appState, editor.setSkyIntensity(skyIntensity));
+            }
+            float environmentIntensity = scene.environmentIntensity;
+            if (ImGui::SliderFloat(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"), &environmentIntensity, 0.0f, 4.0f, "%.2f"))
+            {
+                scene.environmentIntensity = clampf(environmentIntensity, 0.0f, 4.0f);
+                applySceneEditResult(appState, makeLightingDirty());
+            }
+            float exposure = scene.exposure;
+            if (ImGui::SliderFloat(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"), &exposure, 0.1f, 2.5f, "%.2f"))
+            {
+                applySceneEditResult(appState, editor.setExposure(exposure));
             }
             ImGui::EndTabItem();
         }
@@ -1209,11 +1214,11 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Checkbox(u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F"), &progressive))
             {
                 appState.renderMode = progressive ? RenderModeProgressive : RenderModeRealtime;
-                invalidateAccumulation(appState);
+                applySceneEditResult(appState, makeRenderSettingsDirty());
             }
             if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), &appState.denoiserEnabled))
             {
-                invalidateAccumulation(appState);
+                applySceneEditResult(appState, makeRenderSettingsDirty());
             }
             ImGui::TextWrapped("%s", u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u043C \u0438 \u0448\u0443\u043C\u043D\u044B\u043C. \u0414\u043B\u044F \u043E\u0431\u044B\u0447\u043D\u043E\u0433\u043E \u043F\u043E\u043A\u0430\u0437\u0430 \u043B\u0443\u0447\u0448\u0435 High/Medium."));
             ImGui::EndTabItem();
@@ -1330,6 +1335,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
 {
     CameraState& camera = appState.camera;
     SceneState& scene = appState.scene;
+    SceneEditor editor(scene);
 
     float3 forward{};
     float3 right{};
@@ -1358,25 +1364,35 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
 
     const float dt = clampf(deltaTimeSec, 0.0f, 0.05f);
     const float cameraStep = 8.5f * dt;
+    bool cameraChanged = false;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
         camera.position = add3(camera.position, mul3(forward, cameraStep));
+        cameraChanged = true;
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     {
         camera.position = sub3(camera.position, mul3(forward, cameraStep));
+        cameraChanged = true;
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     {
         camera.position = sub3(camera.position, mul3(right, cameraStep));
+        cameraChanged = true;
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     {
         camera.position = add3(camera.position, mul3(right, cameraStep));
+        cameraChanged = true;
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
     {
         camera.position = add3(camera.position, mul3(up, cameraStep));
+        cameraChanged = true;
+    }
+    if (cameraChanged)
+    {
+        applySceneEditResult(appState, makeCameraDirty());
     }
 
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
@@ -1399,15 +1415,11 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
             scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size()))
         {
             const MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
-            if (setSelectedMeshPosition(scene, add3(object.position, delta)))
-            {
-                invalidateAccumulation(appState);
-            }
+            applySceneEditResult(appState, editor.setSelectedMeshPosition(add3(object.position, delta)));
         }
         else
         {
-            moveSelectedSphere(scene, delta);
-            invalidateAccumulation(appState);
+            applySceneEditResult(appState, editor.moveSelectedSphere(delta));
         }
     };
 
@@ -1441,33 +1453,33 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const float lightStep = 7.0f * dt;
     if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS)
     {
-        moveLight(scene, make_float3(-lightStep, 0.0f, 0.0f));
+        applySceneEditResult(appState, editor.moveLight(make_float3(-lightStep, 0.0f, 0.0f)));
     }
     if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
     {
-        moveLight(scene, make_float3(lightStep, 0.0f, 0.0f));
+        applySceneEditResult(appState, editor.moveLight(make_float3(lightStep, 0.0f, 0.0f)));
     }
     if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS)
     {
-        moveLight(scene, make_float3(0.0f, 0.0f, -lightStep));
+        applySceneEditResult(appState, editor.moveLight(make_float3(0.0f, 0.0f, -lightStep)));
     }
     if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
     {
-        moveLight(scene, make_float3(0.0f, 0.0f, lightStep));
+        applySceneEditResult(appState, editor.moveLight(make_float3(0.0f, 0.0f, lightStep)));
     }
     if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
     {
-        moveLight(scene, make_float3(0.0f, lightStep, 0.0f));
+        applySceneEditResult(appState, editor.moveLight(make_float3(0.0f, lightStep, 0.0f)));
     }
     if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
     {
-        moveLight(scene, make_float3(0.0f, -lightStep, 0.0f));
+        applySceneEditResult(appState, editor.moveLight(make_float3(0.0f, -lightStep, 0.0f)));
     }
     static bool mWasDown = false;
     const bool mIsDown = glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS;
     if (mIsDown && !mWasDown)
     {
-        cycleSelectedSphereMaterialPreset(scene);
+        applySceneEditResult(appState, editor.cycleSelectedSphereMaterialPreset());
     }
     mWasDown = mIsDown;
 
@@ -1476,7 +1488,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (bIsDown && !bWasDown)
     {
         selectNextMeshObject(scene);
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, makeRenderSettingsDirty());
     }
     bWasDown = bIsDown;
 
@@ -1484,8 +1496,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool vIsDown = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
     if (vIsDown && !vWasDown)
     {
-        cycleSelectedMeshMaterialPreset(scene);
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, editor.cycleSelectedMeshMaterialPreset());
     }
     vWasDown = vIsDown;
 
@@ -1528,7 +1539,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (pIsDown && !pWasDown)
     {
         appState.renderMode = appState.renderMode == RenderModeProgressive ? RenderModeRealtime : RenderModeProgressive;
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, makeRenderSettingsDirty());
     }
     pWasDown = pIsDown;
 
@@ -1537,7 +1548,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (nIsDown && !nWasDown)
     {
         appState.denoiserEnabled = !appState.denoiserEnabled;
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, makeRenderSettingsDirty());
     }
     nWasDown = nIsDown;
 
@@ -1553,8 +1564,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool key4IsDown = glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS;
     if (key4IsDown && !key4WasDown)
     {
-        adjustSceneExposure(scene, -0.05f);
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, editor.adjustExposure(-0.05f));
     }
     key4WasDown = key4IsDown;
 
@@ -1562,8 +1572,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool key5IsDown = glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS;
     if (key5IsDown && !key5WasDown)
     {
-        adjustSceneExposure(scene, 0.05f);
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, editor.adjustExposure(0.05f));
     }
     key5WasDown = key5IsDown;
 
@@ -1571,8 +1580,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool key6IsDown = glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS;
     if (key6IsDown && !key6WasDown)
     {
-        adjustSceneSkyIntensity(scene, -0.05f);
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, editor.adjustSkyIntensity(-0.05f));
     }
     key6WasDown = key6IsDown;
 
@@ -1580,8 +1588,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool key7IsDown = glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS;
     if (key7IsDown && !key7WasDown)
     {
-        adjustSceneSkyIntensity(scene, 0.05f);
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, editor.adjustSkyIntensity(0.05f));
     }
     key7WasDown = key7IsDown;
 
@@ -1589,8 +1596,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool key8IsDown = glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS;
     if (key8IsDown && !key8WasDown)
     {
-        adjustSceneLightIntensity(scene, -0.1f);
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, editor.adjustLightIntensity(-0.1f));
     }
     key8WasDown = key8IsDown;
 
@@ -1598,8 +1604,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool key9IsDown = glfwGetKey(window, GLFW_KEY_9) == GLFW_PRESS;
     if (key9IsDown && !key9WasDown)
     {
-        adjustSceneLightIntensity(scene, 0.1f);
-        invalidateAccumulation(appState);
+        applySceneEditResult(appState, editor.adjustLightIntensity(0.1f));
     }
     key9WasDown = key9IsDown;
 
