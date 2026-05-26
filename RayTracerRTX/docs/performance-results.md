@@ -58,6 +58,12 @@ The benchmark is headless and does not include GLFW window presentation, HUD
 drawing, or user input processing. Interactive FPS in the desktop app may differ
 because it includes display presentation and VSync settings.
 
+The interactive application now exposes the same performance context in the
+scene panel: FPS, CPU frame time, GPU time, sphere count, mesh object count,
+triangle count, material count, accumulation samples, render mode, quality mode,
+and denoiser state. This panel is diagnostic UI only; it does not change the
+headless benchmark method above.
+
 ## Results
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |

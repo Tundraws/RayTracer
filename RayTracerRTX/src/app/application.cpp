@@ -7,6 +7,7 @@
 #include "logger.h"
 #include "material.h"
 #include "renderer_controller.h"
+#include "renderer_statistics.h"
 #include "scene.h"
 #include "scene_config.h"
 
@@ -295,6 +296,35 @@ bool qualityCombo(const char* id, int& quality)
     return changed;
 }
 
+const char* renderModeNameUtf8(const int mode)
+{
+    return mode == RenderModeProgressive ? u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F") : u8c(u8"\u0420\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F");
+}
+
+bool renderModeCombo(const char* id, int& mode)
+{
+    const int modes[] = {RenderModeRealtime, RenderModeProgressive};
+    bool changed = false;
+    if (ImGui::BeginCombo(id, renderModeNameUtf8(mode)))
+    {
+        for (const int candidate : modes)
+        {
+            const bool selected = mode == candidate;
+            if (ImGui::Selectable(renderModeNameUtf8(candidate), selected))
+            {
+                mode = candidate;
+                changed = true;
+            }
+            if (selected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
 std::string meshObjectLabel(const MeshObject& object, const int index)
 {
     if (!object.displayName.empty())
@@ -438,18 +468,12 @@ void drawHud(
 
     std::wostringstream lineMode;
     lineMode << L"\u0420\u0415\u0416\u0418\u041C: " << (renderMode == RenderModeProgressive ? L"\u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435" : L"\u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F")
-             << L"   \u041A\u0410\u0427\u0415\u0421\u0422\u0412\u041E: " << qualityNameW(renderQuality)
-             << L"   \u0421\u042D\u041C\u041F\u041B\u042B: " << progressiveSamples
-             << L"   \u0428\u0423\u041C: " << (denoiserEnabled ? (denoiserAvailable ? L"\u0432\u043A\u043B" : L"\u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D") : L"\u0432\u044B\u043A\u043B");
-
+             << L"   \u041A\u0410\u0427\u0415\u0421\u0422\u0412\u041E: " << qualityNameW(renderQuality);
+    if (renderMode == RenderModeProgressive)
+    {
+        lineMode << L"   \u0421\u042D\u041C\u041F\u041B\u042B: " << progressiveSamples;
+    }
     const std::wstring line4 = lineMode.str();
-    std::wostringstream lineTuning;
-    lineTuning << L"\u042D\u041A\u0421\u041F\u041E\u0417\u0418\u0426\u0418\u042F: " << std::setprecision(2) << scene.exposure
-               << L"   \u041D\u0415\u0411\u041E: " << scene.skyIntensity
-               << L"   \u0421\u0412\u0415\u0422: " << scene.lightIntensity;
-    const std::wstring line5 = lineTuning.str();
-    const std::wstring line6 = L"G \u0441\u0446\u0435\u043D\u0430   C \u0441\u0431\u0440\u043E\u0441   M/V \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B   Q \u043A\u0430\u0447\u0435\u0441\u0442\u0432\u043E   P \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435";
-    const std::wstring line7 = L"4/5 \u044D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F   6/7 \u043D\u0435\u0431\u043E   8/9 \u0441\u0432\u0435\u0442";
 
     const std::wstring text1 = line1.str();
     const std::wstring text2 = line2.str();
@@ -458,9 +482,6 @@ void drawHud(
     TextOutW(dc, panelX, panelY + 22, text2.c_str(), static_cast<int>(text2.size()));
     TextOutW(dc, panelX, panelY + 44, text3.c_str(), static_cast<int>(text3.size()));
     TextOutW(dc, panelX, panelY + 66, line4.c_str(), static_cast<int>(line4.size()));
-    TextOutW(dc, panelX, panelY + 88, line5.c_str(), static_cast<int>(line5.size()));
-    TextOutW(dc, panelX, panelY + 110, line6.c_str(), static_cast<int>(line6.size()));
-    TextOutW(dc, panelX, panelY + 132, line7.c_str(), static_cast<int>(line7.size()));
 
     SelectObject(dc, oldFont);
     SetTextColor(dc, oldTextColor);
@@ -769,6 +790,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
     };
     refreshMeshSelection();
+    const RendererStatistics rendererStatistics = computeRendererStatistics(scene, appState.progressiveSamples);
 
     const auto drawSphereMaterialEditor = [&]()
     {
@@ -1044,11 +1066,40 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
 
         ImGui::SeparatorText(u8c(u8"\u0420\u0435\u043D\u0434\u0435\u0440"));
+        ImGui::Text("FPS: %.1f", stats.fps);
+        ImGui::Text("CPU frame: %.2f ms", stats.avgHostMs);
+        ImGui::Text("GPU: %.2f ms", stats.avgGpuMs);
+        ImGui::Text("%s: %zu", u8c(u8"\u0421\u0444\u0435\u0440\u044B"), rendererStatistics.sphereCount);
+        ImGui::Text("%s: %zu", u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), rendererStatistics.meshObjectCount);
+        ImGui::Text("%s: %zu", u8c(u8"\u0422\u0440\u0435\u0443\u0433\u043E\u043B\u044C\u043D\u0438\u043A\u0438"), rendererStatistics.triangleCount);
+        ImGui::Text("%s: %zu", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B"), rendererStatistics.materialCount);
+        ImGui::Text("%s: %u", u8c(u8"\u0421\u044D\u043C\u043F\u043B\u044B"), rendererStatistics.accumulationSamples);
+        ImGui::Text("%s: %s", u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"),
+            appState.denoiserEnabled ? (appState.denoiserAvailable ? u8c(u8"\u0432\u043A\u043B") : u8c(u8"\u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D")) : u8c(u8"\u0432\u044B\u043A\u043B"));
+        ImGui::TextWrapped("%s", u8c(u8"VRAM: \u043D\u0435 \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0430\u0435\u0442\u0441\u044F, \u0447\u0442\u043E\u0431\u044B UI \u043D\u0435 \u0437\u0430\u0432\u0438\u0441\u0435\u043B \u043E\u0442 CUDA runtime \u0432 \u043F\u0430\u043D\u0435\u043B\u0438."));
+        int selectedRenderMode = appState.renderMode;
+        if (renderModeCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##renderer_mode"), selectedRenderMode))
+        {
+            appState.renderMode = selectedRenderMode;
+            applySceneEditResult(appState, makeRenderSettingsDirty());
+        }
         int selectedQuality = appState.renderQuality;
         if (qualityCombo(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E##scene_quality"), selectedQuality))
         {
             appState.renderQuality = selectedQuality;
             applyQualityMode(appState);
+        }
+        if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C##renderer_denoiser"), &appState.denoiserEnabled))
+        {
+            applySceneEditResult(appState, makeRenderSettingsDirty());
+        }
+        if (ImGui::Checkbox(u8c(u8"\u041F\u0430\u0443\u0437\u0430 \u0440\u0435\u043D\u0434\u0435\u0440\u0430##renderer_pause"), &appState.renderingPaused))
+        {
+            applySceneEditResult(appState, makeRenderSettingsDirty());
+        }
+        if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435##reset_accumulation")))
+        {
+            invalidateAccumulation(appState);
         }
     }
     else if (appState.hierarchySelectionKind == HierarchySelectionCamera)
@@ -1686,12 +1737,15 @@ void run_optix_app(const ApplicationOptions& options)
 
         const auto hostFrameStart = std::chrono::steady_clock::now();
         float gpuTimeMs = 0.0f;
-        renderer.setRenderQuality(appState.renderQuality);
-        renderer.setRenderMode(appState.renderMode);
-        renderer.setDenoiserEnabled(appState.denoiserEnabled);
-        renderer.renderFrame(appState.scene, appState.camera, pixels, &gpuTimeMs);
-        appState.progressiveSamples = renderer.getAccumulationSampleCount();
-        appState.denoiserAvailable = renderer.isDenoiserAvailable();
+        if (!appState.renderingPaused)
+        {
+            renderer.setRenderQuality(appState.renderQuality);
+            renderer.setRenderMode(appState.renderMode);
+            renderer.setDenoiserEnabled(appState.denoiserEnabled);
+            renderer.renderFrame(appState.scene, appState.camera, pixels, &gpuTimeMs);
+            appState.progressiveSamples = renderer.getAccumulationSampleCount();
+            appState.denoiserAvailable = renderer.isDenoiserAvailable();
+        }
         const auto hostFrameEnd = std::chrono::steady_clock::now();
 
         const double hostFrameMs = std::chrono::duration<double, std::milli>(hostFrameEnd - hostFrameStart).count();

@@ -5,6 +5,7 @@
 #include "../src/app/logger.h"
 #include "../src/app/material.h"
 #include "../src/app/obj_loader.h"
+#include "../src/app/renderer_statistics.h"
 #include "../src/app/scene.h"
 #include "../src/app/scene_config.h"
 #include "../src/app/scene_editor.h"
@@ -1202,6 +1203,38 @@ void testDefaultSceneMeshGeometry(TestContext& t)
     t.expect(scene.mesh.triangles.size() > 0, "Default mesh triangle count should be positive.");
     t.expect(!scene.mesh.materials.empty(), "Default mesh material count should be positive.");
     t.expect(hasValidMeshMaterialIndices(scene.mesh), "Default mesh material indices should stay in range.");
+}
+
+void testRendererStatisticsCountsGeometry(TestContext& t)
+{
+    const SceneState scene = makeDefaultScene();
+    const RendererStatistics statistics = computeRendererStatistics(scene, 7u);
+
+    std::size_t expectedTriangles = 0;
+    std::size_t expectedMaterials = scene.materials.size();
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        expectedTriangles += object.mesh.triangles.size();
+        expectedMaterials += object.mesh.materials.size();
+    }
+
+    t.expect(statistics.sphereCount == scene.spheres.size(), "Renderer statistics should count spheres.");
+    t.expect(statistics.meshObjectCount == scene.meshObjects.size(), "Renderer statistics should count mesh objects.");
+    t.expect(statistics.triangleCount == expectedTriangles, "Renderer statistics should count mesh triangles.");
+    t.expect(statistics.materialCount == expectedMaterials, "Renderer statistics should count sphere and mesh materials.");
+    t.expect(statistics.accumulationSamples == 7u, "Renderer statistics should keep accumulation sample count.");
+}
+
+void testRendererStatisticsEmptySceneSafe(TestContext& t)
+{
+    const SceneState scene{};
+    const RendererStatistics statistics = computeRendererStatistics(scene, 0u);
+
+    t.expect(statistics.sphereCount == 0u, "Empty scene statistics should have zero spheres.");
+    t.expect(statistics.meshObjectCount == 0u, "Empty scene statistics should have zero mesh objects.");
+    t.expect(statistics.triangleCount == 0u, "Empty scene statistics should have zero triangles.");
+    t.expect(statistics.materialCount == 0u, "Empty scene statistics should have zero materials.");
+    t.expect(statistics.accumulationSamples == 0u, "Empty scene statistics should keep zero samples.");
 }
 
 void testBuiltInCubeMesh(TestContext& t)
@@ -2895,6 +2928,8 @@ int main(int argc, char** argv)
     runTest("Demo OBJ asset loads", testDemoObjAssetLoads);
     runTest("Textured cube asset loads", testTexturedCubeAssetLoads);
     runTest("Default scene mesh geometry", testDefaultSceneMeshGeometry);
+    runTest("Renderer statistics counts geometry", testRendererStatisticsCountsGeometry);
+    runTest("Renderer statistics empty scene safe", testRendererStatisticsEmptySceneSafe);
     runTest("Built-in cube mesh", testBuiltInCubeMesh);
     runTest("Built-in pyramid mesh", testBuiltInPyramidMesh);
     runTest("Built-in plane mesh", testBuiltInPlaneMesh);

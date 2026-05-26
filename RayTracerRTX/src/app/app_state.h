@@ -35,6 +35,7 @@ struct AppState
     bool denoiserEnabled = false;
     bool denoiserAvailable = false;
     unsigned int progressiveSamples = 0;
+    bool renderingPaused = false;
     bool imguiPanelVisible = true;
     std::vector<SceneBuildResult> scenePresets;
     std::vector<SceneBuildResult> scenePresetDefaults;
