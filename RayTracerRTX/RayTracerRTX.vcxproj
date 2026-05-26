@@ -93,6 +93,7 @@
     <ClInclude Include="glfw\include\GLFW\glfw3.h" />
     <ClInclude Include="glfw\include\GLFW\glfw3native.h" />
     <ClInclude Include="src\app\application.h" />
+    <ClInclude Include="src\app\app_state.h" />
     <ClInclude Include="src\app\asset_cache.h" />
     <ClInclude Include="src\app\camera.h" />
     <ClInclude Include="src\app\gltf_loader.h" />
@@ -101,6 +102,7 @@
     <ClInclude Include="src\app\material.h" />
     <ClInclude Include="src\app\mesh.h" />
     <ClInclude Include="src\app\obj_loader.h" />
+    <ClInclude Include="src\app\renderer_controller.h" />
     <ClInclude Include="src\app\scene.h" />
     <ClInclude Include="src\app\scene_config.h" />
     <ClInclude Include="src\common\rtx_shared.h" />
@@ -131,6 +133,7 @@
     <ClCompile Include="src\app\material.cpp" />
     <ClCompile Include="src\app\mesh.cpp" />
     <ClCompile Include="src\app\obj_loader.cpp" />
+    <ClCompile Include="src\app\renderer_controller.cpp" />
     <ClCompile Include="src\app\maingpu.cpp" />
     <ClCompile Include="src\app\scene.cpp" />
     <ClCompile Include="src\app\scene_config.cpp" />

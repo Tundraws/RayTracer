@@ -13,6 +13,8 @@ flowchart LR
     Args --> SceneConfig["SceneConfig JSON"]
     App --> Input["Input handling"]
     App --> UI["ImGui tabbed scene panel"]
+    App --> AppState["AppState"]
+    App --> Controller["RendererController helpers"]
     App --> Camera["CameraState / updateCameraBasis"]
     SceneConfig --> JsonMaterials["JSON material inputs"]
     SceneConfig --> MeshObject["MeshObject + transform"]
@@ -36,6 +38,10 @@ flowchart LR
     Scene --> MeshMaterials["Mesh materials"]
     JsonMaterials --> Materials
     JsonMaterials --> MeshMaterials
+    Controller --> Mode["Render mode toggle"]
+    Controller --> Rebuild["Scene rebuild request"]
+    Controller --> AccumReset["invalidateAccumulation"]
+    AppState --> Scene
     App --> Renderer["OptixRenderer"]
     App --> Mode["Render mode toggle"]
     Camera --> Renderer
@@ -153,6 +159,8 @@ flowchart LR
 | Area | Files | Responsibility |
 |---|---|---|
 | Application loop | `src/app/maingpu.cpp`, `src/app/application.*` | Window creation, input, scene updates, presentation |
+| Application state | `src/app/app_state.h` | Shared runtime state for camera, presets, UI selection, quality mode, and renderer rebuild requests |
+| Renderer controller helpers | `src/app/renderer_controller.*` | Centralized accumulation invalidation, quality-mode application, and scene rebuild marking |
 | UI panel | `src/app/application.*` + Dear ImGui | Tabbed runtime controls for scene presets, editor objects, materials, light, quality, and diagnostics |
 | Built-in mesh primitives | `src/app/mesh.*` | Generates cube, pyramid, and finite plane/panel as `MeshData` triangles |
 | Environment presets | `src/app/scene.*` | Builds editable floor, wall and ceiling panels for open/room/empty scene modes |

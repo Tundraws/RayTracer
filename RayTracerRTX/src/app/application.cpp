@@ -1,10 +1,12 @@
 #include "application.h"
 
 #include "../gpu/optix_renderer.h"
+#include "app_state.h"
 #include "asset_cache.h"
 #include "camera.h"
 #include "logger.h"
 #include "material.h"
+#include "renderer_controller.h"
 #include "scene.h"
 #include "scene_config.h"
 
@@ -51,55 +53,6 @@ float gImguiPanelX = 0.0f;
 float gImguiPanelY = 0.0f;
 float gImguiPanelWidth = 0.0f;
 float gImguiPanelHeight = 0.0f;
-
-enum EditorObjectKind
-{
-    EditorObjectSphere = 0,
-    EditorObjectMesh = 1
-};
-
-struct AppState
-{
-    CameraState camera;
-    InputState input;
-    SceneState scene;
-    bool cursorCaptured = true;
-    int renderMode = RenderModeRealtime;
-    int renderQuality = RenderQualityHigh;
-    bool denoiserEnabled = false;
-    bool denoiserAvailable = false;
-    unsigned int progressiveSamples = 0;
-    bool imguiPanelVisible = true;
-    std::vector<SceneBuildResult> scenePresets;
-    std::vector<SceneBuildResult> scenePresetDefaults;
-    std::vector<std::wstring> scenePresetNames;
-    std::vector<std::filesystem::path> scenePresetConfigPaths;
-    AssetCache assetCache;
-    int scenePresetIndex = 0;
-    std::string lastUiMessage;
-    bool lastUiMessageIsError = false;
-    bool rendererSceneRebuildRequested = false;
-    bool imguiPanelPinnedRight = true;
-    float imguiPanelWidth = 360.0f;
-    float imguiPanelHeight = 680.0f;
-    int editorPrimitiveToAdd = BuiltInMeshCube;
-    int editorObjectKind = EditorObjectSphere;
-    int environmentMode = SceneEnvironmentOpen;
-    float roomWidth = 18.0f;
-    float roomDepth = 18.0f;
-    float roomHeight = 9.0f;
-};
-
-struct FrameStats
-{
-    int frameCount = 0;
-    double hostAccumMs = 0.0;
-    double gpuAccumMs = 0.0;
-    double fps = 0.0;
-    double avgHostMs = 0.0;
-    double avgGpuMs = 0.0;
-    std::chrono::steady_clock::time_point lastUpdate = std::chrono::steady_clock::now();
-};
 
 void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath = {});
 
@@ -355,22 +308,6 @@ std::string meshObjectLabel(const MeshObject& object, const int index)
     return std::string(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C ")) + std::to_string(index + 1);
 }
 
-void applyQualityMode(AppState& appState)
-{
-    appState.renderQuality = clampRenderQuality(appState.renderQuality);
-    if (renderQualityUsesPathTracing(appState.renderQuality))
-    {
-        appState.renderMode = RenderModeProgressive;
-        appState.denoiserEnabled = renderQualityUsesDenoiser(appState.renderQuality);
-    }
-    else
-    {
-        appState.renderMode = RenderModeRealtime;
-        appState.denoiserEnabled = false;
-    }
-    appState.progressiveSamples = 0;
-}
-
 struct HudTextCache
 {
     HFONT font = nullptr;
@@ -611,8 +548,8 @@ bool applyScenePreset(AppState& appState, const int index)
     }
 
     appState.scenePresetIndex = index;
-    appState.progressiveSamples = 0;
-    appState.rendererSceneRebuildRequested = true;
+    invalidateAccumulation(appState);
+    requestRendererSceneRebuild(appState);
     return true;
 }
 
@@ -631,8 +568,8 @@ bool resetCurrentPresetView(AppState& appState)
     if (reset)
     {
         saveCurrentScenePreset(appState);
-        appState.progressiveSamples = 0;
-        appState.rendererSceneRebuildRequested = true;
+        invalidateAccumulation(appState);
+        requestRendererSceneRebuild(appState);
     }
     return reset;
 }
@@ -684,8 +621,8 @@ bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPat
     }
 
     appState.scenePresetIndex = newPresetIndex;
-    appState.progressiveSamples = 0;
-    appState.rendererSceneRebuildRequested = true;
+    invalidateAccumulation(appState);
+    requestRendererSceneRebuild(appState);
     appState.lastUiMessage = "Модель загружена: " + meshPath.filename().string();
     appState.lastUiMessageIsError = false;
     return true;
@@ -730,9 +667,9 @@ bool reloadCurrentSceneConfig(AppState& appState)
     appState.scenePresetDefaults[static_cast<size_t>(appState.scenePresetIndex)] = preset;
     if (resetAccumulation)
     {
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
-    appState.rendererSceneRebuildRequested = true;
+    requestRendererSceneRebuild(appState);
     appState.lastUiMessage = "РЎС†РµРЅР° РїРµСЂРµР·Р°РіСЂСѓР¶РµРЅР°: " + configPath.filename().string();
     appState.lastUiMessageIsError = false;
     return true;
@@ -877,7 +814,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             material.roughness = clampf(material.roughness, 0.02f, 1.0f);
             material.ior = clampf(material.ior, 1.01f, 2.8f);
             material.alpha = clampf(material.alpha, 0.0f, 1.0f);
-            appState.progressiveSamples = 0;
+            invalidateAccumulation(appState);
         }
     };
 
@@ -942,8 +879,8 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             meshMaterial->ior = clampf(meshMaterial->ior, 1.01f, 2.8f);
             meshMaterial->alpha = clampf(meshMaterial->alpha, 0.0f, 1.0f);
             applySelectedMeshMaterialToWholeObject(scene);
-            appState.progressiveSamples = 0;
-            appState.rendererSceneRebuildRequested = true;
+            invalidateAccumulation(appState);
+            requestRendererSceneRebuild(appState);
         }
     };
 
@@ -979,7 +916,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             }
             if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B/\u0441\u0432\u0435\u0442\u0430")) && resetCurrentPresetView(appState))
             {
-                appState.progressiveSamples = 0;
+                invalidateAccumulation(appState);
             }
             const bool canReloadSceneConfig =
                 hasPresetIndex(appState, appState.scenePresetIndex) &&
@@ -1020,8 +957,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Button(u8c(u8"\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u043E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435")))
             {
                 const bool changed = applySceneEnvironmentMode(scene, appState.environmentMode);
-                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
-                appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                markSceneEdited(appState, changed, true);
                 refreshMeshSelection();
             }
             if (appState.environmentMode == SceneEnvironmentRoom)
@@ -1033,8 +969,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     appState.roomDepth = clampf(roomSize[1], 4.0f, 80.0f);
                     appState.roomHeight = clampf(roomSize[2], 2.0f, 40.0f);
                     const bool changed = applySceneRoomDimensions(scene, appState.roomWidth, appState.roomDepth, appState.roomHeight);
-                    appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
-                    appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                    markSceneEdited(appState, changed, true);
                     refreshMeshSelection();
                 }
             }
@@ -1042,7 +977,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Button(u8c(u8"\u0421\u043B\u0443\u0436\u0435\u0431\u043D\u044B\u0439 \u043F\u043E\u043B")))
             {
                 scene.showGroundPlane = !scene.showGroundPlane;
-                appState.progressiveSamples = 0;
+                invalidateAccumulation(appState);
             }
             ImGui::TextWrapped("%s", u8c(u8"\u041F\u043E\u043B \u0438 \u0441\u0442\u0435\u043D\u044B \u0441\u043E\u0437\u0434\u0430\u044E\u0442\u0441\u044F \u043A\u0430\u043A \u043E\u0431\u044B\u0447\u043D\u044B\u0435 mesh-\u043F\u0430\u043D\u0435\u043B\u0438: \u0438\u0445 \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C, \u0441\u0434\u0432\u0438\u043D\u0443\u0442\u044C, \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043C\u0430\u0441\u0448\u0442\u0430\u0431 \u0438 \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B."));
 
@@ -1059,17 +994,19 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 {
                     added = addBuiltInMeshPrimitive(scene, appState.editorPrimitiveToAdd);
                     appState.editorObjectKind = EditorObjectMesh;
-                    appState.rendererSceneRebuildRequested = added || appState.rendererSceneRebuildRequested;
+                    markSceneEdited(appState, added, true);
                     refreshMeshSelection();
                 }
-                appState.progressiveSamples = added ? 0 : appState.progressiveSamples;
+                if (appState.editorPrimitiveToAdd == -1)
+                {
+                    markSceneEdited(appState, added);
+                }
             }
             if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u043C\u043E\u0434\u0435\u043B\u0438")))
             {
                 const bool changed = removeAllMeshObjects(scene);
                 appState.editorObjectKind = EditorObjectSphere;
-                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
-                appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                markSceneEdited(appState, changed, true);
                 refreshMeshSelection();
             }
             ImGui::SameLine();
@@ -1077,23 +1014,21 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             {
                 const bool changed = clearSceneObjects(scene);
                 appState.editorObjectKind = EditorObjectSphere;
-                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
-                appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                markSceneEdited(appState, changed, true);
                 refreshMeshSelection();
             }
             if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0441\u0444\u0435\u0440\u044B")))
             {
                 const bool changed = removeAllSpheres(scene);
                 appState.editorObjectKind = scene.meshObjects.empty() ? EditorObjectSphere : EditorObjectMesh;
-                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
+                markSceneEdited(appState, changed);
             }
             ImGui::SameLine();
             if (ImGui::Button(u8c(u8"\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u0431\u0430\u0437\u043E\u0432\u044B\u0435")))
             {
                 const bool changed = restoreDefaultSceneObjects(scene);
                 appState.editorObjectKind = EditorObjectSphere;
-                appState.progressiveSamples = changed ? 0 : appState.progressiveSamples;
-                appState.rendererSceneRebuildRequested = changed || appState.rendererSceneRebuildRequested;
+                markSceneEdited(appState, changed, true);
                 refreshMeshSelection();
             }
             ImGui::SeparatorText(u8c(u8"\u0412\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 \u043E\u0431\u044A\u0435\u043A\u0442"));
@@ -1145,7 +1080,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     ImGui::Text("%s %d", u8c(u8"\u0421\u0444\u0435\u0440\u0430"), scene.selectedSphere + 1);
                     if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u0443\u044E")))
                     {
-                        appState.progressiveSamples = removeSelectedSphere(scene) ? 0 : appState.progressiveSamples;
+                        markSceneEdited(appState, removeSelectedSphere(scene));
                         if (scene.spheres.empty() && !scene.meshObjects.empty())
                         {
                             appState.editorObjectKind = EditorObjectMesh;
@@ -1159,13 +1094,13 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                         sphere.center = make_float3(pos[0], pos[1], pos[2]);
                         sphere.radius = oldRadius;
                         clampScene(scene);
-                        appState.progressiveSamples = 0;
+                        invalidateAccumulation(appState);
                     }
                     float radius = sphere.radius;
                     if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"), &radius, 0.25f, 5.0f, "%.2f"))
                     {
                         setSelectedSphereRadius(scene, radius);
-                        appState.progressiveSamples = 0;
+                        invalidateAccumulation(appState);
                     }
                     drawSphereMaterialEditor();
                 }
@@ -1189,8 +1124,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u0443\u044E")))
                     {
                         const bool removed = removeSelectedMeshObject(scene);
-                        appState.progressiveSamples = removed ? 0 : appState.progressiveSamples;
-                        appState.rendererSceneRebuildRequested = removed || appState.rendererSceneRebuildRequested;
+                        markSceneEdited(appState, removed, true);
                         if (scene.meshObjects.empty() && !scene.spheres.empty())
                         {
                             appState.editorObjectKind = EditorObjectSphere;
@@ -1215,7 +1149,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                     }
                     if (transformChanged)
                     {
-                        appState.progressiveSamples = 0;
+                        invalidateAccumulation(appState);
                     }
                     drawMeshMaterialEditor();
                 }
@@ -1258,7 +1192,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 setSceneLightIntensity(scene, scene.lightIntensity);
                 scene.areaLightRadius = clampf(scene.areaLightRadius, 0.0f, 8.0f);
                 scene.environmentIntensity = clampf(scene.environmentIntensity, 0.0f, 4.0f);
-                appState.progressiveSamples = 0;
+                invalidateAccumulation(appState);
             }
             ImGui::EndTabItem();
         }
@@ -1275,11 +1209,11 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Checkbox(u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F"), &progressive))
             {
                 appState.renderMode = progressive ? RenderModeProgressive : RenderModeRealtime;
-                appState.progressiveSamples = 0;
+                invalidateAccumulation(appState);
             }
             if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), &appState.denoiserEnabled))
             {
-                appState.progressiveSamples = 0;
+                invalidateAccumulation(appState);
             }
             ImGui::TextWrapped("%s", u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u043C \u0438 \u0448\u0443\u043C\u043D\u044B\u043C. \u0414\u043B\u044F \u043E\u0431\u044B\u0447\u043D\u043E\u0433\u043E \u043F\u043E\u043A\u0430\u0437\u0430 \u043B\u0443\u0447\u0448\u0435 High/Medium."));
             ImGui::EndTabItem();
@@ -1467,13 +1401,13 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
             const MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
             if (setSelectedMeshPosition(scene, add3(object.position, delta)))
             {
-                appState.progressiveSamples = 0;
+                invalidateAccumulation(appState);
             }
         }
         else
         {
             moveSelectedSphere(scene, delta);
-            appState.progressiveSamples = 0;
+            invalidateAccumulation(appState);
         }
     };
 
@@ -1542,7 +1476,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (bIsDown && !bWasDown)
     {
         selectNextMeshObject(scene);
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     bWasDown = bIsDown;
 
@@ -1551,7 +1485,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (vIsDown && !vWasDown)
     {
         cycleSelectedMeshMaterialPreset(scene);
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     vWasDown = vIsDown;
 
@@ -1594,7 +1528,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (pIsDown && !pWasDown)
     {
         appState.renderMode = appState.renderMode == RenderModeProgressive ? RenderModeRealtime : RenderModeProgressive;
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     pWasDown = pIsDown;
 
@@ -1603,7 +1537,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (nIsDown && !nWasDown)
     {
         appState.denoiserEnabled = !appState.denoiserEnabled;
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     nWasDown = nIsDown;
 
@@ -1620,7 +1554,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (key4IsDown && !key4WasDown)
     {
         adjustSceneExposure(scene, -0.05f);
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     key4WasDown = key4IsDown;
 
@@ -1629,7 +1563,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (key5IsDown && !key5WasDown)
     {
         adjustSceneExposure(scene, 0.05f);
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     key5WasDown = key5IsDown;
 
@@ -1638,7 +1572,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (key6IsDown && !key6WasDown)
     {
         adjustSceneSkyIntensity(scene, -0.05f);
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     key6WasDown = key6IsDown;
 
@@ -1647,7 +1581,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (key7IsDown && !key7WasDown)
     {
         adjustSceneSkyIntensity(scene, 0.05f);
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     key7WasDown = key7IsDown;
 
@@ -1656,7 +1590,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (key8IsDown && !key8WasDown)
     {
         adjustSceneLightIntensity(scene, -0.1f);
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     key8WasDown = key8IsDown;
 
@@ -1665,7 +1599,7 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     if (key9IsDown && !key9WasDown)
     {
         adjustSceneLightIntensity(scene, 0.1f);
-        appState.progressiveSamples = 0;
+        invalidateAccumulation(appState);
     }
     key9WasDown = key9IsDown;
 
@@ -1844,7 +1778,7 @@ void run_optix_app(const ApplicationOptions& options)
             renderer.setRenderQuality(appState.renderQuality);
             renderer.setRenderMode(appState.renderMode);
             renderer.setDenoiserEnabled(appState.denoiserEnabled);
-            appState.progressiveSamples = 0;
+            invalidateAccumulation(appState);
             appState.rendererSceneRebuildRequested = false;
         }
 
