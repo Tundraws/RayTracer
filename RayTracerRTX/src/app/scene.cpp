@@ -127,6 +127,85 @@ bool isEnvironmentObject(const MeshObject& object)
     return object.assetReference.rfind("environment:", 0) == 0;
 }
 
+float normalizedAbsAngle(const float degrees)
+{
+    float angle = std::fmod(std::fabs(degrees), 360.0f);
+    if (angle > 180.0f)
+    {
+        angle = 360.0f - angle;
+    }
+    return angle;
+}
+
+bool isHorizontalSupportPanel(const MeshObject& object)
+{
+    const bool isPanel = object.assetReference.find("panel") != std::string::npos ||
+        object.assetReference.find("plane") != std::string::npos ||
+        isEnvironmentObject(object);
+    if (!isPanel)
+    {
+        return false;
+    }
+
+    return normalizedAbsAngle(object.rotation.x) < 8.0f &&
+        normalizedAbsAngle(object.rotation.z) < 8.0f;
+}
+
+bool supportPanelContains(const MeshObject& object, const float x, const float z)
+{
+    const float halfX = std::max(0.25f, std::fabs(object.scale.x) * 0.5f);
+    const float halfZ = std::max(0.25f, std::fabs(object.scale.z) * 0.5f);
+    return x >= object.position.x - halfX &&
+        x <= object.position.x + halfX &&
+        z >= object.position.z - halfZ &&
+        z <= object.position.z + halfZ;
+}
+
+float supportFloorYAt(const SceneState& scene, const float x, const float z)
+{
+    float floorY = 0.0f;
+    bool found = false;
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        if (!isHorizontalSupportPanel(object) || !supportPanelContains(object, x, z))
+        {
+            continue;
+        }
+        if (!found || object.position.y > floorY)
+        {
+            floorY = object.position.y;
+            found = true;
+        }
+    }
+    return found ? floorY : 0.0f;
+}
+
+float meshBottomOffset(const MeshObject& object)
+{
+    if (object.assetReference.find("cube") != std::string::npos)
+    {
+        return std::max(0.0f, std::fabs(object.scale.y) * 0.5f);
+    }
+    if (object.assetReference.find("panel") != std::string::npos ||
+        object.assetReference.find("plane") != std::string::npos)
+    {
+        return 0.02f;
+    }
+    return 0.0f;
+}
+
+float3 placeSphereOnSupport(const SceneState& scene, const float3 position, const float radius)
+{
+    const float floorY = supportFloorYAt(scene, position.x, position.z);
+    return make_float3(position.x, floorY + radius, position.z);
+}
+
+float3 placeMeshOnSupport(const SceneState& scene, const MeshObject& object, const float3 position)
+{
+    const float floorY = supportFloorYAt(scene, position.x, position.z);
+    return make_float3(position.x, floorY + meshBottomOffset(object), position.z);
+}
+
 float footprintDistance2(const float x0, const float z0, const float x1, const float z1)
 {
     const float dx = x0 - x1;
@@ -156,7 +235,7 @@ std::vector<SceneFootprint> collectEditableFootprints(const SceneState& scene)
     }
     for (const MeshObject& object : scene.meshObjects)
     {
-        if (isEnvironmentObject(object))
+        if (isEnvironmentObject(object) || isHorizontalSupportPanel(object))
         {
             continue;
         }
@@ -563,7 +642,7 @@ bool addSphere(SceneState& scene)
         }
     }
     sphere.center = findFreePlacementOnFloor(scene, sphere.center, sphere.radius);
-    sphere.center.y = sphere.radius;
+    sphere.center = placeSphereOnSupport(scene, sphere.center, sphere.radius);
 
     scene.spheres.push_back(sphere);
     scene.materials.push_back(material);
@@ -945,6 +1024,7 @@ bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
         ? add3(selected->position, make_float3(placementRadius * 2.0f + 1.0f, 0.0f, 0.0f))
         : object.position;
     object.position = findFreePlacementOnFloor(scene, preferred, placementRadius);
+    object.position = placeMeshOnSupport(scene, object, object.position);
     updateMeshObjectTransform(object);
 
     if (primitiveType == BuiltInMeshCube)

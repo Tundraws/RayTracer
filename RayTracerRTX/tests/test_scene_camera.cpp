@@ -1306,6 +1306,23 @@ void testAddBuiltInMeshDuplicatesSelectedAndFindsFreeSpot(TestContext& t)
     t.expect(distance > 4.0f, "Duplicated cube should be placed away from the selected cube.");
 }
 
+void testAddBuiltInMeshUsesSupportPlaneHeight(TestContext& t)
+{
+    SceneState scene{};
+    MeshObject panel;
+    panel.assetReference = "built-in panel";
+    panel.displayName = "panel";
+    panel.mesh = createPlaneMesh();
+    panel.position = make_float3(0.0f, 2.0f, -2.6f);
+    panel.rotation = make_float3(0.0f, 0.0f, 0.0f);
+    panel.scale = make_float3(20.0f, 1.0f, 20.0f);
+    scene.meshObjects.push_back(panel);
+
+    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshCube), "Cube add on elevated panel should succeed.");
+    const MeshObject& cube = scene.meshObjects.back();
+    t.expect(almostEqual(cube.position.y, 2.0f + cube.scale.y * 0.5f), "Cube should stand on the support panel.");
+}
+
 void testRemoveSelectedMeshObjectSafe(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2388,6 +2405,23 @@ void testAddSphereDuplicatesSelectedAndFindsFreeSpot(TestContext& t)
     t.expect(almostEqual(material.color.z, 0.9f), "Duplicated sphere should keep selected material color.");
 }
 
+void testAddSphereUsesSupportPlaneHeight(TestContext& t)
+{
+    SceneState scene{};
+    MeshObject panel;
+    panel.assetReference = "built-in panel";
+    panel.displayName = "panel";
+    panel.mesh = createPlaneMesh();
+    panel.position = make_float3(0.0f, 2.5f, -2.5f);
+    panel.rotation = make_float3(0.0f, 0.0f, 0.0f);
+    panel.scale = make_float3(20.0f, 1.0f, 20.0f);
+    scene.meshObjects.push_back(panel);
+
+    t.expect(addSphere(scene), "Sphere add on elevated panel should succeed.");
+    const SphereGeometry& sphere = scene.spheres.back();
+    t.expect(almostEqual(sphere.center.y, 2.5f + sphere.radius), "Sphere should stand on the support panel.");
+}
+
 void testRemoveSelectedSphereKeepsSceneValid(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3038,6 +3072,7 @@ int main(int argc, char** argv)
     runTest("Hierarchy previous scene object cycles spheres and meshes", testHierarchyPreviousSceneObjectCyclesSpheresAndMeshes);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Add sphere duplicates selected and finds free spot", testAddSphereDuplicatesSelectedAndFindsFreeSpot);
+    runTest("Add sphere uses support plane height", testAddSphereUsesSupportPlaneHeight);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
     runTest("Remove last sphere safe", testRemoveLastSphereSafe);
     runTest("Remove penultimate sphere keeps selection valid", testRemovePenultimateSphereKeepsSelectionValid);
@@ -3106,6 +3141,7 @@ int main(int argc, char** argv)
     runTest("Built-in plane mesh", testBuiltInPlaneMesh);
     runTest("Add built-in mesh primitives", testAddBuiltInMeshPrimitives);
     runTest("Add built-in mesh duplicates selected and finds free spot", testAddBuiltInMeshDuplicatesSelectedAndFindsFreeSpot);
+    runTest("Add built-in mesh uses support plane height", testAddBuiltInMeshUsesSupportPlaneHeight);
     runTest("Remove selected mesh object safe", testRemoveSelectedMeshObjectSafe);
     runTest("Scene clear helpers", testSceneClearHelpers);
     runTest("Restore default scene objects", testRestoreDefaultSceneObjects);
