@@ -194,6 +194,58 @@ void addRoomPanels(SceneState& scene, const float width, const float depth, cons
     clampScene(scene);
 }
 
+bool updateRoomPanels(SceneState& scene, const float width, const float depth, const float height)
+{
+    std::vector<MeshObject*> panels;
+    panels.reserve(5);
+    for (MeshObject& object : scene.meshObjects)
+    {
+        if (isEnvironmentObject(object))
+        {
+            panels.push_back(&object);
+        }
+    }
+    if (panels.size() < 5)
+    {
+        return false;
+    }
+
+    const float safeWidth = clampScalar(width, 4.0f, 80.0f);
+    const float safeDepth = clampScalar(depth, 4.0f, 80.0f);
+    const float safeHeight = clampScalar(height, 2.0f, 40.0f);
+    const float halfWidth = safeWidth * 0.5f;
+    const float halfDepth = safeDepth * 0.5f;
+    const float halfHeight = safeHeight * 0.5f;
+
+    panels[0]->position = make_float3(0.0f, 0.0f, 0.0f);
+    panels[0]->rotation = make_float3(0.0f, 0.0f, 0.0f);
+    panels[0]->scale = make_float3(safeWidth, 1.0f, safeDepth);
+
+    panels[1]->position = make_float3(0.0f, halfHeight, -halfDepth);
+    panels[1]->rotation = make_float3(90.0f, 0.0f, 0.0f);
+    panels[1]->scale = make_float3(safeWidth, 1.0f, safeHeight);
+
+    panels[2]->position = make_float3(-halfWidth, halfHeight, 0.0f);
+    panels[2]->rotation = make_float3(0.0f, 0.0f, -90.0f);
+    panels[2]->scale = make_float3(safeHeight, 1.0f, safeDepth);
+
+    panels[3]->position = make_float3(halfWidth, halfHeight, 0.0f);
+    panels[3]->rotation = make_float3(0.0f, 0.0f, 90.0f);
+    panels[3]->scale = make_float3(safeHeight, 1.0f, safeDepth);
+
+    panels[4]->position = make_float3(0.0f, safeHeight, 0.0f);
+    panels[4]->rotation = make_float3(180.0f, 0.0f, 0.0f);
+    panels[4]->scale = make_float3(safeWidth, 1.0f, safeDepth);
+
+    for (MeshObject* panel : panels)
+    {
+        updateMeshObjectTransform(*panel);
+    }
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+    return true;
+}
+
 float3 clamp3(const float3 value, const float3 minValue, const float3 maxValue)
 {
     return make_float3(
@@ -821,9 +873,12 @@ bool applySceneEnvironmentMode(SceneState& scene, const int environmentMode)
 
 bool applySceneRoomDimensions(SceneState& scene, const float width, const float depth, const float height)
 {
-    removeEnvironmentObjects(scene);
-    scene.showGroundPlane = false;
-    addRoomPanels(scene, width, depth, height);
+    if (!updateRoomPanels(scene, width, depth, height))
+    {
+        removeEnvironmentObjects(scene);
+        scene.showGroundPlane = false;
+        addRoomPanels(scene, width, depth, height);
+    }
     return true;
 }
 

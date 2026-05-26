@@ -41,6 +41,38 @@ bool needsRendererSceneRebuild(const SceneDirtyFlags& dirty)
     return dirty.geometry || dirty.fullRebuild;
 }
 
+bool selectHierarchyObject(SceneState& scene, const int selectionKind, const int index)
+{
+    if (selectionKind == SceneHierarchySelectionSphere)
+    {
+        if (index < 0 || index >= static_cast<int>(scene.spheres.size()))
+        {
+            clampScene(scene);
+            return false;
+        }
+        scene.selectedSphere = index;
+        clampScene(scene);
+        return true;
+    }
+
+    if (selectionKind == SceneHierarchySelectionMesh)
+    {
+        if (index < 0 || index >= static_cast<int>(scene.meshObjects.size()))
+        {
+            clampScene(scene);
+            return false;
+        }
+        scene.selectedMeshObject = index;
+        scene.selectedMeshMaterial = 0;
+        clampScene(scene);
+        return true;
+    }
+
+    return selectionKind == SceneHierarchySelectionScene ||
+        selectionKind == SceneHierarchySelectionCamera ||
+        selectionKind == SceneHierarchySelectionLight;
+}
+
 SceneEditResult makeSceneEditResult(const bool changed, const SceneDirtyFlags dirty)
 {
     return {changed && hasDirtyFlags(dirty), dirty};
@@ -148,7 +180,16 @@ SceneEditResult SceneEditor::applyEnvironmentMode(const int environmentMode)
 
 SceneEditResult SceneEditor::applyRoomDimensions(const float width, const float depth, const float height)
 {
-    return makeGeometryDirty(applySceneRoomDimensions(scene_, width, depth, height));
+    size_t environmentPanelCount = 0;
+    for (const MeshObject& object : scene_.meshObjects)
+    {
+        if (object.assetReference.rfind("environment:", 0) == 0)
+        {
+            ++environmentPanelCount;
+        }
+    }
+    const bool changed = applySceneRoomDimensions(scene_, width, depth, height);
+    return environmentPanelCount >= 5 ? makeTransformDirty(changed) : makeGeometryDirty(changed);
 }
 
 SceneEditResult SceneEditor::setSelectedSphereRadius(const float radius)

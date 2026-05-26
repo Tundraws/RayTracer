@@ -19,8 +19,18 @@ struct SceneEditResult
     SceneDirtyFlags dirty;
 };
 
+enum SceneHierarchySelectionKind
+{
+    SceneHierarchySelectionScene = 0,
+    SceneHierarchySelectionCamera = 1,
+    SceneHierarchySelectionLight = 2,
+    SceneHierarchySelectionSphere = 3,
+    SceneHierarchySelectionMesh = 4
+};
+
 bool hasDirtyFlags(const SceneDirtyFlags& dirty);
 bool needsRendererSceneRebuild(const SceneDirtyFlags& dirty);
+bool selectHierarchyObject(SceneState& scene, int selectionKind, int index);
 
 SceneEditResult makeSceneEditResult(bool changed, SceneDirtyFlags dirty);
 SceneEditResult makeCameraDirty(bool changed = true);

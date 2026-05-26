@@ -689,7 +689,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     const float displayHeight = std::max(1.0f, displaySize.y);
     const float margin = 16.0f;
     const float minPanelWidth = std::min(320.0f, displayWidth - margin * 2.0f);
-    const float maxPanelWidth = std::min(520.0f, displayWidth - margin * 2.0f);
+    const float maxPanelWidth = std::min(640.0f, displayWidth - margin * 2.0f);
     const float minPanelHeight = std::min(380.0f, displayHeight - margin * 2.0f);
     const float maxPanelHeight = std::max(minPanelHeight, displayHeight - margin * 2.0f);
     appState.imguiPanelWidth = clampf(appState.imguiPanelWidth, minPanelWidth, maxPanelWidth);
@@ -885,370 +885,255 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
     };
 
-    if (ImGui::BeginTabBar("ScenePanelTabs", ImGuiTabBarFlags_FittingPolicyScroll))
+    const auto selectHierarchy = [&](const int kind, const int index)
     {
-        if (ImGui::BeginTabItem(u8c(u8"\u0421\u0446\u0435\u043D\u0430")))
+        if (selectHierarchyObject(scene, kind, index))
         {
-            std::vector<std::string> presetNames;
-            presetNames.reserve(appState.scenePresetNames.size());
-            for (const std::wstring& name : appState.scenePresetNames)
+            appState.hierarchySelectionKind = kind;
+            appState.hierarchySelectionIndex = index;
+            if (kind == SceneHierarchySelectionSphere)
             {
-                presetNames.push_back(wideToUtf8(name));
-            }
-            const char* currentPreset = appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(presetNames.size())
-                ? presetNames[static_cast<size_t>(appState.scenePresetIndex)].c_str()
-                : u8c(u8"\u0421\u0432\u043E\u044F \u0441\u0446\u0435\u043D\u0430");
-            if (ImGui::BeginCombo(u8c(u8"\u041F\u0440\u0435\u0441\u0435\u0442"), currentPreset))
-            {
-                for (int i = 0; i < static_cast<int>(presetNames.size()); ++i)
-                {
-                    const bool selected = i == appState.scenePresetIndex;
-                    const std::string presetLabel = presetNames[static_cast<size_t>(i)] + "##preset_" + std::to_string(i);
-                    if (ImGui::Selectable(presetLabel.c_str(), selected))
-                    {
-                        applyScenePreset(appState, i);
-                    }
-                    if (selected)
-                    {
-                        ImGui::SetItemDefaultFocus();
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B/\u0441\u0432\u0435\u0442\u0430")) && resetCurrentPresetView(appState))
-            {
-                applySceneEditResult(appState, makeCameraDirty());
-            }
-            const bool canReloadSceneConfig =
-                hasPresetIndex(appState, appState.scenePresetIndex) &&
-                appState.scenePresetIndex < static_cast<int>(appState.scenePresetConfigPaths.size()) &&
-                !appState.scenePresetConfigPaths[static_cast<size_t>(appState.scenePresetIndex)].empty();
-            if (!canReloadSceneConfig)
-            {
-                ImGui::BeginDisabled();
-            }
-            if (ImGui::Button(u8c(u8"\u041F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C JSON")))
-            {
-                reloadCurrentSceneConfig(appState);
-            }
-            if (!canReloadSceneConfig)
-            {
-                ImGui::EndDisabled();
-            }
-            if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C OBJ/glTF...")))
-            {
-                if (const std::optional<std::filesystem::path> meshPath = openMeshFileDialog(window))
-                {
-                    loadUserMeshPreset(appState, *meshPath);
-                }
-            }
-            if (!appState.lastUiMessage.empty())
-            {
-                ImGui::TextWrapped("%s: %s",
-                    appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
-                    appState.lastUiMessage.c_str());
-            }
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem(u8c(u8"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440")))
-        {
-            ImGui::SeparatorText(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"));
-            environmentModeCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##environment_mode"), appState.environmentMode);
-            if (ImGui::Button(u8c(u8"\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u043E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435")))
-            {
-                applySceneEditResult(appState, editor.applyEnvironmentMode(appState.environmentMode));
-                refreshMeshSelection();
-            }
-            if (appState.environmentMode == SceneEnvironmentRoom)
-            {
-                float roomSize[3] = {appState.roomWidth, appState.roomDepth, appState.roomHeight};
-                if (ImGui::DragFloat3(u8c(u8"\u0420\u0430\u0437\u043C\u0435\u0440 \u043A\u043E\u043C\u043D\u0430\u0442\u044B##room_size"), roomSize, 0.5f, 4.0f, 80.0f, "%.2f"))
-                {
-                    appState.roomWidth = clampf(roomSize[0], 4.0f, 80.0f);
-                    appState.roomDepth = clampf(roomSize[1], 4.0f, 80.0f);
-                    appState.roomHeight = clampf(roomSize[2], 2.0f, 40.0f);
-                    applySceneEditResult(appState, editor.applyRoomDimensions(appState.roomWidth, appState.roomDepth, appState.roomHeight));
-                    refreshMeshSelection();
-                }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(u8c(u8"\u0421\u043B\u0443\u0436\u0435\u0431\u043D\u044B\u0439 \u043F\u043E\u043B")))
-            {
-                scene.showGroundPlane = !scene.showGroundPlane;
-                applySceneEditResult(appState, makeRenderSettingsDirty());
-            }
-            ImGui::TextWrapped("%s", u8c(u8"\u041F\u043E\u043B \u0438 \u0441\u0442\u0435\u043D\u044B \u0441\u043E\u0437\u0434\u0430\u044E\u0442\u0441\u044F \u043A\u0430\u043A \u043E\u0431\u044B\u0447\u043D\u044B\u0435 mesh-\u043F\u0430\u043D\u0435\u043B\u0438: \u0438\u0445 \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C, \u0441\u0434\u0432\u0438\u043D\u0443\u0442\u044C, \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043C\u0430\u0441\u0448\u0442\u0430\u0431 \u0438 \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B."));
-
-            ImGui::SeparatorText(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u044B"));
-            builtInPrimitiveCombo(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C##editor_add_type"), appState.editorPrimitiveToAdd);
-            if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442")))
-            {
-                bool added = false;
-                if (appState.editorPrimitiveToAdd == -1)
-                {
-                    const SceneEditResult result = editor.addSphere();
-                    added = result.changed;
-                    applySceneEditResult(appState, result);
-                }
-                else
-                {
-                    const SceneEditResult result = editor.addMeshPrimitive(appState.editorPrimitiveToAdd);
-                    added = result.changed;
-                    applySceneEditResult(appState, result);
-                    appState.editorObjectKind = EditorObjectMesh;
-                    refreshMeshSelection();
-                }
-            }
-            if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u043C\u043E\u0434\u0435\u043B\u0438")))
-            {
-                const SceneEditResult result = editor.removeAllMeshObjects();
                 appState.editorObjectKind = EditorObjectSphere;
-                applySceneEditResult(appState, result);
+            }
+            else if (kind == SceneHierarchySelectionMesh)
+            {
+                appState.editorObjectKind = EditorObjectMesh;
                 refreshMeshSelection();
             }
-            ImGui::SameLine();
-            if (ImGui::Button(u8c(u8"\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0441\u0446\u0435\u043D\u0443")))
-            {
-                const SceneEditResult result = editor.clearScene();
-                appState.editorObjectKind = EditorObjectSphere;
-                applySceneEditResult(appState, result);
-                refreshMeshSelection();
-            }
-            if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0441\u0444\u0435\u0440\u044B")))
-            {
-                const SceneEditResult result = editor.removeAllSpheres();
-                appState.editorObjectKind = scene.meshObjects.empty() ? EditorObjectSphere : EditorObjectMesh;
-                applySceneEditResult(appState, result);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(u8c(u8"\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u0431\u0430\u0437\u043E\u0432\u044B\u0435")))
-            {
-                const SceneEditResult result = editor.restoreDefaultObjects();
-                appState.editorObjectKind = EditorObjectSphere;
-                applySceneEditResult(appState, result);
-                refreshMeshSelection();
-            }
-            ImGui::SeparatorText(u8c(u8"\u0412\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 \u043E\u0431\u044A\u0435\u043A\u0442"));
-            const std::string editorLabel = appState.editorObjectKind == EditorObjectMesh && !scene.meshObjects.empty()
-                ? meshObjectLabel(scene.meshObjects[static_cast<size_t>(std::max(0, std::min(scene.selectedMeshObject, static_cast<int>(scene.meshObjects.size()) - 1)))], scene.selectedMeshObject)
-                : (scene.spheres.empty()
-                    ? std::string(u8c(u8"\u041D\u0435\u0442 \u0441\u0444\u0435\u0440"))
-                    : std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1));
-            if (ImGui::BeginCombo(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442##editor_selected"), editorLabel.c_str()))
-            {
-                for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
-                {
-                    const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1);
-                    const bool selected = appState.editorObjectKind == EditorObjectSphere && scene.selectedSphere == i;
-                    if (ImGui::Selectable(label.c_str(), selected))
-                    {
-                        appState.editorObjectKind = EditorObjectSphere;
-                        scene.selectedSphere = i;
-                        clampScene(scene);
-                    }
-                }
-                for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
-                {
-                    const std::string label = meshObjectLabel(scene.meshObjects[static_cast<size_t>(i)], i);
-                    const bool selected = appState.editorObjectKind == EditorObjectMesh && scene.selectedMeshObject == i;
-                    if (ImGui::Selectable(label.c_str(), selected))
-                    {
-                        appState.editorObjectKind = EditorObjectMesh;
-                        scene.selectedMeshObject = i;
-                        scene.selectedMeshMaterial = 0;
-                        clampScene(scene);
-                        refreshMeshSelection();
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::Separator();
-
-            if (appState.editorObjectKind == EditorObjectSphere)
-            {
-                if (scene.spheres.empty())
-                {
-                    ImGui::TextWrapped("%s", u8c(u8"\u0421\u0444\u0435\u0440\u044B \u043D\u0435\u0442. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0441\u0444\u0435\u0440\u0443 \u0447\u0435\u0440\u0435\u0437 \u0441\u043F\u0438\u0441\u043E\u043A \u0432\u044B\u0448\u0435."));
-                }
-                else
-                {
-                    clampScene(scene);
-                    SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
-                    ImGui::Text("%s %d", u8c(u8"\u0421\u0444\u0435\u0440\u0430"), scene.selectedSphere + 1);
-                    if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u0443\u044E")))
-                    {
-                        applySceneEditResult(appState, editor.deleteSelectedSphere());
-                        if (scene.spheres.empty() && !scene.meshObjects.empty())
-                        {
-                            appState.editorObjectKind = EditorObjectMesh;
-                            refreshMeshSelection();
-                        }
-                    }
-                    float pos[3] = {sphere.center.x, sphere.center.y, sphere.center.z};
-                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"), pos, 0.05f, -50.0f, 50.0f, "%.2f"))
-                    {
-                        const float oldRadius = sphere.radius;
-                        sphere.center = make_float3(pos[0], pos[1], pos[2]);
-                        sphere.radius = oldRadius;
-                        clampScene(scene);
-                        applySceneEditResult(appState, makeTransformDirty());
-                    }
-                    float radius = sphere.radius;
-                    if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"), &radius, 0.25f, 5.0f, "%.2f"))
-                    {
-                        applySceneEditResult(appState, editor.setSelectedSphereRadius(radius));
-                    }
-                    drawSphereMaterialEditor();
-                }
-            }
-            else
-            {
-                refreshMeshSelection();
-                if (selectedMeshObject == nullptr)
-                {
-                    ImGui::TextWrapped("%s", u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0435\u0439 \u043D\u0435\u0442. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043A\u0443\u0431, \u043F\u0438\u0440\u0430\u043C\u0438\u0434\u0443, \u043F\u0430\u043D\u0435\u043B\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 OBJ/glTF."));
-                }
-                else
-                {
-                    char nameBuffer[128]{};
-                    const std::string currentName = meshObjectLabel(*selectedMeshObject, scene.selectedMeshObject);
-                    std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", currentName.c_str());
-                    if (ImGui::InputText(u8c(u8"\u0418\u043C\u044F##mesh_name"), nameBuffer, sizeof(nameBuffer)))
-                    {
-                        selectedMeshObject->displayName = nameBuffer;
-                    }
-                    if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u0443\u044E")))
-                    {
-                        const SceneEditResult result = editor.deleteSelectedMeshObject();
-                        applySceneEditResult(appState, result);
-                        if (scene.meshObjects.empty() && !scene.spheres.empty())
-                        {
-                            appState.editorObjectKind = EditorObjectSphere;
-                        }
-                        refreshMeshSelection();
-                    }
-                    float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
-                    float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
-                    float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
-                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
-                    {
-                        const SceneEditResult result = editor.setSelectedMeshPosition(make_float3(position[0], position[1], position[2]));
-                        applySceneEditResult(appState, result);
-                    }
-                    if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"), rotation, 0.8f, -360.0f, 360.0f, "%.1f"))
-                    {
-                        const SceneEditResult result = editor.setSelectedMeshRotation(make_float3(rotation[0], rotation[1], rotation[2]));
-                        applySceneEditResult(appState, result);
-                    }
-                    if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.10f, 0.05f, 100.0f, "%.2f"))
-                    {
-                        const SceneEditResult result = editor.setSelectedMeshScale(make_float3(scale[0], scale[1], scale[2]));
-                        applySceneEditResult(appState, result);
-                    }
-                    drawMeshMaterialEditor();
-                }
-            }
-            ImGui::EndTabItem();
         }
+    };
 
-        if (ImGui::BeginTabItem(u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B")))
-        {
-            if (ImGui::CollapsingHeader(u8c(u8"\u0421\u0444\u0435\u0440\u0430"), ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                drawSphereMaterialEditor();
-            }
-            if (ImGui::CollapsingHeader(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C"), ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                drawMeshMaterialEditor();
-            }
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem(u8c(u8"\u0421\u0432\u0435\u0442")))
-        {
-            float lightPosition[3] = {scene.lightPosition.x, scene.lightPosition.y, scene.lightPosition.z};
-            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F"), lightPosition, 0.05f, -40.0f, 40.0f, "%.2f"))
-            {
-                applySceneEditResult(appState, editor.setLightPosition(make_float3(lightPosition[0], std::max(6.0f, lightPosition[1]), lightPosition[2])));
-            }
-            float lightIntensity = scene.lightIntensity;
-            if (ImGui::SliderFloat(u8c(u8"\u0421\u0438\u043B\u0430 \u0441\u0432\u0435\u0442\u0430"), &lightIntensity, 0.0f, 5.0f, "%.2f"))
-            {
-                applySceneEditResult(appState, editor.setLightIntensity(lightIntensity));
-            }
-            float areaLightRadius = scene.areaLightRadius;
-            if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0437\u043C\u0435\u0440 area light"), &areaLightRadius, 0.0f, 8.0f, "%.2f"))
-            {
-                scene.areaLightRadius = clampf(areaLightRadius, 0.0f, 8.0f);
-                applySceneEditResult(appState, makeLightingDirty());
-            }
-            float skyIntensity = scene.skyIntensity;
-            if (ImGui::SliderFloat(u8c(u8"\u042F\u0440\u043A\u043E\u0441\u0442\u044C \u043D\u0435\u0431\u0430"), &skyIntensity, 0.0f, 3.0f, "%.2f"))
-            {
-                applySceneEditResult(appState, editor.setSkyIntensity(skyIntensity));
-            }
-            float environmentIntensity = scene.environmentIntensity;
-            if (ImGui::SliderFloat(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"), &environmentIntensity, 0.0f, 4.0f, "%.2f"))
-            {
-                scene.environmentIntensity = clampf(environmentIntensity, 0.0f, 4.0f);
-                applySceneEditResult(appState, makeLightingDirty());
-            }
-            float exposure = scene.exposure;
-            if (ImGui::SliderFloat(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"), &exposure, 0.1f, 2.5f, "%.2f"))
-            {
-                applySceneEditResult(appState, editor.setExposure(exposure));
-            }
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E")))
-        {
-            int selectedQuality = appState.renderQuality;
-            if (qualityCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##quality_mode"), selectedQuality))
-            {
-                appState.renderQuality = selectedQuality;
-                applyQualityMode(appState);
-            }
-            bool progressive = appState.renderMode == RenderModeProgressive;
-            if (ImGui::Checkbox(u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F"), &progressive))
-            {
-                appState.renderMode = progressive ? RenderModeProgressive : RenderModeRealtime;
-                applySceneEditResult(appState, makeRenderSettingsDirty());
-            }
-            if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"), &appState.denoiserEnabled))
-            {
-                applySceneEditResult(appState, makeRenderSettingsDirty());
-            }
-            ImGui::TextWrapped("%s", u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u044F \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u043C \u0438 \u0448\u0443\u043C\u043D\u044B\u043C. \u0414\u043B\u044F \u043E\u0431\u044B\u0447\u043D\u043E\u0433\u043E \u043F\u043E\u043A\u0430\u0437\u0430 \u043B\u0443\u0447\u0448\u0435 High/Medium."));
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem(u8c(u8"\u0414\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0430")))
-        {
-            size_t meshMaterialCount = 0;
-            size_t triangleCount = 0;
-            for (const MeshObject& object : scene.meshObjects)
-            {
-                meshMaterialCount += object.mesh.materials.size();
-                triangleCount += object.mesh.triangles.size();
-            }
-            ImGui::Text("%s: %zu", u8c(u8"\u0421\u0444\u0435\u0440\u044B"), scene.spheres.size());
-            ImGui::Text("%s: %zu", u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), scene.meshObjects.size());
-            ImGui::Text("%s: %zu", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B"), scene.materials.size() + meshMaterialCount);
-            ImGui::Text("%s: %zu", u8c(u8"\u0422\u0440\u0435\u0443\u0433\u043E\u043B\u044C\u043D\u0438\u043A\u0438"), triangleCount);
-            ImGui::TextWrapped("%s: %s", u8c(u8"\u041B\u043E\u0433"), getLogFilePath().string().c_str());
-            if (!appState.lastUiMessage.empty())
-            {
-                ImGui::TextWrapped("%s: %s",
-                    appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
-                    appState.lastUiMessage.c_str());
-            }
-            ImGui::TextWrapped("%s", u8c(u8"\u041B\u041A\u041C: \u043A\u0443\u0440\u0441\u043E\u0440/\u043A\u0430\u043C\u0435\u0440\u0430. H: \u0441\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C."));
-            ImGui::EndTabItem();
-        }
-        ImGui::EndTabBar();
+    const float hierarchyWidth = std::min(190.0f, std::max(150.0f, panelSize.x * 0.36f));
+    const float childHeight = std::max(300.0f, panelSize.y - 92.0f);
+    ImGui::BeginChild("HierarchyPanel", ImVec2(hierarchyWidth, childHeight), true);
+    ImGui::TextUnformatted(u8c(u8"\u0418\u0435\u0440\u0430\u0440\u0445\u0438\u044F"));
+    if (ImGui::Selectable(u8c(u8"\u0421\u0446\u0435\u043D\u0430"), appState.hierarchySelectionKind == HierarchySelectionScene))
+    {
+        selectHierarchy(SceneHierarchySelectionScene, 0);
     }
+    if (ImGui::Selectable(u8c(u8"\u041A\u0430\u043C\u0435\u0440\u0430"), appState.hierarchySelectionKind == HierarchySelectionCamera))
+    {
+        selectHierarchy(SceneHierarchySelectionCamera, 0);
+    }
+    if (ImGui::Selectable(u8c(u8"\u0421\u0432\u0435\u0442"), appState.hierarchySelectionKind == HierarchySelectionLight))
+    {
+        selectHierarchy(SceneHierarchySelectionLight, 0);
+    }
+    if (ImGui::TreeNodeEx(u8c(u8"\u0421\u0444\u0435\u0440\u044B"), ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
+        {
+            const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1);
+            const bool selected = appState.hierarchySelectionKind == HierarchySelectionSphere && scene.selectedSphere == i;
+            if (ImGui::Selectable(label.c_str(), selected))
+            {
+                selectHierarchy(SceneHierarchySelectionSphere, i);
+            }
+        }
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNodeEx(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
+        {
+            const MeshObject& object = scene.meshObjects[static_cast<size_t>(i)];
+            const bool isEnvironment = object.assetReference.rfind("environment:", 0) == 0;
+            const std::string label = (isEnvironment ? std::string(u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C: ")) : std::string{}) + meshObjectLabel(object, i);
+            const bool selected = appState.hierarchySelectionKind == HierarchySelectionMesh && scene.selectedMeshObject == i;
+            if (ImGui::Selectable(label.c_str(), selected))
+            {
+                selectHierarchy(SceneHierarchySelectionMesh, i);
+            }
+        }
+        ImGui::TreePop();
+    }
+    ImGui::EndChild();
+    ImGui::SameLine();
+
+    ImGui::BeginChild("PropertiesPanel", ImVec2(0.0f, childHeight), true);
+    ImGui::TextUnformatted(u8c(u8"\u0421\u0432\u043E\u0439\u0441\u0442\u0432\u0430"));
+    if (appState.hierarchySelectionKind == HierarchySelectionScene)
+    {
+        std::vector<std::string> presetNames;
+        presetNames.reserve(appState.scenePresetNames.size());
+        for (const std::wstring& name : appState.scenePresetNames)
+        {
+            presetNames.push_back(wideToUtf8(name));
+        }
+        const char* currentPreset = appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(presetNames.size())
+            ? presetNames[static_cast<size_t>(appState.scenePresetIndex)].c_str()
+            : u8c(u8"\u0421\u0432\u043E\u044F \u0441\u0446\u0435\u043D\u0430");
+        if (ImGui::BeginCombo(u8c(u8"\u041F\u0440\u0435\u0441\u0435\u0442"), currentPreset))
+        {
+            for (int i = 0; i < static_cast<int>(presetNames.size()); ++i)
+            {
+                const bool selected = i == appState.scenePresetIndex;
+                const std::string presetLabel = presetNames[static_cast<size_t>(i)] + "##preset_" + std::to_string(i);
+                if (ImGui::Selectable(presetLabel.c_str(), selected))
+                {
+                    applyScenePreset(appState, i);
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B/\u0441\u0432\u0435\u0442\u0430")) && resetCurrentPresetView(appState))
+        {
+            applySceneEditResult(appState, makeCameraDirty());
+        }
+        if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C OBJ/glTF...")))
+        {
+            if (const std::optional<std::filesystem::path> meshPath = openMeshFileDialog(window))
+            {
+                loadUserMeshPreset(appState, *meshPath);
+            }
+        }
+        ImGui::SeparatorText(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"));
+        environmentModeCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##environment_mode"), appState.environmentMode);
+        if (ImGui::Button(u8c(u8"\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C")))
+        {
+            applySceneEditResult(appState, editor.applyEnvironmentMode(appState.environmentMode));
+            refreshMeshSelection();
+        }
+        if (appState.environmentMode == SceneEnvironmentRoom)
+        {
+            float roomSize[3] = {appState.roomWidth, appState.roomDepth, appState.roomHeight};
+            if (ImGui::DragFloat3(u8c(u8"\u0420\u0430\u0437\u043C\u0435\u0440 \u043A\u043E\u043C\u043D\u0430\u0442\u044B##room_size"), roomSize, 0.5f, 4.0f, 80.0f, "%.2f"))
+            {
+                appState.roomWidth = clampf(roomSize[0], 4.0f, 80.0f);
+                appState.roomDepth = clampf(roomSize[1], 4.0f, 80.0f);
+                appState.roomHeight = clampf(roomSize[2], 2.0f, 40.0f);
+                applySceneEditResult(appState, editor.applyRoomDimensions(appState.roomWidth, appState.roomDepth, appState.roomHeight));
+                refreshMeshSelection();
+            }
+        }
+        float exposure = scene.exposure;
+        if (ImGui::SliderFloat(u8c(u8"\u042D\u043A\u0441\u043F\u043E\u0437\u0438\u0446\u0438\u044F"), &exposure, 0.1f, 2.5f, "%.2f"))
+        {
+            applySceneEditResult(appState, editor.setExposure(exposure));
+        }
+        float skyIntensity = scene.skyIntensity;
+        if (ImGui::SliderFloat(u8c(u8"\u041D\u0435\u0431\u043E"), &skyIntensity, 0.0f, 3.0f, "%.2f"))
+        {
+            applySceneEditResult(appState, editor.setSkyIntensity(skyIntensity));
+        }
+    }
+    else if (appState.hierarchySelectionKind == HierarchySelectionCamera)
+    {
+        ImGui::Text("Position: %.2f %.2f %.2f", appState.camera.position.x, appState.camera.position.y, appState.camera.position.z);
+        ImGui::Text("Yaw/Pitch/FOV: %.1f %.1f %.1f", appState.camera.yaw, appState.camera.pitch, appState.camera.fov);
+        ImGui::TextWrapped("%s", u8c(u8"\u041A\u0430\u043C\u0435\u0440\u0430 \u0434\u0432\u0438\u0433\u0430\u0435\u0442\u0441\u044F WASD/Space \u0438 \u043C\u044B\u0448\u044C\u044E."));
+    }
+    else if (appState.hierarchySelectionKind == HierarchySelectionLight)
+    {
+        float lightPosition[3] = {scene.lightPosition.x, scene.lightPosition.y, scene.lightPosition.z};
+        if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F"), lightPosition, 0.05f, -40.0f, 40.0f, "%.2f"))
+        {
+            applySceneEditResult(appState, editor.setLightPosition(make_float3(lightPosition[0], std::max(6.0f, lightPosition[1]), lightPosition[2])));
+        }
+        float lightIntensity = scene.lightIntensity;
+        if (ImGui::SliderFloat(u8c(u8"\u0421\u0438\u043B\u0430"), &lightIntensity, 0.0f, 5.0f, "%.2f"))
+        {
+            applySceneEditResult(appState, editor.setLightIntensity(lightIntensity));
+        }
+        float areaLightRadius = scene.areaLightRadius;
+        if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0437\u043C\u0435\u0440 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u0430"), &areaLightRadius, 0.0f, 8.0f, "%.2f"))
+        {
+            scene.areaLightRadius = clampf(areaLightRadius, 0.0f, 8.0f);
+            applySceneEditResult(appState, makeLightingDirty());
+        }
+    }
+    else if (appState.hierarchySelectionKind == HierarchySelectionSphere)
+    {
+        if (!scene.spheres.empty())
+        {
+            clampScene(scene);
+            SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
+            if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0441\u0444\u0435\u0440\u0443")))
+            {
+                applySceneEditResult(appState, editor.deleteSelectedSphere());
+            }
+            float pos[3] = {sphere.center.x, sphere.center.y, sphere.center.z};
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"), pos, 0.05f, -50.0f, 50.0f, "%.2f"))
+            {
+                const float oldRadius = sphere.radius;
+                sphere.center = make_float3(pos[0], pos[1], pos[2]);
+                sphere.radius = oldRadius;
+                clampScene(scene);
+                applySceneEditResult(appState, makeTransformDirty());
+            }
+            float radius = sphere.radius;
+            if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0434\u0438\u0443\u0441"), &radius, 0.25f, 5.0f, "%.2f"))
+            {
+                applySceneEditResult(appState, editor.setSelectedSphereRadius(radius));
+            }
+            drawSphereMaterialEditor();
+        }
+    }
+    else if (appState.hierarchySelectionKind == HierarchySelectionMesh)
+    {
+        refreshMeshSelection();
+        if (selectedMeshObject != nullptr)
+        {
+            char nameBuffer[128]{};
+            const std::string currentName = meshObjectLabel(*selectedMeshObject, scene.selectedMeshObject);
+            std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", currentName.c_str());
+            if (ImGui::InputText(u8c(u8"\u0418\u043C\u044F##mesh_name"), nameBuffer, sizeof(nameBuffer)))
+            {
+                selectedMeshObject->displayName = nameBuffer;
+            }
+            if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u044C")))
+            {
+                applySceneEditResult(appState, editor.deleteSelectedMeshObject());
+                refreshMeshSelection();
+            }
+            float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
+            float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
+            float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
+            {
+                applySceneEditResult(appState, editor.setSelectedMeshPosition(make_float3(position[0], position[1], position[2])));
+            }
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"), rotation, 0.8f, -360.0f, 360.0f, "%.1f"))
+            {
+                applySceneEditResult(appState, editor.setSelectedMeshRotation(make_float3(rotation[0], rotation[1], rotation[2])));
+            }
+            if (ImGui::DragFloat3(u8c(u8"\u041C\u0430\u0441\u0448\u0442\u0430\u0431##mesh_scale"), scale, 0.10f, 0.05f, 100.0f, "%.2f"))
+            {
+                applySceneEditResult(appState, editor.setSelectedMeshScale(make_float3(scale[0], scale[1], scale[2])));
+            }
+            drawMeshMaterialEditor();
+        }
+    }
+
+    ImGui::Separator();
+    builtInPrimitiveCombo(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C"), appState.editorPrimitiveToAdd);
+    if (ImGui::Button(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C")))
+    {
+        const SceneEditResult result = appState.editorPrimitiveToAdd == -1
+            ? editor.addSphere()
+            : editor.addMeshPrimitive(appState.editorPrimitiveToAdd);
+        applySceneEditResult(appState, result);
+        refreshMeshSelection();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(u8c(u8"\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C")))
+    {
+        applySceneEditResult(appState, editor.clearScene());
+        refreshMeshSelection();
+    }
+    int selectedQuality = appState.renderQuality;
+    if (qualityCombo(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E"), selectedQuality))
+    {
+        appState.renderQuality = selectedQuality;
+        applyQualityMode(appState);
+    }
+    if (!appState.lastUiMessage.empty())
+    {
+        ImGui::TextWrapped("%s: %s",
+            appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
+            appState.lastUiMessage.c_str());
+    }
+    ImGui::EndChild();
     ImGui::PopItemWidth();
     ImGui::End();
 }

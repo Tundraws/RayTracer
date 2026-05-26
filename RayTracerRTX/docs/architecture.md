@@ -12,7 +12,7 @@ flowchart LR
     Main --> Args["--mesh / --scene args"]
     Args --> SceneConfig["SceneConfig JSON"]
     App --> Input["Input handling"]
-    App --> UI["ImGui tabbed scene panel"]
+    App --> UI["ImGui hierarchy/properties scene editor"]
     App --> AppState["AppState"]
     UI --> SceneEditor["SceneEditor"]
     Input --> SceneEditor
@@ -163,10 +163,10 @@ flowchart LR
 | Area | Files | Responsibility |
 |---|---|---|
 | Application loop | `src/app/maingpu.cpp`, `src/app/application.*` | Window creation, input, scene updates, presentation |
-| Application state | `src/app/app_state.h` | Shared runtime state for camera, presets, UI selection, quality mode, and renderer rebuild requests |
+| Application state | `src/app/app_state.h` | Shared runtime state for camera, presets, hierarchy selection, quality mode, and renderer rebuild requests |
 | Scene editor | `src/app/scene_editor.*` | Applies scene edits through helper methods and reports `SceneDirtyFlags` for camera, material, transform, geometry, lighting, and render settings |
 | Renderer controller helpers | `src/app/renderer_controller.*` | Centralized accumulation invalidation, quality-mode application, and scene rebuild marking from dirty flags |
-| UI panel | `src/app/application.*` + Dear ImGui | Tabbed runtime controls for scene presets, editor objects, materials, light, quality, and diagnostics |
+| UI panel | `src/app/application.*` + Dear ImGui | Compact hierarchy/properties editor for selecting scene objects and editing scene, camera, light, sphere, mesh, material, and quality settings |
 | Built-in mesh primitives | `src/app/mesh.*` | Generates cube, pyramid, and finite plane/panel as `MeshData` triangles |
 | Environment presets | `src/app/scene.*` | Builds editable floor, wall and ceiling panels for open/room/empty scene modes |
 | Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*`, `src/app/gltf_loader.*` | Spheres, OBJ/glTF mesh data, materials, selected object, light movement and clamping |

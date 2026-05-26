@@ -15,6 +15,15 @@ enum EditorObjectKind
     EditorObjectMesh = 1
 };
 
+enum HierarchySelectionKind
+{
+    HierarchySelectionScene = 0,
+    HierarchySelectionCamera = 1,
+    HierarchySelectionLight = 2,
+    HierarchySelectionSphere = 3,
+    HierarchySelectionMesh = 4
+};
+
 struct AppState
 {
     CameraState camera;
@@ -45,6 +54,8 @@ struct AppState
     float roomWidth = 18.0f;
     float roomDepth = 18.0f;
     float roomHeight = 9.0f;
+    int hierarchySelectionKind = HierarchySelectionScene;
+    int hierarchySelectionIndex = 0;
 };
 
 struct FrameStats

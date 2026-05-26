@@ -2123,6 +2123,59 @@ void testSceneEditorInvalidEditSafe(TestContext& t)
     t.expect(scene.meshObjects.empty(), "Invalid edit should not create mesh objects.");
 }
 
+void testHierarchySelectSphereObject(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(scene.spheres.size() >= 2, "Default scene should have spheres for hierarchy selection.");
+
+    const bool selected = selectHierarchyObject(scene, SceneHierarchySelectionSphere, 1);
+
+    t.expect(selected, "Hierarchy should select a valid sphere.");
+    t.expect(scene.selectedSphere == 1, "Hierarchy sphere selection should update selected sphere index.");
+}
+
+void testHierarchySelectMeshObject(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(!scene.meshObjects.empty(), "Default scene should have mesh objects for hierarchy selection.");
+
+    const bool selected = selectHierarchyObject(scene, SceneHierarchySelectionMesh, 0);
+
+    t.expect(selected, "Hierarchy should select a valid mesh object.");
+    t.expect(scene.selectedMeshObject == 0, "Hierarchy mesh selection should update selected mesh index.");
+    t.expect(scene.selectedMeshMaterial == 0, "Hierarchy mesh selection should reset selected mesh material.");
+}
+
+void testHierarchySelectLight(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 1;
+    scene.selectedMeshObject = 0;
+
+    const bool selected = selectHierarchyObject(scene, SceneHierarchySelectionLight, 0);
+
+    t.expect(selected, "Hierarchy should select the light entry.");
+    t.expect(scene.selectedSphere == 1, "Selecting light should not change selected sphere.");
+    t.expect(scene.selectedMeshObject == 0, "Selecting light should not change selected mesh.");
+}
+
+void testHierarchyInvalidSelectionSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 0;
+    scene.selectedMeshObject = 0;
+
+    const bool sphereSelected = selectHierarchyObject(scene, SceneHierarchySelectionSphere, 999);
+    const bool meshSelected = selectHierarchyObject(scene, SceneHierarchySelectionMesh, -1);
+    const bool invalidKindSelected = selectHierarchyObject(scene, 999, 0);
+
+    t.expect(!sphereSelected, "Invalid sphere hierarchy selection should fail safely.");
+    t.expect(!meshSelected, "Invalid mesh hierarchy selection should fail safely.");
+    t.expect(!invalidKindSelected, "Invalid hierarchy kind should fail safely.");
+    t.expect(scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.spheres.size()), "Invalid selection should keep sphere index valid.");
+    t.expect(scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size()), "Invalid selection should keep mesh index valid.");
+}
+
 void testAddSphereSelectsNewSphere(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2776,6 +2829,10 @@ int main(int argc, char** argv)
     runTest("SceneEditor add mesh geometry dirty", testSceneEditorAddMeshGeometryDirty);
     runTest("SceneEditor light dirty", testSceneEditorLightDirty);
     runTest("SceneEditor invalid edit safe", testSceneEditorInvalidEditSafe);
+    runTest("Hierarchy select sphere object", testHierarchySelectSphereObject);
+    runTest("Hierarchy select mesh object", testHierarchySelectMeshObject);
+    runTest("Hierarchy select light", testHierarchySelectLight);
+    runTest("Hierarchy invalid selection safe", testHierarchyInvalidSelectionSafe);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
     runTest("Remove last sphere safe", testRemoveLastSphereSafe);
