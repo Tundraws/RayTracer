@@ -1284,6 +1284,28 @@ void testAddBuiltInMeshPrimitives(TestContext& t)
     t.expect(!scene.meshObjects.back().displayName.empty(), "Built-in mesh object should have editable display name.");
 }
 
+void testAddBuiltInMeshDuplicatesSelectedAndFindsFreeSpot(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshCube), "Initial cube add should succeed.");
+    MeshObject& selected = scene.meshObjects.back();
+    selected.mesh.materials[0].color = make_float3(0.0f, 0.4f, 1.0f);
+    t.expect(setSelectedMeshScale(scene, make_float3(4.0f, 4.0f, 4.0f)), "Selected cube scale edit should succeed.");
+    t.expect(setSelectedMeshRotation(scene, make_float3(0.0f, 45.0f, 0.0f)), "Selected cube rotation edit should succeed.");
+
+    const float3 originalPosition = scene.meshObjects.back().position;
+    t.expect(addBuiltInMeshPrimitive(scene, BuiltInMeshCube), "Second cube add should duplicate selected cube.");
+    const MeshObject& added = scene.meshObjects.back();
+    const float dx = added.position.x - originalPosition.x;
+    const float dz = added.position.z - originalPosition.z;
+    const float distance = std::sqrt(dx * dx + dz * dz);
+
+    t.expect(almostEqual(added.scale.x, 4.0f), "Duplicated cube should keep selected scale.");
+    t.expect(almostEqual(added.rotation.y, 45.0f), "Duplicated cube should keep selected rotation.");
+    t.expect(almostEqual(added.mesh.materials[0].color.z, 1.0f), "Duplicated cube should keep selected material.");
+    t.expect(distance > 4.0f, "Duplicated cube should be placed away from the selected cube.");
+}
+
 void testRemoveSelectedMeshObjectSafe(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2345,6 +2367,27 @@ void testAddSphereSelectsNewSphere(TestContext& t)
     t.expect(scene.selectedSphere == static_cast<int>(scene.spheres.size()) - 1, "New sphere should become selected.");
 }
 
+void testAddSphereDuplicatesSelectedAndFindsFreeSpot(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 0;
+    scene.spheres[0].radius = 3.0f;
+    scene.spheres[0].center = make_float3(0.0f, 3.0f, 0.0f);
+    scene.materials[0].color = make_float3(0.1f, 0.5f, 0.9f);
+
+    t.expect(addSphere(scene), "Adding a sphere should duplicate selected sphere settings.");
+    const SphereGeometry& added = scene.spheres.back();
+    const SphereMaterial& material = scene.materials.back();
+    const float dx = added.center.x - scene.spheres[0].center.x;
+    const float dz = added.center.z - scene.spheres[0].center.z;
+    const float distance = std::sqrt(dx * dx + dz * dz);
+
+    t.expect(almostEqual(added.radius, 3.0f), "Duplicated sphere should keep selected radius.");
+    t.expect(almostEqual(added.center.y, added.radius), "Duplicated sphere should stay on the floor.");
+    t.expect(distance > added.radius + scene.spheres[0].radius, "Duplicated sphere should not touch the selected sphere.");
+    t.expect(almostEqual(material.color.z, 0.9f), "Duplicated sphere should keep selected material color.");
+}
+
 void testRemoveSelectedSphereKeepsSceneValid(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2994,6 +3037,7 @@ int main(int argc, char** argv)
     runTest("Hierarchy invalid selection safe", testHierarchyInvalidSelectionSafe);
     runTest("Hierarchy previous scene object cycles spheres and meshes", testHierarchyPreviousSceneObjectCyclesSpheresAndMeshes);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
+    runTest("Add sphere duplicates selected and finds free spot", testAddSphereDuplicatesSelectedAndFindsFreeSpot);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
     runTest("Remove last sphere safe", testRemoveLastSphereSafe);
     runTest("Remove penultimate sphere keeps selection valid", testRemovePenultimateSphereKeepsSelectionValid);
@@ -3061,6 +3105,7 @@ int main(int argc, char** argv)
     runTest("Built-in pyramid mesh", testBuiltInPyramidMesh);
     runTest("Built-in plane mesh", testBuiltInPlaneMesh);
     runTest("Add built-in mesh primitives", testAddBuiltInMeshPrimitives);
+    runTest("Add built-in mesh duplicates selected and finds free spot", testAddBuiltInMeshDuplicatesSelectedAndFindsFreeSpot);
     runTest("Remove selected mesh object safe", testRemoveSelectedMeshObjectSafe);
     runTest("Scene clear helpers", testSceneClearHelpers);
     runTest("Restore default scene objects", testRestoreDefaultSceneObjects);

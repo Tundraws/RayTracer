@@ -17,6 +17,13 @@ constexpr float kMinSphereRadius = 0.25f;
 constexpr float kMaxSphereRadius = 5.0f;
 constexpr float kPi = 3.14159265358979323846f;
 
+struct SceneFootprint
+{
+    float x = 0.0f;
+    float z = 0.0f;
+    float radius = 1.0f;
+};
+
 float clampScalar(const float v, const float minV, const float maxV)
 {
     return v < minV ? minV : (v > maxV ? maxV : v);
@@ -118,6 +125,120 @@ MeshObject makeBuiltInMeshObject(MeshData mesh, std::string name, const float3 p
 bool isEnvironmentObject(const MeshObject& object)
 {
     return object.assetReference.rfind("environment:", 0) == 0;
+}
+
+float footprintDistance2(const float x0, const float z0, const float x1, const float z1)
+{
+    const float dx = x0 - x1;
+    const float dz = z0 - z1;
+    return dx * dx + dz * dz;
+}
+
+float meshFootprintRadius(const MeshObject& object)
+{
+    const float maxHorizontalScale = std::max(std::fabs(object.scale.x), std::fabs(object.scale.z));
+    if (object.assetReference.find("panel") != std::string::npos ||
+        object.assetReference.find("plane") != std::string::npos)
+    {
+        return std::max(0.8f, maxHorizontalScale * 0.72f);
+    }
+    return std::max(0.9f, maxHorizontalScale * 0.82f);
+}
+
+std::vector<SceneFootprint> collectEditableFootprints(const SceneState& scene)
+{
+    std::vector<SceneFootprint> footprints;
+    footprints.reserve(scene.spheres.size() + scene.meshObjects.size());
+
+    for (const SphereGeometry& sphere : scene.spheres)
+    {
+        footprints.push_back({sphere.center.x, sphere.center.z, std::max(0.35f, sphere.radius)});
+    }
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        if (isEnvironmentObject(object))
+        {
+            continue;
+        }
+        footprints.push_back({object.position.x, object.position.z, meshFootprintRadius(object)});
+    }
+    return footprints;
+}
+
+bool footprintIsFree(const std::vector<SceneFootprint>& footprints, const float x, const float z, const float radius)
+{
+    constexpr float padding = 0.45f;
+    for (const SceneFootprint& footprint : footprints)
+    {
+        const float minDistance = radius + footprint.radius + padding;
+        if (footprintDistance2(x, z, footprint.x, footprint.z) < minDistance * minDistance)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+float3 findFreePlacementOnFloor(const SceneState& scene, const float3 preferred, const float radius)
+{
+    const std::vector<SceneFootprint> footprints = collectEditableFootprints(scene);
+    const float safeRadius = std::max(0.35f, radius);
+    if (footprintIsFree(footprints, preferred.x, preferred.z, safeRadius))
+    {
+        return preferred;
+    }
+
+    const float spacing = safeRadius * 2.0f + 1.0f;
+    const float2 directions[] = {
+        make_float2(1.0f, 0.0f),
+        make_float2(-1.0f, 0.0f),
+        make_float2(0.0f, 1.0f),
+        make_float2(0.0f, -1.0f),
+        make_float2(1.0f, 1.0f),
+        make_float2(-1.0f, 1.0f),
+        make_float2(1.0f, -1.0f),
+        make_float2(-1.0f, -1.0f)
+    };
+
+    for (int ring = 1; ring <= 12; ++ring)
+    {
+        for (const float2 direction : directions)
+        {
+            const float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+            const float x = preferred.x + direction.x / length * spacing * static_cast<float>(ring);
+            const float z = preferred.z + direction.y / length * spacing * static_cast<float>(ring);
+            if (footprintIsFree(footprints, x, z, safeRadius))
+            {
+                return make_float3(
+                    clampScalar(x, -35.0f, 35.0f),
+                    preferred.y,
+                    clampScalar(z, -35.0f, 35.0f));
+            }
+        }
+    }
+
+    return make_float3(
+        clampScalar(preferred.x + spacing, -35.0f, 35.0f),
+        preferred.y,
+        clampScalar(preferred.z, -35.0f, 35.0f));
+}
+
+bool selectedMeshMatchesPrimitive(const MeshObject& object, const int primitiveType)
+{
+    if (primitiveType == BuiltInMeshCube)
+    {
+        return object.assetReference.find("cube") != std::string::npos;
+    }
+    if (primitiveType == BuiltInMeshPyramid)
+    {
+        return object.assetReference.find("pyramid") != std::string::npos;
+    }
+    if (primitiveType == BuiltInMeshPlane)
+    {
+        return object.assetReference.find("panel") != std::string::npos ||
+            object.assetReference.find("plane") != std::string::npos;
+    }
+    return false;
 }
 
 MeshObject makeEnvironmentPanel(
@@ -441,6 +562,8 @@ bool addSphere(SceneState& scene)
             material = scene.materials[static_cast<size_t>(scene.selectedSphere)];
         }
     }
+    sphere.center = findFreePlacementOnFloor(scene, sphere.center, sphere.radius);
+    sphere.center.y = sphere.radius;
 
     scene.spheres.push_back(sphere);
     scene.materials.push_back(material);
@@ -776,39 +899,68 @@ void applySelectedMeshMaterialToWholeObject(SceneState& scene)
 
 bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
 {
-    const float xOffset = static_cast<float>(scene.meshObjects.size()) * 1.4f - 1.4f;
-    if (primitiveType == BuiltInMeshCube)
+    clampScene(scene);
+    MeshObject object;
+    const MeshObject* selected = selectedMeshObject(scene);
+    if (selected != nullptr &&
+        !isEnvironmentObject(*selected) &&
+        selectedMeshMatchesPrimitive(*selected, primitiveType))
     {
-        scene.meshObjects.push_back(makeBuiltInMeshObject(
+        object = *selected;
+    }
+    else if (primitiveType == BuiltInMeshCube)
+    {
+        object = makeBuiltInMeshObject(
             createCubeMesh(),
             "built-in cube",
-            make_float3(xOffset, 0.5f, -2.6f),
+            make_float3(0.0f, 0.7f, -2.6f),
             make_float3(0.0f, 25.0f, 0.0f),
-            make_float3(1.4f, 1.4f, 1.4f)));
+            make_float3(1.4f, 1.4f, 1.4f));
     }
     else if (primitiveType == BuiltInMeshPyramid)
     {
-        scene.meshObjects.push_back(makeBuiltInMeshObject(
+        object = makeBuiltInMeshObject(
             createPyramidMesh(),
             "built-in pyramid",
-            make_float3(xOffset, 0.0f, -2.6f),
+            make_float3(0.0f, 0.0f, -2.6f),
             make_float3(0.0f, -18.0f, 0.0f),
-            make_float3(1.4f, 1.4f, 1.4f)));
+            make_float3(1.4f, 1.4f, 1.4f));
     }
     else if (primitiveType == BuiltInMeshPlane)
     {
-        scene.meshObjects.push_back(makeBuiltInMeshObject(
+        object = makeBuiltInMeshObject(
             createPlaneMesh(),
             "built-in panel",
-            make_float3(xOffset, 0.02f, -2.6f),
+            make_float3(0.0f, 0.02f, -2.6f),
             make_float3(0.0f, 0.0f, 0.0f),
-            make_float3(3.0f, 1.0f, 3.0f)));
+            make_float3(3.0f, 1.0f, 3.0f));
     }
     else
     {
         return false;
     }
 
+    const float placementRadius = meshFootprintRadius(object);
+    const float3 preferred = selected != nullptr && selectedMeshMatchesPrimitive(*selected, primitiveType)
+        ? add3(selected->position, make_float3(placementRadius * 2.0f + 1.0f, 0.0f, 0.0f))
+        : object.position;
+    object.position = findFreePlacementOnFloor(scene, preferred, placementRadius);
+    updateMeshObjectTransform(object);
+
+    if (primitiveType == BuiltInMeshCube)
+    {
+        object.displayName = object.displayName.empty() ? "built-in cube" : object.displayName;
+    }
+    else if (primitiveType == BuiltInMeshPyramid)
+    {
+        object.displayName = object.displayName.empty() ? "built-in pyramid" : object.displayName;
+    }
+    else if (primitiveType == BuiltInMeshPlane)
+    {
+        object.displayName = object.displayName.empty() ? "built-in panel" : object.displayName;
+    }
+
+    scene.meshObjects.push_back(std::move(object));
     scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
     scene.selectedMeshMaterial = 0;
     syncCompatibilityMesh(scene);
