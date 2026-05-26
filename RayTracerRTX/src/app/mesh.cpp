@@ -69,6 +69,27 @@ bool hasValidMeshMaterialIndices(const MeshData& mesh)
     return true;
 }
 
+MeshTextureMetadata getMeshTextureMetadata(const MeshData& mesh, const int textureIndex, const std::string& path)
+{
+    MeshTextureMetadata metadata;
+    metadata.hasPath = !path.empty() || textureIndex >= 0;
+    metadata.path = path;
+
+    if (textureIndex < 0 || textureIndex >= static_cast<int>(mesh.textures.size()))
+    {
+        return metadata;
+    }
+
+    const MeshTexture& texture = mesh.textures[static_cast<size_t>(textureIndex)];
+    metadata.loaded = !texture.pixels.empty() && texture.width > 0 && texture.height > 0;
+    metadata.path = texture.path.empty() ? path : texture.path;
+    metadata.type = texture.type;
+    metadata.width = texture.width;
+    metadata.height = texture.height;
+    metadata.channels = texture.channels;
+    return metadata;
+}
+
 MeshData createCubeMesh()
 {
     MeshData mesh;

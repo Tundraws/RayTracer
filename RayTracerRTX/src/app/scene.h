@@ -75,6 +75,7 @@ void setSelectedSphereMaterialType(SceneState& scene, int materialType);
 void selectNextMeshObject(SceneState& scene);
 void cycleSelectedMeshMaterialPreset(SceneState& scene);
 void setSelectedMeshMaterialType(SceneState& scene, int materialType);
+void applySelectedMeshMaterialToWholeObject(SceneState& scene);
 bool addBuiltInMeshPrimitive(SceneState& scene, int primitiveType);
 bool removeSelectedMeshObject(SceneState& scene);
 bool removeAllSpheres(SceneState& scene);

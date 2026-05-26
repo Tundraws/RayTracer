@@ -53,6 +53,17 @@ struct MeshTexture
     std::vector<uchar4> pixels;
 };
 
+struct MeshTextureMetadata
+{
+    bool hasPath = false;
+    bool loaded = false;
+    std::string path;
+    std::string type;
+    unsigned int width = 0;
+    unsigned int height = 0;
+    unsigned int channels = 0;
+};
+
 struct MeshData
 {
     std::vector<MeshVertex> vertices;
@@ -63,6 +74,7 @@ struct MeshData
 
 bool isEmptyMesh(const MeshData& mesh);
 bool hasValidMeshMaterialIndices(const MeshData& mesh);
+MeshTextureMetadata getMeshTextureMetadata(const MeshData& mesh, int textureIndex, const std::string& path);
 MeshData createCubeMesh();
 MeshData createPyramidMesh();
 MeshData createPlaneMesh();

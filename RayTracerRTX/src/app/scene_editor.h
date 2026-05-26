@@ -60,6 +60,7 @@ public:
 
     SceneEditResult setSelectedSphereRadius(float radius);
     SceneEditResult setSelectedSphereColor(float3 color);
+    SceneEditResult setSelectedSphereMaterialProperties(float3 color, float roughness, float ior, float alpha);
     SceneEditResult moveSelectedSphere(float3 delta);
     SceneEditResult setSelectedSphereMaterialType(int materialType);
     SceneEditResult cycleSelectedSphereMaterialPreset();
@@ -67,6 +68,7 @@ public:
     SceneEditResult setSelectedMeshPosition(float3 position);
     SceneEditResult setSelectedMeshRotation(float3 rotation);
     SceneEditResult setSelectedMeshScale(float3 scale);
+    SceneEditResult setSelectedMeshMaterialProperties(float3 color, float roughness, float ior, float alpha, bool textureEnabled);
     SceneEditResult setSelectedMeshMaterialType(int materialType);
     SceneEditResult cycleSelectedMeshMaterialPreset();
 

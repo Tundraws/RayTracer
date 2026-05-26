@@ -736,6 +736,29 @@ void setSelectedMeshMaterialType(SceneState& scene, const int materialType)
     syncSelectedMeshMaterialToCombined(scene);
 }
 
+void applySelectedMeshMaterialToWholeObject(SceneState& scene)
+{
+    if (scene.meshObjects.empty())
+    {
+        return;
+    }
+    clampScene(scene);
+    MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+    if (object.mesh.materials.empty() ||
+        scene.selectedMeshMaterial < 0 ||
+        scene.selectedMeshMaterial >= static_cast<int>(object.mesh.materials.size()))
+    {
+        return;
+    }
+
+    const MeshMaterial material = object.mesh.materials[static_cast<size_t>(scene.selectedMeshMaterial)];
+    for (MeshMaterial& objectMaterial : object.mesh.materials)
+    {
+        objectMaterial = material;
+    }
+    syncSelectedMeshMaterialToCombined(scene);
+}
+
 bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
 {
     const float xOffset = static_cast<float>(scene.meshObjects.size()) * 1.4f - 1.4f;

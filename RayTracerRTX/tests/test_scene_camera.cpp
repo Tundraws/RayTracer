@@ -2089,6 +2089,41 @@ void testSceneEditorMaterialDirty(TestContext& t)
     t.expect(!needsRendererSceneRebuild(result.dirty), "SceneEditor material edit should not require scene rebuild.");
 }
 
+void testSceneEditorMaterialPropertiesClamp(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    SceneEditor editor(scene);
+
+    const SceneEditResult result = editor.setSelectedSphereMaterialProperties(make_float3(2.0f, -1.0f, 0.5f), -4.0f, 9.0f, -2.0f);
+
+    t.expect(result.changed, "SceneEditor material parameter edit should report a change.");
+    t.expect(result.dirty.material, "SceneEditor material parameter edit should set material dirty.");
+    t.expect(almostEqual(scene.materials[0].color.x, 1.0f), "Sphere material color should clamp high.");
+    t.expect(almostEqual(scene.materials[0].color.y, 0.0f), "Sphere material color should clamp low.");
+    t.expect(almostEqual(scene.materials[0].roughness, 0.02f), "Sphere material roughness should clamp low.");
+    t.expect(almostEqual(scene.materials[0].ior, 2.8f), "Sphere material IOR should clamp high.");
+    t.expect(almostEqual(scene.materials[0].alpha, 0.0f), "Sphere material alpha should clamp low.");
+}
+
+void testSceneEditorMeshMaterialPropertiesClamp(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    SceneEditor editor(scene);
+
+    const SceneEditResult result = editor.setSelectedMeshMaterialProperties(make_float3(-1.0f, 2.0f, 0.25f), 5.0f, 0.2f, 2.0f, false);
+    const MeshMaterial& material = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)].mesh.materials[0];
+
+    t.expect(result.changed, "SceneEditor mesh material parameter edit should report a change.");
+    t.expect(result.dirty.material, "SceneEditor mesh material parameter edit should set material dirty.");
+    t.expect(result.dirty.fullRebuild, "SceneEditor mesh material parameter edit should request renderer refresh.");
+    t.expect(almostEqual(material.color.x, 0.0f), "Mesh material color should clamp low.");
+    t.expect(almostEqual(material.color.y, 1.0f), "Mesh material color should clamp high.");
+    t.expect(almostEqual(material.roughness, 1.0f), "Mesh material roughness should clamp high.");
+    t.expect(almostEqual(material.ior, 1.01f), "Mesh material IOR should clamp low.");
+    t.expect(almostEqual(material.alpha, 1.0f), "Mesh material alpha should clamp high.");
+    t.expect(material.textureEnabled == 0, "Mesh material texture toggle should be stored.");
+}
+
 void testSceneEditorMeshMaterialRequestsRebuild(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2154,6 +2189,32 @@ void testSceneEditorInvalidEditSafe(TestContext& t)
     t.expect(!transform.changed, "Invalid SceneEditor mesh transform should not report a change.");
     t.expect(!meshMaterial.changed, "Invalid SceneEditor material edit should not report a change.");
     t.expect(scene.meshObjects.empty(), "Invalid edit should not create mesh objects.");
+}
+
+void testTextureMetadataDisplayHelperSafe(TestContext& t)
+{
+    MeshData mesh;
+    MeshTextureMetadata missing = getMeshTextureMetadata(mesh, -1, "");
+    t.expect(!missing.hasPath, "Missing texture metadata should report no path.");
+    t.expect(!missing.loaded, "Missing texture metadata should not be loaded.");
+
+    MeshTextureMetadata unresolved = getMeshTextureMetadata(mesh, 3, "missing.png");
+    t.expect(unresolved.hasPath, "Texture metadata should keep unresolved path.");
+    t.expect(!unresolved.loaded, "Out-of-range texture metadata should not be loaded.");
+    t.expect(unresolved.path == "missing.png", "Out-of-range texture metadata should preserve path.");
+
+    MeshTexture texture;
+    texture.path = "albedo.png";
+    texture.type = "baseColor";
+    texture.width = 2;
+    texture.height = 4;
+    texture.channels = 4;
+    texture.pixels.resize(8);
+    mesh.textures.push_back(texture);
+    MeshTextureMetadata loaded = getMeshTextureMetadata(mesh, 0, "");
+    t.expect(loaded.hasPath, "Loaded texture metadata should report a path.");
+    t.expect(loaded.loaded, "Loaded texture metadata should report loaded.");
+    t.expect(loaded.width == 2 && loaded.height == 4 && loaded.channels == 4, "Loaded texture metadata should expose dimensions.");
 }
 
 void testHierarchySelectSphereObject(TestContext& t)
@@ -2857,11 +2918,14 @@ int main(int argc, char** argv)
     runTest("Selected mesh transform invalid safe", testSelectedMeshTransformInvalidSafe);
     runTest("Invalid mesh selection safe", testInvalidMeshSelectionSafe);
     runTest("SceneEditor material dirty", testSceneEditorMaterialDirty);
+    runTest("SceneEditor material properties clamp", testSceneEditorMaterialPropertiesClamp);
+    runTest("SceneEditor mesh material properties clamp", testSceneEditorMeshMaterialPropertiesClamp);
     runTest("SceneEditor mesh material requests rebuild", testSceneEditorMeshMaterialRequestsRebuild);
     runTest("SceneEditor mesh transform dirty", testSceneEditorMeshTransformDirty);
     runTest("SceneEditor add mesh geometry dirty", testSceneEditorAddMeshGeometryDirty);
     runTest("SceneEditor light dirty", testSceneEditorLightDirty);
     runTest("SceneEditor invalid edit safe", testSceneEditorInvalidEditSafe);
+    runTest("Texture metadata display helper safe", testTextureMetadataDisplayHelperSafe);
     runTest("Hierarchy select sphere object", testHierarchySelectSphereObject);
     runTest("Hierarchy select mesh object", testHierarchySelectMeshObject);
     runTest("Hierarchy select light", testHierarchySelectLight);

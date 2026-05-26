@@ -14,6 +14,16 @@ bool equal3(const float3 a, const float3 b)
     return equalFloat(a.x, b.x) && equalFloat(a.y, b.y) && equalFloat(a.z, b.z);
 }
 
+float clampMaterialUnit(const float value)
+{
+    return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+}
+
+float3 clampColor(const float3 value)
+{
+    return make_float3(clampMaterialUnit(value.x), clampMaterialUnit(value.y), clampMaterialUnit(value.z));
+}
+
 bool hasSelectedSphere(const SceneState& scene)
 {
     return scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.spheres.size());
@@ -218,6 +228,26 @@ SceneEditResult SceneEditor::setSelectedSphereColor(const float3 color)
     return makeMaterialDirty(!equal3(before, after));
 }
 
+SceneEditResult SceneEditor::setSelectedSphereMaterialProperties(const float3 color, const float roughness, const float ior, const float alpha)
+{
+    if (scene_.materials.empty() || !hasSelectedSphere(scene_))
+    {
+        return makeMaterialDirty(false);
+    }
+
+    SphereMaterial& material = scene_.materials[static_cast<size_t>(scene_.selectedSphere)];
+    const SphereMaterial before = material;
+    material.color = clampColor(color);
+    material.roughness = clampMaterialRoughnessShared(roughness);
+    material.ior = clampMaterialIorShared(ior);
+    material.alpha = clampMaterialUnit(alpha);
+
+    return makeMaterialDirty(!equal3(before.color, material.color) ||
+        !equalFloat(before.roughness, material.roughness) ||
+        !equalFloat(before.ior, material.ior) ||
+        !equalFloat(before.alpha, material.alpha));
+}
+
 SceneEditResult SceneEditor::moveSelectedSphere(const float3 delta)
 {
     if (!hasSelectedSphere(scene_))
@@ -276,6 +306,36 @@ SceneEditResult SceneEditor::setSelectedMeshRotation(const float3 rotation)
 SceneEditResult SceneEditor::setSelectedMeshScale(const float3 scale)
 {
     return makeTransformDirty(::setSelectedMeshScale(scene_, scale));
+}
+
+SceneEditResult SceneEditor::setSelectedMeshMaterialProperties(const float3 color, const float roughness, const float ior, const float alpha, const bool textureEnabled)
+{
+    if (!hasSelectedMesh(scene_))
+    {
+        return makeMeshMaterialDirty(false);
+    }
+
+    const int materialIndex = scene_.selectedMeshMaterial;
+    MeshObject& object = scene_.meshObjects[static_cast<size_t>(scene_.selectedMeshObject)];
+    if (materialIndex < 0 || materialIndex >= static_cast<int>(object.mesh.materials.size()))
+    {
+        return makeMeshMaterialDirty(false);
+    }
+
+    MeshMaterial& material = object.mesh.materials[static_cast<size_t>(materialIndex)];
+    const MeshMaterial before = material;
+    material.color = clampColor(color);
+    material.roughness = clampMaterialRoughnessShared(roughness);
+    material.ior = clampMaterialIorShared(ior);
+    material.alpha = clampMaterialUnit(alpha);
+    material.textureEnabled = textureEnabled ? 1 : 0;
+    applySelectedMeshMaterialToWholeObject(scene_);
+
+    return makeMeshMaterialDirty(!equal3(before.color, material.color) ||
+        !equalFloat(before.roughness, material.roughness) ||
+        !equalFloat(before.ior, material.ior) ||
+        !equalFloat(before.alpha, material.alpha) ||
+        before.textureEnabled != material.textureEnabled);
 }
 
 SceneEditResult SceneEditor::setSelectedMeshMaterialType(const int materialType)

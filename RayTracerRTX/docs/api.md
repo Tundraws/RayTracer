@@ -91,11 +91,13 @@ Declared in `src/app/scene.h`.
 | `removeSelectedSphere(SceneState&)` | Removes the selected sphere; empty sphere lists are valid |
 | `setSelectedSphereRadius(SceneState&, float)` | Changes selected sphere radius with clamping |
 | `setSelectedSphereColor(SceneState&, float3)` | Changes selected sphere color with clamping |
+| `SceneEditor::setSelectedSphereMaterialProperties(...)` | Updates selected sphere material color, roughness, IOR and alpha through dirty flags |
 | `moveSelectedSphere(SceneState&, float3)` | Moves selected sphere and applies bounds |
 | `toggleSelectedMaterial(SceneState&)` | Switches selected sphere between diffuse and mirror material |
 | `cycleSelectedSphereMaterialPreset(SceneState&)` | Cycles selected sphere through diffuse, mirror, metal and dielectric presets |
 | `selectNextMeshObject(SceneState&)` | Selects the next mesh object for HUD/material editing |
 | `cycleSelectedMeshMaterialPreset(SceneState&)` | Cycles selected mesh material through diffuse, mirror, metal and dielectric presets |
+| `SceneEditor::setSelectedMeshMaterialProperties(...)` | Updates selected mesh material color, roughness, IOR, alpha and texture toggle through dirty flags |
 | `addBuiltInMeshPrimitive(SceneState&, int)` | Adds a built-in mesh primitive: cube, pyramid, or finite plane/panel |
 | `removeSelectedMeshObject(SceneState&)` | Removes selected mesh object; empty mesh object lists are valid |
 | `removeAllSpheres(SceneState&)` | Removes all analytic spheres and their materials |
@@ -120,6 +122,7 @@ Declared in `src/app/mesh.h`.
 | `createCubeMesh()` | Builds a cube as triangle `MeshData` with per-face normals |
 | `createPyramidMesh()` | Builds a pyramid as triangle `MeshData` |
 | `createPlaneMesh()` | Builds a finite rectangular panel from two triangles |
+| `getMeshTextureMetadata(...)` | Returns safe display metadata for base color, normal, roughness, or metallic texture slots |
 
 The built-in cube, pyramid and plane/panel are not separate GPU primitive
 types. They use the same `MeshData` path as imported OBJ/glTF geometry. The
@@ -129,6 +132,22 @@ other editable rectangular surfaces.
 The visible floor in the default editor scene is also a finite mesh panel. The
 older renderer-side service plane is hidden by default and is kept only as a
 compatibility fallback.
+
+## Interactive Material Editor
+
+The Dear ImGui material editor is organized into Russian UI sections:
+
+- `Поверхность`: base color/tint for matte, metal and glass-like materials;
+- `Отражение`: roughness, mirror blur and metal reflection controls;
+- `Прозрачность/стекло`: transparency, IOR and glass haze controls;
+- `Текстуры`: read-only diagnostics for base color texture, normal map,
+  roughness map and metallic map.
+
+Texture paths are not edited directly in the panel. They come from OBJ/MTL,
+glTF/GLB or JSON scene input. The panel only reports whether a texture slot is
+missing, unresolved, or loaded with dimensions/channel count. Material edits go
+through `SceneEditor` methods so dirty flags can reset accumulation and request
+renderer refreshes consistently.
 
 ## OBJ Mesh API
 
