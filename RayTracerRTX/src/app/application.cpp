@@ -1321,6 +1321,14 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     SceneState& scene = appState.scene;
     SceneEditor editor(scene);
 
+    const bool imguiCapturesKeyboard =
+        ImGui::GetCurrentContext() != nullptr &&
+        (ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantTextInput);
+    if (imguiCapturesKeyboard)
+    {
+        return;
+    }
+
     float3 forward{};
     float3 right{};
     float3 up{};
