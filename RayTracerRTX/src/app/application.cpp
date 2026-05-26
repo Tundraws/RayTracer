@@ -1029,6 +1029,20 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
     };
 
+    const auto selectSafeObjectAfterDelete = [&]()
+    {
+        clampScene(scene);
+        if (appState.hierarchySelectionKind == SceneHierarchySelectionSphere && scene.spheres.empty())
+        {
+            appState.hierarchySelectionKind = scene.meshObjects.empty() ? SceneHierarchySelectionScene : SceneHierarchySelectionMesh;
+        }
+        else if (appState.hierarchySelectionKind == SceneHierarchySelectionMesh && scene.meshObjects.empty())
+        {
+            appState.hierarchySelectionKind = scene.spheres.empty() ? SceneHierarchySelectionScene : SceneHierarchySelectionSphere;
+        }
+        syncEditorKindFromHierarchy();
+    };
+
     const float hierarchyWidth = std::min(190.0f, std::max(150.0f, panelSize.x * 0.36f));
     const float childHeight = std::max(300.0f, panelSize.y - 92.0f);
     ImGui::BeginChild("HierarchyPanel", ImVec2(hierarchyWidth, childHeight), true);
@@ -1242,6 +1256,17 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0441\u0444\u0435\u0440\u0443")))
             {
                 applySceneEditResult(appState, editor.deleteSelectedSphere());
+                selectSafeObjectAfterDelete();
+                ImGui::EndChild();
+                ImGui::PopItemWidth();
+                if (!appState.lastUiMessage.empty())
+                {
+                    ImGui::TextWrapped("%s: %s",
+                        appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
+                        appState.lastUiMessage.c_str());
+                }
+                ImGui::End();
+                return;
             }
             float pos[3] = {sphere.center.x, sphere.center.y, sphere.center.z};
             if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"), pos, 0.05f, -50.0f, 50.0f, "%.2f"))
@@ -1275,7 +1300,17 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u044C")))
             {
                 applySceneEditResult(appState, editor.deleteSelectedMeshObject());
-                refreshMeshSelection();
+                selectSafeObjectAfterDelete();
+                ImGui::EndChild();
+                ImGui::PopItemWidth();
+                if (!appState.lastUiMessage.empty())
+                {
+                    ImGui::TextWrapped("%s: %s",
+                        appState.lastUiMessageIsError ? u8c(u8"\u041E\u0448\u0438\u0431\u043A\u0430") : u8c(u8"\u0421\u0442\u0430\u0442\u0443\u0441"),
+                        appState.lastUiMessage.c_str());
+                }
+                ImGui::End();
+                return;
             }
             float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
             float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
