@@ -124,6 +124,24 @@ std::string wideToUtf8(const std::wstring& text)
     return result;
 }
 
+std::wstring utf8ToWide(const std::string& text)
+{
+    if (text.empty())
+    {
+        return {};
+    }
+
+    const int size = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0);
+    if (size <= 0)
+    {
+        return {};
+    }
+
+    std::wstring result(static_cast<size_t>(size), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), result.data(), size);
+    return result;
+}
+
 const wchar_t* qualityNameW(const int quality)
 {
     switch (clampRenderQuality(quality))
@@ -424,6 +442,7 @@ void drawHud(
     const FrameStats& stats,
     const int renderMode,
     const int renderQuality,
+    const int hierarchySelectionKind,
     const bool denoiserEnabled,
     const bool denoiserAvailable,
     const unsigned int progressiveSamples,
@@ -477,8 +496,12 @@ void drawHud(
     line1 << L"FPS: " << std::fixed << std::setprecision(1) << stats.fps
           << L"   GPU: " << stats.avgGpuMs << L" \u043C\u0441";
 
-    const bool hasSphere = scene.selectedSphere >= 0 && scene.selectedSphere < static_cast<int>(scene.materials.size());
-    const bool hasMesh = scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size());
+    const bool hasSphere = hierarchySelectionKind == SceneHierarchySelectionSphere &&
+        scene.selectedSphere >= 0 &&
+        scene.selectedSphere < static_cast<int>(scene.materials.size());
+    const bool hasMesh = hierarchySelectionKind == SceneHierarchySelectionMesh &&
+        scene.selectedMeshObject >= 0 &&
+        scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size());
     const MeshObject* meshObject = hasMesh ? &scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)] : nullptr;
     const bool hasMeshMaterial = meshObject != nullptr &&
         scene.selectedMeshMaterial >= 0 &&
@@ -488,10 +511,9 @@ void drawHud(
     std::wostringstream line2;
     line2 << L"\u0421\u0426\u0415\u041D\u0410: " << presetName;
 
+    const std::wstring selectedObject = utf8ToWide(selectedSceneObjectLabel(scene, hierarchySelectionKind));
     std::wostringstream line3;
-    line3 << L"\u041E\u0411\u042A\u0415\u041A\u0422: "
-          << (hasMesh ? L"\u0441\u0435\u0442\u043A\u0430 " : L"\u0441\u0435\u0442\u043A\u0430 ")
-          << (hasMesh ? scene.selectedMeshObject + 1 : 0) << L"/" << scene.meshObjects.size()
+    line3 << L"\u0412\u042B\u0411\u0420\u0410\u041D\u041E: " << selectedObject
           << L"   \u041C\u0410\u0422\u0415\u0420\u0418\u0410\u041B: "
           << (meshMaterial != nullptr ? materialNameW(meshMaterial->materialType) :
               (hasSphere ? materialNameW(scene.materials[scene.selectedSphere].materialType) : L"N/A"));
@@ -780,14 +802,6 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     gImguiPanelWidth = panelSize.x;
     gImguiPanelHeight = panelSize.y;
 
-    if (appState.cursorCaptured)
-    {
-        ImGui::Text("FPS %.1f | GPU %.2f ms", stats.fps, stats.avgGpuMs);
-        ImGui::TextWrapped("%s", u8c(u8"\u0420\u0435\u0436\u0438\u043C \u043A\u0430\u043C\u0435\u0440\u044B: \u043F\u0430\u043D\u0435\u043B\u044C \u043D\u0435 \u043F\u0440\u0438\u043D\u0438\u043C\u0430\u0435\u0442 \u0432\u0432\u043E\u0434. \u041B\u041A\u041C - \u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043A\u0443\u0440\u0441\u043E\u0440."));
-        ImGui::End();
-        return;
-    }
-
     ImGui::PushItemWidth(std::min(260.0f, std::max(170.0f, panelSize.x - 56.0f)));
 
     ImGui::Text("FPS %.1f | GPU %.2f ms", stats.fps, stats.avgGpuMs);
@@ -1019,9 +1033,6 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     const float childHeight = std::max(300.0f, panelSize.y - 92.0f);
     ImGui::BeginChild("HierarchyPanel", ImVec2(hierarchyWidth, childHeight), true);
     ImGui::TextUnformatted(u8c(u8"\u0418\u0435\u0440\u0430\u0440\u0445\u0438\u044F"));
-    const std::string selectedLabel = selectedSceneObjectLabel(scene, appState.hierarchySelectionKind);
-    ImGui::TextWrapped("%s: %s", u8c(u8"\u0412\u044B\u0431\u0440\u0430\u043D\u043E"), selectedLabel.c_str());
-    ImGui::Separator();
     if (ImGui::Selectable(u8c(u8"\u0421\u0446\u0435\u043D\u0430"), appState.hierarchySelectionKind == HierarchySelectionScene))
     {
         selectHierarchy(SceneHierarchySelectionScene, 0);
@@ -1921,6 +1932,7 @@ void run_optix_app(const ApplicationOptions& options)
             stats,
             appState.renderMode,
             appState.renderQuality,
+            appState.hierarchySelectionKind,
             appState.denoiserEnabled,
             appState.denoiserAvailable,
             appState.progressiveSamples,
