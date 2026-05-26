@@ -29,6 +29,7 @@ SceneEditResult makeTransformDirty(bool changed = true);
 SceneEditResult makeGeometryDirty(bool changed = true);
 SceneEditResult makeLightingDirty(bool changed = true);
 SceneEditResult makeRenderSettingsDirty(bool changed = true);
+SceneEditResult makeMeshMaterialDirty(bool changed = true);
 
 class SceneEditor
 {

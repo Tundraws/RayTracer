@@ -881,7 +881,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             meshMaterial->ior = clampf(meshMaterial->ior, 1.01f, 2.8f);
             meshMaterial->alpha = clampf(meshMaterial->alpha, 0.0f, 1.0f);
             applySelectedMeshMaterialToWholeObject(scene);
-            applySceneEditResult(appState, makeMaterialDirty());
+            applySceneEditResult(appState, makeMeshMaterialDirty());
         }
     };
 

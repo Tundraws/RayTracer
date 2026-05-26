@@ -88,6 +88,14 @@ SceneEditResult makeRenderSettingsDirty(const bool changed)
     return makeSceneEditResult(changed, dirty);
 }
 
+SceneEditResult makeMeshMaterialDirty(const bool changed)
+{
+    SceneDirtyFlags dirty;
+    dirty.material = true;
+    dirty.fullRebuild = true;
+    return makeSceneEditResult(changed, dirty);
+}
+
 SceneEditor::SceneEditor(SceneState& scene)
     : scene_(scene)
 {
@@ -233,20 +241,20 @@ SceneEditResult SceneEditor::setSelectedMeshMaterialType(const int materialType)
 {
     if (!hasSelectedMesh(scene_))
     {
-        return makeMaterialDirty(false);
+        return makeMeshMaterialDirty(false);
     }
 
     const int materialIndex = scene_.selectedMeshMaterial;
     MeshObject& object = scene_.meshObjects[static_cast<size_t>(scene_.selectedMeshObject)];
     if (materialIndex < 0 || materialIndex >= static_cast<int>(object.mesh.materials.size()))
     {
-        return makeMaterialDirty(false);
+        return makeMeshMaterialDirty(false);
     }
 
     const MeshMaterial before = object.mesh.materials[static_cast<size_t>(materialIndex)];
     ::setSelectedMeshMaterialType(scene_, materialType);
     const MeshMaterial after = object.mesh.materials[static_cast<size_t>(materialIndex)];
-    return makeMaterialDirty(before.materialType != after.materialType ||
+    return makeMeshMaterialDirty(before.materialType != after.materialType ||
         !equal3(before.color, after.color) ||
         !equalFloat(before.roughness, after.roughness) ||
         !equalFloat(before.ior, after.ior) ||
@@ -257,11 +265,11 @@ SceneEditResult SceneEditor::cycleSelectedMeshMaterialPreset()
 {
     if (!hasSelectedMesh(scene_))
     {
-        return makeMaterialDirty(false);
+        return makeMeshMaterialDirty(false);
     }
 
     ::cycleSelectedMeshMaterialPreset(scene_);
-    return makeMaterialDirty(true);
+    return makeMeshMaterialDirty(true);
 }
 
 SceneEditResult SceneEditor::setLightPosition(const float3 position)

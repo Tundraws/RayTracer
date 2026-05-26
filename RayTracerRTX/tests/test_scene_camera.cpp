@@ -2056,6 +2056,19 @@ void testSceneEditorMaterialDirty(TestContext& t)
     t.expect(!needsRendererSceneRebuild(result.dirty), "SceneEditor material edit should not require scene rebuild.");
 }
 
+void testSceneEditorMeshMaterialRequestsRebuild(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    SceneEditor editor(scene);
+
+    const SceneEditResult result = editor.setSelectedMeshMaterialType(MaterialMetal);
+
+    t.expect(result.changed, "SceneEditor mesh material edit should report a change.");
+    t.expect(result.dirty.material, "SceneEditor mesh material edit should set material dirty.");
+    t.expect(result.dirty.fullRebuild, "SceneEditor mesh material edit should request renderer rebuild until mesh material upload is separated.");
+    t.expect(needsRendererSceneRebuild(result.dirty), "SceneEditor mesh material edit should currently require renderer rebuild.");
+}
+
 void testSceneEditorMeshTransformDirty(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2758,6 +2771,7 @@ int main(int argc, char** argv)
     runTest("Selected mesh transform invalid safe", testSelectedMeshTransformInvalidSafe);
     runTest("Invalid mesh selection safe", testInvalidMeshSelectionSafe);
     runTest("SceneEditor material dirty", testSceneEditorMaterialDirty);
+    runTest("SceneEditor mesh material requests rebuild", testSceneEditorMeshMaterialRequestsRebuild);
     runTest("SceneEditor mesh transform dirty", testSceneEditorMeshTransformDirty);
     runTest("SceneEditor add mesh geometry dirty", testSceneEditorAddMeshGeometryDirty);
     runTest("SceneEditor light dirty", testSceneEditorLightDirty);
