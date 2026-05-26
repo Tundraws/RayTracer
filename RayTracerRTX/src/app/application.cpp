@@ -338,6 +338,36 @@ std::string meshObjectLabel(const MeshObject& object, const int index)
     return std::string(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u044C ")) + std::to_string(index + 1);
 }
 
+std::string selectedSceneObjectLabel(const SceneState& scene, const int selectionKind)
+{
+    if (selectionKind == SceneHierarchySelectionSphere &&
+        scene.selectedSphere >= 0 &&
+        scene.selectedSphere < static_cast<int>(scene.spheres.size()))
+    {
+        return std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1);
+    }
+
+    if (selectionKind == SceneHierarchySelectionMesh &&
+        scene.selectedMeshObject >= 0 &&
+        scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size()))
+    {
+        const MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+        const bool isEnvironment = object.assetReference.rfind("environment:", 0) == 0;
+        return (isEnvironment ? std::string(u8c(u8"\u041F\u0430\u043D\u0435\u043B\u044C: ")) : std::string{}) +
+            meshObjectLabel(object, scene.selectedMeshObject);
+    }
+
+    if (selectionKind == SceneHierarchySelectionCamera)
+    {
+        return u8c(u8"\u041A\u0430\u043C\u0435\u0440\u0430");
+    }
+    if (selectionKind == SceneHierarchySelectionLight)
+    {
+        return u8c(u8"\u0421\u0432\u0435\u0442");
+    }
+    return u8c(u8"\u0421\u0446\u0435\u043D\u0430");
+}
+
 struct HudTextCache
 {
     HFONT font = nullptr;
@@ -989,6 +1019,9 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     const float childHeight = std::max(300.0f, panelSize.y - 92.0f);
     ImGui::BeginChild("HierarchyPanel", ImVec2(hierarchyWidth, childHeight), true);
     ImGui::TextUnformatted(u8c(u8"\u0418\u0435\u0440\u0430\u0440\u0445\u0438\u044F"));
+    const std::string selectedLabel = selectedSceneObjectLabel(scene, appState.hierarchySelectionKind);
+    ImGui::TextWrapped("%s: %s", u8c(u8"\u0412\u044B\u0431\u0440\u0430\u043D\u043E"), selectedLabel.c_str());
+    ImGui::Separator();
     if (ImGui::Selectable(u8c(u8"\u0421\u0446\u0435\u043D\u0430"), appState.hierarchySelectionKind == HierarchySelectionScene))
     {
         selectHierarchy(SceneHierarchySelectionScene, 0);
