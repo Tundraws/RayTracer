@@ -180,6 +180,35 @@ float supportFloorYAt(const SceneState& scene, const float x, const float z)
     return found ? floorY : 0.0f;
 }
 
+bool sceneHasSupportPanel(const SceneState& scene)
+{
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        if (isHorizontalSupportPanel(object))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool hasSupportAt(const SceneState& scene, const float x, const float z)
+{
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        if (isHorizontalSupportPanel(object) && supportPanelContains(object, x, z))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool placementIsOnAvailableSupport(const SceneState& scene, const float x, const float z)
+{
+    return !sceneHasSupportPanel(scene) || hasSupportAt(scene, x, z);
+}
+
 float meshBottomOffset(const MeshObject& object)
 {
     if (object.assetReference.find("cube") != std::string::npos)
@@ -246,7 +275,7 @@ std::vector<SceneFootprint> collectEditableFootprints(const SceneState& scene)
 
 bool footprintIsFree(const std::vector<SceneFootprint>& footprints, const float x, const float z, const float radius)
 {
-    constexpr float padding = 0.45f;
+    constexpr float padding = 0.04f;
     for (const SceneFootprint& footprint : footprints)
     {
         const float minDistance = radius + footprint.radius + padding;
@@ -258,16 +287,45 @@ bool footprintIsFree(const std::vector<SceneFootprint>& footprints, const float 
     return true;
 }
 
+float3 findAdjacentPlacementOnFloor(const SceneState& scene, const SceneFootprint& anchor, const float3 preferred, const float radius)
+{
+    const std::vector<SceneFootprint> footprints = collectEditableFootprints(scene);
+    const float safeRadius = std::max(0.35f, radius);
+    const float distance = anchor.radius + safeRadius + 0.06f;
+    const float2 directions[] = {
+        make_float2(1.0f, 0.0f),
+        make_float2(-1.0f, 0.0f),
+        make_float2(0.0f, 1.0f),
+        make_float2(0.0f, -1.0f)
+    };
+
+    for (const float2 direction : directions)
+    {
+        const float x = anchor.x + direction.x * distance;
+        const float z = anchor.z + direction.y * distance;
+        if (placementIsOnAvailableSupport(scene, x, z) && footprintIsFree(footprints, x, z, safeRadius))
+        {
+            return make_float3(
+                clampScalar(x, -35.0f, 35.0f),
+                preferred.y,
+                clampScalar(z, -35.0f, 35.0f));
+        }
+    }
+
+    return preferred;
+}
+
 float3 findFreePlacementOnFloor(const SceneState& scene, const float3 preferred, const float radius)
 {
     const std::vector<SceneFootprint> footprints = collectEditableFootprints(scene);
     const float safeRadius = std::max(0.35f, radius);
-    if (footprintIsFree(footprints, preferred.x, preferred.z, safeRadius))
+    if (placementIsOnAvailableSupport(scene, preferred.x, preferred.z) &&
+        footprintIsFree(footprints, preferred.x, preferred.z, safeRadius))
     {
         return preferred;
     }
 
-    const float spacing = safeRadius * 2.0f + 1.0f;
+    const float spacing = safeRadius * 2.0f + 0.08f;
     const float2 directions[] = {
         make_float2(1.0f, 0.0f),
         make_float2(-1.0f, 0.0f),
@@ -286,7 +344,7 @@ float3 findFreePlacementOnFloor(const SceneState& scene, const float3 preferred,
             const float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
             const float x = preferred.x + direction.x / length * spacing * static_cast<float>(ring);
             const float z = preferred.z + direction.y / length * spacing * static_cast<float>(ring);
-            if (footprintIsFree(footprints, x, z, safeRadius))
+            if (placementIsOnAvailableSupport(scene, x, z) && footprintIsFree(footprints, x, z, safeRadius))
             {
                 return make_float3(
                     clampScalar(x, -35.0f, 35.0f),
@@ -634,7 +692,11 @@ bool addSphere(SceneState& scene)
     {
         const SphereGeometry& selected = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
         sphere.radius = selected.radius;
-        sphere.center = add3(selected.center, make_float3(selected.radius * 2.2f + 0.5f, 0.0f, 0.0f));
+        sphere.center = findAdjacentPlacementOnFloor(
+            scene,
+            SceneFootprint{selected.center.x, selected.center.z, selected.radius},
+            selected.center,
+            sphere.radius);
 
         if (scene.selectedSphere < static_cast<int>(scene.materials.size()))
         {
@@ -1020,8 +1082,13 @@ bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
     }
 
     const float placementRadius = meshFootprintRadius(object);
-    const float3 preferred = selected != nullptr && selectedMeshMatchesPrimitive(*selected, primitiveType)
-        ? add3(selected->position, make_float3(placementRadius * 2.0f + 1.0f, 0.0f, 0.0f))
+    const bool duplicateSelected = selected != nullptr && selectedMeshMatchesPrimitive(*selected, primitiveType);
+    const float3 preferred = duplicateSelected
+        ? findAdjacentPlacementOnFloor(
+            scene,
+            SceneFootprint{selected->position.x, selected->position.z, meshFootprintRadius(*selected)},
+            selected->position,
+            placementRadius)
         : object.position;
     object.position = findFreePlacementOnFloor(scene, preferred, placementRadius);
     object.position = placeMeshOnSupport(scene, object, object.position);
