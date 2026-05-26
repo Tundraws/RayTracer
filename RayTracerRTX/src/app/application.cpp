@@ -970,6 +970,21 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
     };
 
+    const auto syncEditorKindFromHierarchy = [&]()
+    {
+        if (appState.hierarchySelectionKind == SceneHierarchySelectionSphere)
+        {
+            appState.editorObjectKind = EditorObjectSphere;
+            appState.hierarchySelectionIndex = scene.selectedSphere;
+        }
+        else if (appState.hierarchySelectionKind == SceneHierarchySelectionMesh)
+        {
+            appState.editorObjectKind = EditorObjectMesh;
+            appState.hierarchySelectionIndex = scene.selectedMeshObject;
+            refreshMeshSelection();
+        }
+    };
+
     const float hierarchyWidth = std::min(190.0f, std::max(150.0f, panelSize.x * 0.36f));
     const float childHeight = std::max(300.0f, panelSize.y - 92.0f);
     ImGui::BeginChild("HierarchyPanel", ImVec2(hierarchyWidth, childHeight), true);
@@ -986,7 +1001,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
     {
         selectHierarchy(SceneHierarchySelectionLight, 0);
     }
-    if (ImGui::TreeNodeEx(u8c(u8"\u0421\u0444\u0435\u0440\u044B"), ImGuiTreeNodeFlags_DefaultOpen))
+    if (ImGui::TreeNodeEx(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), ImGuiTreeNodeFlags_DefaultOpen))
     {
         for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
         {
@@ -997,10 +1012,6 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 selectHierarchy(SceneHierarchySelectionSphere, i);
             }
         }
-        ImGui::TreePop();
-    }
-    if (ImGui::TreeNodeEx(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), ImGuiTreeNodeFlags_DefaultOpen))
-    {
         for (int i = 0; i < static_cast<int>(scene.meshObjects.size()); ++i)
         {
             const MeshObject& object = scene.meshObjects[static_cast<size_t>(i)];
@@ -1100,19 +1111,18 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             applySceneEditResult(appState, editor.clearScene());
             refreshMeshSelection();
         }
-        if (scene.meshObjects.empty())
+        if (scene.meshObjects.empty() && scene.spheres.empty())
         {
             ImGui::BeginDisabled();
         }
-        if (ImGui::Button(u8c(u8"\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C (B)##select_prev_mesh")))
+        if (ImGui::Button(u8c(u8"\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C (B)##select_prev_object")))
         {
-            selectPreviousMeshObject(scene);
-            appState.hierarchySelectionKind = HierarchySelectionMesh;
-            appState.editorObjectKind = EditorObjectMesh;
+            selectPreviousSceneObject(scene, appState.hierarchySelectionKind);
+            syncEditorKindFromHierarchy();
             applySceneEditResult(appState, makeRenderSettingsDirty());
             refreshMeshSelection();
         }
-        if (scene.meshObjects.empty())
+        if (scene.meshObjects.empty() && scene.spheres.empty())
         {
             ImGui::EndDisabled();
         }
@@ -1495,9 +1505,17 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     const bool bIsDown = glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS;
     if (bIsDown && !bWasDown)
     {
-        selectPreviousMeshObject(scene);
-        appState.hierarchySelectionKind = HierarchySelectionMesh;
-        appState.editorObjectKind = EditorObjectMesh;
+        selectPreviousSceneObject(scene, appState.hierarchySelectionKind);
+        if (appState.hierarchySelectionKind == SceneHierarchySelectionSphere)
+        {
+            appState.editorObjectKind = EditorObjectSphere;
+            appState.hierarchySelectionIndex = scene.selectedSphere;
+        }
+        else if (appState.hierarchySelectionKind == SceneHierarchySelectionMesh)
+        {
+            appState.editorObjectKind = EditorObjectMesh;
+            appState.hierarchySelectionIndex = scene.selectedMeshObject;
+        }
         applySceneEditResult(appState, makeRenderSettingsDirty());
     }
     bWasDown = bIsDown;

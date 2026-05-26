@@ -83,6 +83,67 @@ bool selectHierarchyObject(SceneState& scene, const int selectionKind, const int
         selectionKind == SceneHierarchySelectionLight;
 }
 
+bool selectPreviousSceneObject(SceneState& scene, int& selectionKind)
+{
+    clampScene(scene);
+    const bool hasSpheres = !scene.spheres.empty();
+    const bool hasMeshes = !scene.meshObjects.empty();
+    if (!hasSpheres && !hasMeshes)
+    {
+        selectionKind = SceneHierarchySelectionScene;
+        return false;
+    }
+
+    if (selectionKind == SceneHierarchySelectionMesh && hasMeshes)
+    {
+        if (scene.selectedMeshObject > 0)
+        {
+            --scene.selectedMeshObject;
+            scene.selectedMeshMaterial = 0;
+            return true;
+        }
+        if (hasSpheres)
+        {
+            scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
+            selectionKind = SceneHierarchySelectionSphere;
+            return true;
+        }
+        scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+        scene.selectedMeshMaterial = 0;
+        return true;
+    }
+
+    if (selectionKind == SceneHierarchySelectionSphere && hasSpheres)
+    {
+        if (scene.selectedSphere > 0)
+        {
+            --scene.selectedSphere;
+            return true;
+        }
+        if (hasMeshes)
+        {
+            scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+            scene.selectedMeshMaterial = 0;
+            selectionKind = SceneHierarchySelectionMesh;
+            return true;
+        }
+        scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
+        return true;
+    }
+
+    if (hasMeshes)
+    {
+        scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+        scene.selectedMeshMaterial = 0;
+        selectionKind = SceneHierarchySelectionMesh;
+        return true;
+    }
+
+    scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
+    selectionKind = SceneHierarchySelectionSphere;
+    return true;
+}
+
 SceneEditResult makeSceneEditResult(const bool changed, const SceneDirtyFlags dirty)
 {
     return {changed && hasDirtyFlags(dirty), dirty};

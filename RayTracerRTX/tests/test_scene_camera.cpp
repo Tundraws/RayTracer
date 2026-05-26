@@ -2303,6 +2303,33 @@ void testHierarchyInvalidSelectionSafe(TestContext& t)
     t.expect(scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size()), "Invalid selection should keep mesh index valid.");
 }
 
+void testHierarchyPreviousSceneObjectCyclesSpheresAndMeshes(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(scene.spheres.size() >= 2, "Default scene should have spheres for unified object selection.");
+    t.expect(!scene.meshObjects.empty(), "Default scene should have mesh objects for unified object selection.");
+
+    int selectionKind = SceneHierarchySelectionMesh;
+    scene.selectedMeshObject = 0;
+    scene.selectedSphere = 0;
+
+    const bool selectedSphere = selectPreviousSceneObject(scene, selectionKind);
+    t.expect(selectedSphere, "Previous scene object should select across object groups.");
+    t.expect(selectionKind == SceneHierarchySelectionSphere, "Previous from first mesh should move to the last sphere.");
+    t.expect(scene.selectedSphere == static_cast<int>(scene.spheres.size()) - 1, "Previous from first mesh should select last sphere.");
+
+    const bool selectedPreviousSphere = selectPreviousSceneObject(scene, selectionKind);
+    t.expect(selectedPreviousSphere, "Previous scene object should keep cycling through spheres.");
+    t.expect(selectionKind == SceneHierarchySelectionSphere, "Previous sphere selection should stay in sphere mode.");
+    t.expect(scene.selectedSphere == static_cast<int>(scene.spheres.size()) - 2, "Previous sphere selection should decrement sphere index.");
+
+    scene.selectedSphere = 0;
+    const bool wrappedToMesh = selectPreviousSceneObject(scene, selectionKind);
+    t.expect(wrappedToMesh, "Previous from first sphere should wrap to mesh objects.");
+    t.expect(selectionKind == SceneHierarchySelectionMesh, "Previous from first sphere should move to mesh mode.");
+    t.expect(scene.selectedMeshObject == static_cast<int>(scene.meshObjects.size()) - 1, "Previous from first sphere should select last mesh object.");
+}
+
 void testAddSphereSelectsNewSphere(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2965,6 +2992,7 @@ int main(int argc, char** argv)
     runTest("Hierarchy select mesh object", testHierarchySelectMeshObject);
     runTest("Hierarchy select light", testHierarchySelectLight);
     runTest("Hierarchy invalid selection safe", testHierarchyInvalidSelectionSafe);
+    runTest("Hierarchy previous scene object cycles spheres and meshes", testHierarchyPreviousSceneObjectCyclesSpheresAndMeshes);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
     runTest("Remove last sphere safe", testRemoveLastSphereSafe);

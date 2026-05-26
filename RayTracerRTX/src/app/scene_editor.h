@@ -31,6 +31,7 @@ enum SceneHierarchySelectionKind
 bool hasDirtyFlags(const SceneDirtyFlags& dirty);
 bool needsRendererSceneRebuild(const SceneDirtyFlags& dirty);
 bool selectHierarchyObject(SceneState& scene, int selectionKind, int index);
+bool selectPreviousSceneObject(SceneState& scene, int& selectionKind);
 
 SceneEditResult makeSceneEditResult(bool changed, SceneDirtyFlags dirty);
 SceneEditResult makeCameraDirty(bool changed = true);
