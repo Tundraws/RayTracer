@@ -215,7 +215,8 @@ materials, exposure, sky intensity, light intensity, area-light size,
 environment intensity, material-specific roughness/transparency/IOR tuning,
 quality mode, progressive mode and denoiser toggle. It also provides a Windows
 file dialog button for adding an additional `.obj`, `.gltf`, or `.glb` model to
-the current scene, plus a compact JSON reload button for JSON-backed presets.
+the current scene, a JSON scene load button that adds the selected `.json` file
+as a runtime preset, plus a compact JSON reload button for JSON-backed presets.
 Loaded models are placed on the available floor/support panel when possible and
 shifted to a nearby free spot to avoid overlapping existing editable objects.
 The compact left overlay exposes quick controls for the right panel visibility,

@@ -61,6 +61,7 @@ float gImguiPanelHeight = 0.0f;
 
 void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath = {});
 std::filesystem::path defaultSavedScenePath();
+std::optional<std::filesystem::path> openSceneFileDialog(GLFWwindow* window);
 std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window);
 bool saveFrameSnapshot(const std::filesystem::path& path, const std::vector<uchar4>& pixels, int width, int height, std::string& error);
 
@@ -747,6 +748,29 @@ std::optional<std::filesystem::path> openMeshFileDialog(GLFWwindow* window)
     return std::nullopt;
 }
 
+std::optional<std::filesystem::path> openSceneFileDialog(GLFWwindow* window)
+{
+    wchar_t fileName[MAX_PATH] = L"";
+
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = window != nullptr ? glfwGetWin32Window(window) : nullptr;
+    ofn.lpstrTitle = L"\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 JSON-\u0441\u0446\u0435\u043D\u0443";
+    ofn.lpstrFilter =
+        L"JSON \u0441\u0446\u0435\u043D\u0430 (*.json)\0*.json\0"
+        L"\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B (*.*)\0*.*\0";
+    ofn.lpstrFile = fileName;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrDefExt = L"json";
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (GetOpenFileNameW(&ofn) == TRUE)
+    {
+        return std::filesystem::path(fileName);
+    }
+    return std::nullopt;
+}
+
 std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window)
 {
     wchar_t fileName[MAX_PATH] = L"RayTracerRTX_frame.png";
@@ -876,22 +900,21 @@ std::wstring lowerExtension(const std::filesystem::path& path)
     return ext;
 }
 
-std::vector<unsigned char> makeBgraTopDownPixels(const std::vector<uchar4>& pixels, const int width, const int height)
+std::vector<unsigned char> makeBgrTopDownPixels(const std::vector<uchar4>& pixels, const int width, const int height)
 {
-    std::vector<unsigned char> bgra(static_cast<size_t>(width * height * 4), 255);
+    std::vector<unsigned char> bgr(static_cast<size_t>(width * height * 3), 0);
     for (int y = 0; y < height; ++y)
     {
         for (int x = 0; x < width; ++x)
         {
             const uchar4 pixel = pixels[static_cast<size_t>((height - 1 - y) * width + x)];
-            const size_t offset = static_cast<size_t>((y * width + x) * 4);
-            bgra[offset + 0] = pixel.z;
-            bgra[offset + 1] = pixel.y;
-            bgra[offset + 2] = pixel.x;
-            bgra[offset + 3] = pixel.w;
+            const size_t offset = static_cast<size_t>((y * width + x) * 3);
+            bgr[offset + 0] = pixel.z;
+            bgr[offset + 1] = pixel.y;
+            bgr[offset + 2] = pixel.x;
         }
     }
-    return bgra;
+    return bgr;
 }
 
 bool saveFrameWithWic(
@@ -981,7 +1004,7 @@ bool saveFrameWithWic(
     {
         hr = encoder->CreateNewFrame(&frame, &propertyBag);
     }
-    if (SUCCEEDED(hr) && containerFormat == GUID_ContainerFormatJpeg && propertyBag != nullptr)
+    if (SUCCEEDED(hr) && IsEqualGUID(containerFormat, GUID_ContainerFormatJpeg) && propertyBag != nullptr)
     {
         PROPBAG2 option{};
         option.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
@@ -1000,19 +1023,23 @@ bool saveFrameWithWic(
     {
         hr = frame->SetSize(static_cast<UINT>(width), static_cast<UINT>(height));
     }
-    WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat32bppBGRA;
+    WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat24bppBGR;
     if (SUCCEEDED(hr))
     {
         hr = frame->SetPixelFormat(&pixelFormat);
     }
+    if (SUCCEEDED(hr) && !IsEqualGUID(pixelFormat, GUID_WICPixelFormat24bppBGR))
+    {
+        hr = WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT;
+    }
     if (SUCCEEDED(hr))
     {
-        const std::vector<unsigned char> bgra = makeBgraTopDownPixels(pixels, width, height);
+        const std::vector<unsigned char> bgr = makeBgrTopDownPixels(pixels, width, height);
         hr = frame->WritePixels(
             static_cast<UINT>(height),
-            static_cast<UINT>(width * 4),
-            static_cast<UINT>(bgra.size()),
-            const_cast<BYTE*>(bgra.data()));
+            static_cast<UINT>(width * 3),
+            static_cast<UINT>(bgr.size()),
+            const_cast<BYTE*>(bgr.data()));
     }
     if (SUCCEEDED(hr))
     {
@@ -1084,6 +1111,48 @@ bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPat
     appState.lastUiMessageIsError = false;
     return true;
 
+}
+
+bool loadUserScenePreset(AppState& appState, const std::filesystem::path& scenePath)
+{
+    const SceneConfigResult config = loadSceneConfigFile(scenePath);
+    if (!config.ok)
+    {
+        appState.lastUiMessage = config.error.empty() ? "Не удалось прочитать JSON-сцену." : config.error;
+        appState.lastUiMessageIsError = true;
+        logError(appState.lastUiMessage);
+        return false;
+    }
+
+    SceneBuildResult loaded = buildSceneFromConfig(config.config, scenePath.parent_path(), appState.assetCache);
+    if (!loaded.ok)
+    {
+        appState.lastUiMessage = loaded.error.empty() ? "Не удалось собрать сцену из JSON." : loaded.error;
+        appState.lastUiMessageIsError = true;
+        logError(appState.lastUiMessage);
+        return false;
+    }
+
+    saveCurrentScenePreset(appState);
+    const std::wstring presetName = scenePath.stem().wstring().empty()
+        ? L"JSON scene"
+        : scenePath.stem().wstring();
+    addScenePreset(appState, std::move(loaded), presetName, scenePath);
+    const int newIndex = static_cast<int>(appState.scenePresets.size()) - 1;
+    if (!applyScenePreset(appState, newIndex))
+    {
+        appState.lastUiMessage = "JSON-сцена добавлена, но не удалось переключиться на неё.";
+        appState.lastUiMessageIsError = true;
+        logError(appState.lastUiMessage);
+        return false;
+    }
+
+    appState.undoStack.clear();
+    appState.hierarchySelectionKind = HierarchySelectionScene;
+    appState.hierarchySelectionIndex = 0;
+    appState.lastUiMessage = "JSON-сцена загружена: " + scenePath.filename().string();
+    appState.lastUiMessageIsError = false;
+    return true;
 }
 
 bool reloadCurrentSceneConfig(AppState& appState)
@@ -1617,6 +1686,13 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             }
         }
         ImGui::SameLine();
+        if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C JSON...")))
+        {
+            if (const std::optional<std::filesystem::path> scenePath = openSceneFileDialog(window))
+            {
+                loadUserScenePreset(appState, *scenePath);
+            }
+        }
         if (ImGui::Button(u8c(u8"\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C JSON")))
         {
             const std::filesystem::path savePath = defaultSavedScenePath();
