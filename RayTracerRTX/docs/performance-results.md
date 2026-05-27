@@ -1,6 +1,6 @@
 # Performance Results
 
-Date: 2026-05-26
+Date: 2026-05-27
 
 ## Hardware and Environment
 
@@ -68,24 +68,23 @@ headless benchmark method above.
 
 | Scenario | Resolution | FPS | Avg frame ms | Avg GPU ms |
 |---|---:|---:|---:|---:|
-| Low resolution / High quality | 640x360 | 902.19 | 1.11 | 1.08 |
-| HD resolution / High quality | 1280x720 | 266.71 | 3.75 | 3.72 |
-| Full HD resolution / High quality | 1920x1080 | 121.08 | 8.26 | 8.21 |
-| Low quality | 640x360 | 831.29 | 1.20 | 1.16 |
-| Medium quality | 640x360 | 162.66 | 6.15 | 6.01 |
-| High quality | 640x360 | 167.11 | 5.98 | 5.94 |
-| PathTracing quality | 640x360 | 63.04 | 15.86 | 15.81 |
-| PathTracing quality + denoiser | 640x360 | 15.91 | 62.85 | 62.75 |
+| Low resolution / High quality | 640x360 | 664.37 | 1.51 | 1.48 |
+| HD resolution / High quality | 1280x720 | 187.94 | 5.32 | 5.28 |
+| Full HD resolution / High quality | 1920x1080 | 51.93 | 19.26 | 19.18 |
+| Low quality | 640x360 | 286.97 | 3.48 | 3.34 |
+| Medium quality | 640x360 | 181.32 | 5.52 | 5.47 |
+| High quality | 640x360 | 88.58 | 11.29 | 11.22 |
+| PathTracing quality | 640x360 | 53.63 | 18.65 | 18.38 |
+| PathTracing quality + denoiser | 640x360 | 5.72 | 174.69 | 174.60 |
 
 ## Interpretation
 
-The renderer stays within real-time frame budgets for all tested resolutions
-with the OBJ mesh scene enabled. Full HD High quality averages about 121 FPS, so
-the current scene remains above the 60 FPS target in the Debug build. The
-extra material, diffuse texture, normal-map shading state, dielectric
-refraction, rough reflection approximation, and per-object Triangle GAS/IAS
-layout remain within the real-time budget: average GPU time is about 8.2 ms at
-1920x1080, under the 16.67 ms frame budget for 60 FPS.
+The renderer remains interactive with the OBJ mesh scene enabled, but the current
+Debug build no longer stays above the 60 FPS target at Full HD High quality.
+Full HD High quality averages about 52 FPS with an average GPU time of about
+19.2 ms. HD and low-resolution modes remain comfortably real-time, while Full HD
+High quality is a useful stress case for the heavier material, texture,
+normal-map, dielectric, rough-reflection, and per-object Triangle GAS/IAS path.
 
 Quality modes are intended for demonstration and performance comparison. Low
 quality disables direct shadow rays and uses fewer samples/depth, so it is much
@@ -97,10 +96,10 @@ accumulation buffer so stale samples are not mixed with the new view. Without
 the denoiser, PathTracing quality remains interactive at 640x360 in the
 benchmark but is visibly noisy until samples accumulate.
 
-The optional OptiX denoiser greatly reduces progressive noise but is not a
-real-time default path in this Debug build. It is intentionally controlled by a
-HUD flag and only applies to progressive accumulation, not to the direct
-real-time mode.
+The optional OptiX denoiser greatly reduces progressive noise but is very heavy
+in this Debug build. At 640x360 it drops the path-tracing benchmark to about
+5.7 FPS, so it is intentionally optional and only applies to progressive
+accumulation, not to the direct real-time mode.
 
 The close match between host frame time and GPU time indicates that the benchmark
 is dominated by GPU rendering and synchronization rather than CPU-side scene

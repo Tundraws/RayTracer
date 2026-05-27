@@ -397,7 +397,8 @@ deterministic broadened reflection direction so roughness has a visible effect
 in real-time mode. `Kd` maps to baseColor, `Ks` tints the specular
 approximation, `Ns` maps to roughness, and material names containing `metal`
 use metallic shading. This is a physically motivated material model with the
-limited material inputs listed above, not a full physically correct renderer.
+limited material inputs listed above, not a complete physically accurate
+renderer.
 
 ### `SphereMaterial`
 
