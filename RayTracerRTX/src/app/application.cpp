@@ -1919,13 +1919,13 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             applySceneEditResultWithUndo(appState, before, editor.setSkyGradientBlend(skyGradientBlend));
         }
         float floorFadeDistance = scene.floorFadeDistance;
-        if (ImGui::SliderFloat(u8c(u8"\u0414\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u044C \u0434\u044B\u043C\u043A\u0438"), &floorFadeDistance, 40.0f, 800.0f, "%.1f"))
+        if (ImGui::SliderFloat(u8c(u8"\u0414\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u044C fade \u043F\u043E\u043B\u0430"), &floorFadeDistance, 10.0f, 300.0f, "%.1f"))
         {
             const SceneState before = scene;
             applySceneEditResultWithUndo(appState, before, editor.setFloorFadeDistance(floorFadeDistance));
         }
         float floorFadeSoftness = scene.floorFadeSoftness;
-        if (ImGui::SliderFloat(u8c(u8"\u041C\u044F\u0433\u043A\u043E\u0441\u0442\u044C \u0434\u044B\u043C\u043A\u0438"), &floorFadeSoftness, 40.0f, 900.0f, "%.1f"))
+        if (ImGui::SliderFloat(u8c(u8"\u041C\u044F\u0433\u043A\u043E\u0441\u0442\u044C fade \u043F\u043E\u043B\u0430"), &floorFadeSoftness, 10.0f, 400.0f, "%.1f"))
         {
             const SceneState before = scene;
             applySceneEditResultWithUndo(appState, before, editor.setFloorFadeSoftness(floorFadeSoftness));

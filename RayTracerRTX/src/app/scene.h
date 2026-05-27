@@ -85,8 +85,8 @@ struct SceneState
     float lightIntensity = 0.95f;
     float areaLightRadius = 0.0f;
     float environmentIntensity = 1.0f;
-    float floorFadeDistance = 220.0f;
-    float floorFadeSoftness = 280.0f;
+    float floorFadeDistance = 90.0f;
+    float floorFadeSoftness = 120.0f;
     std::string environmentType = "gradient";
     std::string environmentPath;
     MeshTexture environmentMap;

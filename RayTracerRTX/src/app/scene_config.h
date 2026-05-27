@@ -77,9 +77,9 @@ struct SceneConfig
     bool hasEnvironmentIntensity = false;
     float environmentIntensity = 1.0f;
     bool hasFloorFadeDistance = false;
-    float floorFadeDistance = 220.0f;
+    float floorFadeDistance = 90.0f;
     bool hasFloorFadeSoftness = false;
-    float floorFadeSoftness = 280.0f;
+    float floorFadeSoftness = 120.0f;
     std::string environmentType = "gradient";
     std::filesystem::path environmentPath;
 };
