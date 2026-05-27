@@ -810,6 +810,74 @@ void testObjLoaderMissingNormalsFallback(TestContext& t)
     t.expect(almostEqual(result.mesh.vertices[0].normal.z, 1.0f), "Fallback normal should be computed from triangle winding.");
 }
 
+void testObjLoaderQuadFaceTriangulates(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "quad_face.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 1 1 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3 4\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+
+    t.expect(result.ok, "OBJ quad face should load.");
+    t.expect(result.mesh.triangles.size() == 2, "OBJ quad face should triangulate into two triangles.");
+    t.expect(result.mesh.vertices.size() == 6, "OBJ quad triangulation should emit two triangle vertex triplets.");
+    t.expect(result.mesh.triangles[0].i0 == 0 && result.mesh.triangles[1].i0 == 3, "Triangulated quad should append triangle indices in order.");
+}
+
+void testObjLoaderPentagonFaceTriangulates(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "pentagon_face.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 1.4 0.8 0\n"
+        "v 0.5 1.4 0\n"
+        "v -0.4 0.8 0\n"
+        "f 1 2 3 4 5\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+
+    t.expect(result.ok, "OBJ pentagon face should load.");
+    t.expect(result.mesh.triangles.size() == 3, "OBJ pentagon face should triangulate into three triangles.");
+    t.expect(result.mesh.vertices.size() == 9, "OBJ pentagon triangulation should emit three triangle vertex triplets.");
+}
+
+void testObjLoaderQuadFaceWithUvNormalsTriangulates(TestContext& t)
+{
+    const std::filesystem::path objPath = writeFixtureFile(
+        "quad_face_uv_normals.obj",
+        "mtllib quad_face_uv_normals.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 1 1 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 1 1\n"
+        "vt 0 1\n"
+        "vn 0 0 1\n"
+        "usemtl quad_material\n"
+        "f 1/1/1 2/2/1 3/3/1 4/4/1\n");
+    writeFixtureFile(
+        "quad_face_uv_normals.mtl",
+        "newmtl quad_material\n"
+        "Kd 0.2 0.4 0.8\n");
+
+    const ObjLoadResult result = loadObjMesh(objPath);
+
+    t.expect(result.ok, "OBJ quad face with UV and normals should load.");
+    t.expect(result.mesh.triangles.size() == 2, "Textured quad should triangulate into two triangles.");
+    t.expect(result.mesh.vertices.size() == 6, "Textured quad should emit six vertices.");
+    t.expect(result.mesh.vertices[0].hasTexcoord == 1 && result.mesh.vertices[5].hasTexcoord == 1, "Triangulated quad should preserve UV availability.");
+    t.expect(almostEqual(result.mesh.vertices[0].normal.z, 1.0f) && almostEqual(result.mesh.vertices[5].normal.z, 1.0f), "Triangulated quad should preserve normals.");
+    t.expect(result.mesh.triangles[0].materialIndex == result.mesh.triangles[1].materialIndex, "Triangulated quad should preserve material index.");
+    t.expect(hasValidMeshMaterialIndices(result.mesh), "Triangulated quad material indices should remain valid.");
+}
+
 void testObjLoaderEmptyFile(TestContext& t)
 {
     const std::filesystem::path objPath = writeFixtureFile("empty.obj", "");
@@ -824,13 +892,11 @@ void testObjLoaderInvalidFace(TestContext& t)
         "invalid_face.obj",
         "v 0 0 0\n"
         "v 1 0 0\n"
-        "v 0 1 0\n"
-        "v 1 1 0\n"
-        "f 1 2 3 4\n");
+        "f 1 2\n");
 
     const ObjLoadResult result = loadObjMesh(objPath);
-    t.expect(!result.ok, "Non-triangulated face should fail.");
-    t.expect(result.error.find("triangulated") != std::string::npos, "Invalid face error should explain triangulated requirement.");
+    t.expect(!result.ok, "Face with fewer than three vertices should fail.");
+    t.expect(result.error.find("at least 3 vertices") != std::string::npos, "Invalid face error should explain minimum vertex count.");
 }
 
 void testObjLoaderMissingFile(TestContext& t)
@@ -3221,6 +3287,9 @@ int main(int argc, char** argv)
     runTest("OBJ loader missing UV disables normal map", testObjLoaderMissingUvDisablesNormalMap);
     runTest("OBJ loader invalid normal map fallback", testObjLoaderInvalidNormalMapFallback);
     runTest("OBJ loader missing normals fallback", testObjLoaderMissingNormalsFallback);
+    runTest("OBJ loader quad face triangulates", testObjLoaderQuadFaceTriangulates);
+    runTest("OBJ loader pentagon face triangulates", testObjLoaderPentagonFaceTriangulates);
+    runTest("OBJ loader quad face with UV normals triangulates", testObjLoaderQuadFaceWithUvNormalsTriangulates);
     runTest("OBJ loader empty file", testObjLoaderEmptyFile);
     runTest("OBJ loader invalid face", testObjLoaderInvalidFace);
     runTest("OBJ loader missing file", testObjLoaderMissingFile);

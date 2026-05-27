@@ -555,55 +555,64 @@ ObjLoadResult loadObjMesh(const std::filesystem::path& path)
                 faceVertices.push_back(faceVertex);
             }
 
-            if (faceVertices.size() != 3)
+            if (faceVertices.size() < 3)
             {
-                return fail("Only triangulated OBJ faces are supported at line " + std::to_string(lineNumber));
+                return fail("OBJ face must have at least 3 vertices at line " + std::to_string(lineNumber));
             }
 
-            const float3 p0 = positions[static_cast<size_t>(faceVertices[0].positionIndex)];
-            const float3 p1 = positions[static_cast<size_t>(faceVertices[1].positionIndex)];
-            const float3 p2 = positions[static_cast<size_t>(faceVertices[2].positionIndex)];
-            const float3 fallbackNormal = normalize3(cross3(sub3(p1, p0), sub3(p2, p0)));
-            const std::uint32_t firstVertex = static_cast<std::uint32_t>(mesh.vertices.size());
-            const bool hasTriangleTexcoords =
-                faceVertices[0].texcoordIndex >= 0 &&
-                faceVertices[1].texcoordIndex >= 0 &&
-                faceVertices[2].texcoordIndex >= 0;
-            const float2 uv0 = hasTriangleTexcoords
-                ? texcoords[static_cast<size_t>(faceVertices[0].texcoordIndex)]
-                : make_float2(0.0f, 0.0f);
-            const float2 uv1 = hasTriangleTexcoords
-                ? texcoords[static_cast<size_t>(faceVertices[1].texcoordIndex)]
-                : make_float2(0.0f, 0.0f);
-            const float2 uv2 = hasTriangleTexcoords
-                ? texcoords[static_cast<size_t>(faceVertices[2].texcoordIndex)]
-                : make_float2(0.0f, 0.0f);
-            const float3 tangent = hasTriangleTexcoords
-                ? computeTriangleTangent(p0, p1, p2, uv0, uv1, uv2, fallbackNormal)
-                : make_float3(0.0f, 0.0f, 0.0f);
-
-            for (const FaceVertex& faceVertex : faceVertices)
+            const auto appendTriangle = [&](const FaceVertex& a, const FaceVertex& b, const FaceVertex& c)
             {
-                const float3 position = positions[static_cast<size_t>(faceVertex.positionIndex)];
-                const float3 normal = faceVertex.normalIndex >= 0
-                    ? normals[static_cast<size_t>(faceVertex.normalIndex)]
-                    : fallbackNormal;
-                const float2 texcoord = faceVertex.texcoordIndex >= 0
-                    ? texcoords[static_cast<size_t>(faceVertex.texcoordIndex)]
+                const FaceVertex triangleVertices[3] = {a, b, c};
+                const float3 p0 = positions[static_cast<size_t>(a.positionIndex)];
+                const float3 p1 = positions[static_cast<size_t>(b.positionIndex)];
+                const float3 p2 = positions[static_cast<size_t>(c.positionIndex)];
+                const float3 fallbackNormal = normalize3(cross3(sub3(p1, p0), sub3(p2, p0)));
+                const std::uint32_t firstVertex = static_cast<std::uint32_t>(mesh.vertices.size());
+                const bool hasTriangleTexcoords =
+                    a.texcoordIndex >= 0 &&
+                    b.texcoordIndex >= 0 &&
+                    c.texcoordIndex >= 0;
+                const float2 uv0 = hasTriangleTexcoords
+                    ? texcoords[static_cast<size_t>(a.texcoordIndex)]
                     : make_float2(0.0f, 0.0f);
-                mesh.vertices.push_back(MeshVertex{
-                    position,
-                    normal,
-                    texcoord,
-                    hasTriangleTexcoords ? orthonormalizeTangent(tangent, normal) : make_float3(0.0f, 0.0f, 0.0f),
-                    hasTriangleTexcoords ? 1 : 0});
-            }
+                const float2 uv1 = hasTriangleTexcoords
+                    ? texcoords[static_cast<size_t>(b.texcoordIndex)]
+                    : make_float2(0.0f, 0.0f);
+                const float2 uv2 = hasTriangleTexcoords
+                    ? texcoords[static_cast<size_t>(c.texcoordIndex)]
+                    : make_float2(0.0f, 0.0f);
+                const float3 tangent = hasTriangleTexcoords
+                    ? computeTriangleTangent(p0, p1, p2, uv0, uv1, uv2, fallbackNormal)
+                    : make_float3(0.0f, 0.0f, 0.0f);
 
-            mesh.triangles.push_back(MeshTriangle{
-                firstVertex,
-                firstVertex + 1u,
-                firstVertex + 2u,
-                static_cast<std::uint32_t>(currentMaterial)});
+                for (const FaceVertex& faceVertex : triangleVertices)
+                {
+                    const float3 position = positions[static_cast<size_t>(faceVertex.positionIndex)];
+                    const float3 normal = faceVertex.normalIndex >= 0
+                        ? normals[static_cast<size_t>(faceVertex.normalIndex)]
+                        : fallbackNormal;
+                    const float2 texcoord = faceVertex.texcoordIndex >= 0
+                        ? texcoords[static_cast<size_t>(faceVertex.texcoordIndex)]
+                        : make_float2(0.0f, 0.0f);
+                    mesh.vertices.push_back(MeshVertex{
+                        position,
+                        normal,
+                        texcoord,
+                        hasTriangleTexcoords ? orthonormalizeTangent(tangent, normal) : make_float3(0.0f, 0.0f, 0.0f),
+                        hasTriangleTexcoords ? 1 : 0});
+                }
+
+                mesh.triangles.push_back(MeshTriangle{
+                    firstVertex,
+                    firstVertex + 1u,
+                    firstVertex + 2u,
+                    static_cast<std::uint32_t>(currentMaterial)});
+            };
+
+            for (size_t i = 1; i + 1 < faceVertices.size(); ++i)
+            {
+                appendTriangle(faceVertices[0], faceVertices[i], faceVertices[i + 1]);
+            }
         }
     }
 

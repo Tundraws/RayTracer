@@ -239,7 +239,7 @@ Loads a simple OBJ mesh description into `MeshData`. The loader supports:
 - `v` positions;
 - `vn` normals;
 - `vt` texture coordinates;
-- triangular `f` faces;
+- `f` faces with 3+ vertices; faces with 4+ vertices are converted to triangles by simple fan triangulation;
 - `mtllib` and `usemtl` material references;
 - MTL `Kd`, `Ks`, `Ns`, `Ni`, and `d` material values;
 - MTL `map_Kd` diffuse texture references for PPM (`P3`), PNG, and JPG/JPEG images;
@@ -255,6 +255,10 @@ OBJ materials are mapped by name: `metal` to `MaterialMetal`, `glass` or
 `MaterialDiffuse`. `Ns` is converted to a clamped roughness value, `Ni` stores
 index of refraction, `d` stores alpha, and `Ks` stores specular color. The
 loader is intentionally limited to the listed OBJ and MTL records.
+
+Fan triangulation is intentionally simple: it is suitable for common convex OBJ
+polygons, but complex concave polygons can triangulate inaccurately. The
+renderer still receives triangle `MeshData`; the GPU pipeline is unchanged.
 
 If a texture map points to a missing or unsupported file, the loader keeps the
 path for diagnostics and falls back to the numeric material values. Basic normal

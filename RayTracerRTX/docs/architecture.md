@@ -28,7 +28,8 @@ flowchart LR
     AssetCache --> TextureCache["Texture cache by path"]
     MeshObject --> AssetCache
     MeshCache --> ObjLoader
-    ObjLoader["ObjLoader"] --> MeshData["MeshData"]
+    ObjLoader["ObjLoader"] --> Triangulation["Fan triangulation for OBJ faces"]
+    Triangulation --> MeshData["MeshData"]
     ObjLoader --> Textures["map_Kd / normal PPM textures"]
     ObjLoader --> Tangents["Tangent basis"]
     Textures --> MeshData
