@@ -131,8 +131,8 @@ static __forceinline__ __device__ float3 environmentColor(const float3 rayDir)
     const float t = saturate1(0.5f * (rayDir.y + 1.0f));
     const float horizonGlow = expf(-18.0f * fabsf(rayDir.y));
     const float sun = powf(fmaxf(dot3(rayDir, normalize3(make_vec(0.35f, 0.55f, -0.75f))), 0.0f), 96.0f);
-    const float3 ground = make_vec(0.20f, 0.22f, 0.21f);
     const float3 horizon = params.skyHorizonColor;
+    const float3 ground = horizon;
     const float3 zenith = params.skyZenithColor;
     const float gradientBlend = saturate1(params.skyGradientBlend);
     const float mixWidth = 0.04f + gradientBlend * 0.96f;
