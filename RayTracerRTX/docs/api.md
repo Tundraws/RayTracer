@@ -186,8 +186,8 @@ If image-tuning fields are missing, the default scene values are used. Numeric
 values outside the supported range are clamped so old or experimental scene
 files do not make the renderer unstable. `saveSceneToConfigFile(...)` writes the
 current camera, light, spheres, built-in primitives, loaded mesh objects, and
-basic material parameters back to JSON; the ImGui button saves to
-`RayTracerRTX/assets/scenes/saved_scene.json`.
+basic material parameters back to JSON; the ImGui button opens a native save
+dialog and suggests a timestamped name such as `Scene_270526_1755.json`.
 
 JSON material `type` accepts `matte`, `mirror`, `metal`, and `glass`. The loader
 also accepts `diffuse` as an alias for `matte` and `dielectric` as an alias for
@@ -221,7 +221,8 @@ Loaded models are placed on the available floor/support panel when possible and
 shifted to a nearby free spot to avoid overlapping existing editable objects.
 The compact left overlay exposes quick controls for the right panel visibility,
 the short FPS/GPU summary, and saving the current framebuffer as a PNG, JPG, or
-BMP snapshot through the native Windows save dialog.
+BMP snapshot through the native Windows save dialog. Snapshot file names are
+timestamped by default, for example `RayTracerRTXPhoto_270526_1755.png`.
 UI widgets are not unit-tested directly; the underlying state helpers are
 covered by tests.
 

@@ -1818,6 +1818,8 @@ void testSceneConfigSaveCurrentScene(TestContext& t)
     addSphere(scene);
     scene.spheres.back().center = make_float3(0.0f, 2.0f, 0.0f);
     scene.spheres.back().radius = 2.0f;
+    t.expect(!scene.meshObjects.empty(), "Base editor scene should have a floor panel.");
+    scene.meshObjects[0].mesh.materials[0].color = make_float3(0.2f, 0.9f, 0.3f);
     CameraState camera{};
     camera.position = make_float3(0.0f, 6.0f, -12.0f);
     camera.yaw = 90.0f;
@@ -1834,6 +1836,7 @@ void testSceneConfigSaveCurrentScene(TestContext& t)
     t.expect(loaded.ok, "Saved scene should build again.");
     t.expect(loaded.scene.spheres.size() == 1, "Saved sphere should round-trip.");
     t.expect(!loaded.scene.meshObjects.empty(), "Saved floor panel should round-trip.");
+    t.expect(almostEqual(loaded.scene.meshObjects[0].mesh.materials[0].color.y, 0.9f), "Saved built-in floor color should round-trip.");
 }
 
 void testSceneConfigSaveExternalMeshKeepsSourceMaterials(TestContext& t)

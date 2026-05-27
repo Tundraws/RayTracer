@@ -34,6 +34,7 @@
 #include <cmath>
 #include <cctype>
 #include <cstdio>
+#include <ctime>
 #include <cwctype>
 #include <fstream>
 #include <filesystem>
@@ -62,6 +63,7 @@ float gImguiPanelHeight = 0.0f;
 void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath = {});
 std::filesystem::path defaultSavedScenePath();
 std::optional<std::filesystem::path> openSceneFileDialog(GLFWwindow* window);
+std::optional<std::filesystem::path> saveSceneFileDialog(GLFWwindow* window);
 std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window);
 bool saveFrameSnapshot(const std::filesystem::path& path, const std::vector<uchar4>& pixels, int width, int height, std::string& error);
 
@@ -771,9 +773,60 @@ std::optional<std::filesystem::path> openSceneFileDialog(GLFWwindow* window)
     return std::nullopt;
 }
 
+std::wstring timestampedFileName(const wchar_t* prefix, const wchar_t* extension)
+{
+    std::time_t rawTime = std::time(nullptr);
+    std::tm localTime{};
+    localtime_s(&localTime, &rawTime);
+
+    std::wostringstream name;
+    name << prefix
+         << std::setfill(L'0')
+         << std::setw(2) << localTime.tm_mday
+         << std::setw(2) << (localTime.tm_mon + 1)
+         << std::setw(2) << (localTime.tm_year % 100)
+         << L"_"
+         << std::setw(2) << localTime.tm_hour
+         << std::setw(2) << localTime.tm_min
+         << extension;
+    return name.str();
+}
+
+std::optional<std::filesystem::path> saveSceneFileDialog(GLFWwindow* window)
+{
+    const std::wstring defaultName = timestampedFileName(L"Scene_", L".json");
+    wchar_t fileName[MAX_PATH] = L"";
+    wcscpy_s(fileName, defaultName.c_str());
+
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = window != nullptr ? glfwGetWin32Window(window) : nullptr;
+    ofn.lpstrTitle = L"\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C JSON-\u0441\u0446\u0435\u043D\u0443";
+    ofn.lpstrFilter =
+        L"JSON \u0441\u0446\u0435\u043D\u0430 (*.json)\0*.json\0"
+        L"\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B (*.*)\0*.*\0";
+    ofn.lpstrFile = fileName;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrDefExt = L"json";
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (GetSaveFileNameW(&ofn) == TRUE)
+    {
+        std::filesystem::path path(fileName);
+        if (path.extension().empty())
+        {
+            path.replace_extension(".json");
+        }
+        return path;
+    }
+    return std::nullopt;
+}
+
 std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window)
 {
-    wchar_t fileName[MAX_PATH] = L"RayTracerRTX_frame.png";
+    const std::wstring defaultName = timestampedFileName(L"RayTracerRTXPhoto_", L".png");
+    wchar_t fileName[MAX_PATH] = L"";
+    wcscpy_s(fileName, defaultName.c_str());
 
     OPENFILENAMEW ofn{};
     ofn.lStructSize = sizeof(ofn);
@@ -1699,7 +1752,9 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
         if (ImGui::Button(u8c(u8"\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C JSON")))
         {
-            const std::filesystem::path savePath = defaultSavedScenePath();
+            if (const std::optional<std::filesystem::path> selectedSavePath = saveSceneFileDialog(window))
+            {
+            const std::filesystem::path savePath = *selectedSavePath;
             std::error_code ec;
             std::filesystem::create_directories(savePath.parent_path(), ec);
             std::string error;
@@ -1713,6 +1768,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 appState.lastUiMessage = error.empty() ? "Не удалось сохранить сцену." : error;
                 appState.lastUiMessageIsError = true;
                 logError(appState.lastUiMessage);
+            }
             }
         }
         ImGui::SeparatorText(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"));

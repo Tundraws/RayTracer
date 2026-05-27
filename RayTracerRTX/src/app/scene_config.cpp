@@ -1009,6 +1009,10 @@ bool equalMeshMaterialForSave(const MeshMaterial& a, const MeshMaterial& b)
 
 bool meshObjectUsesSourceMaterials(const MeshObject& object)
 {
+    if (!meshPrimitiveName(object).empty())
+    {
+        return false;
+    }
     if (object.sourceMaterials.empty() || object.sourceMaterials.size() != object.mesh.materials.size())
     {
         return false;
