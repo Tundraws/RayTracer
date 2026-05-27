@@ -2721,6 +2721,9 @@ void testSceneGroupDuplicateCreatesGroupedCopies(TestContext& t)
     });
     scene.groups[0].name = "Набор";
     scene.selectedGroup = 0;
+    const float beforeDx = scene.spheres[0].center.x - scene.meshObjects[0].position.x;
+    const float beforeDy = scene.spheres[0].center.y - scene.meshObjects[0].position.y;
+    const float beforeDz = scene.spheres[0].center.z - scene.meshObjects[0].position.z;
 
     const bool duplicated = duplicateSelectedSceneGroup(scene);
 
@@ -2732,6 +2735,9 @@ void testSceneGroupDuplicateCreatesGroupedCopies(TestContext& t)
     t.expect(scene.groups.back().objects.size() == 2, "Duplicated group should contain copied child refs.");
     t.expect(scene.spheres.back().displayName == "Шар 1", "Duplicated grouped sphere should receive a unique name.");
     t.expect(scene.meshObjects.back().displayName == "Куб 1", "Duplicated grouped mesh should receive a unique name.");
+    t.expect(almostEqual(scene.spheres.back().center.x - scene.meshObjects.back().position.x, beforeDx), "Duplicated group should preserve child X offset.");
+    t.expect(almostEqual(scene.spheres.back().center.y - scene.meshObjects.back().position.y, beforeDy), "Duplicated group should preserve child Y offset.");
+    t.expect(almostEqual(scene.spheres.back().center.z - scene.meshObjects.back().position.z, beforeDz), "Duplicated group should preserve child Z offset.");
 }
 
 void testSceneGroupPrunesDeletedObject(TestContext& t)

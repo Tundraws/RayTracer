@@ -1782,7 +1782,7 @@ bool duplicateSelectedSceneGroup(SceneState& scene)
     std::vector<SceneObjectRef> copiedRefs;
     copiedRefs.reserve(source.objects.size());
 
-    float maxRadius = 1.0f;
+    float groupRadius = 1.0f;
     for (const SceneObjectRef ref : source.objects)
     {
         if (!isValidSceneObjectRef(scene, ref))
@@ -1791,16 +1791,22 @@ bool duplicateSelectedSceneGroup(SceneState& scene)
         }
         if (ref.kind == kSceneObjectSphere)
         {
-            maxRadius = std::max(maxRadius, scene.spheres[static_cast<size_t>(ref.index)].radius);
+            const SphereGeometry& sphere = scene.spheres[static_cast<size_t>(ref.index)];
+            const float dx = sphere.center.x - source.position.x;
+            const float dz = sphere.center.z - source.position.z;
+            groupRadius = std::max(groupRadius, std::sqrt(dx * dx + dz * dz) + sphere.radius);
         }
         else if (ref.kind == kSceneObjectMesh)
         {
-            maxRadius = std::max(maxRadius, meshFootprintRadius(scene.meshObjects[static_cast<size_t>(ref.index)]));
+            const MeshObject& object = scene.meshObjects[static_cast<size_t>(ref.index)];
+            const float dx = object.position.x - source.position.x;
+            const float dz = object.position.z - source.position.z;
+            groupRadius = std::max(groupRadius, std::sqrt(dx * dx + dz * dz) + meshFootprintRadius(object));
         }
     }
 
-    const float spacing = std::max(3.0f, maxRadius * 2.5f);
-    const float3 groupTarget = findFreePlacementOnFloor(scene, add3(source.position, make_float3(spacing, 0.0f, 0.0f)), maxRadius);
+    const float spacing = std::max(3.0f, groupRadius * 2.2f);
+    const float3 groupTarget = findFreePlacementOnFloor(scene, add3(source.position, make_float3(spacing, 0.0f, 0.0f)), groupRadius);
     const float3 delta = sub3(groupTarget, source.position);
 
     for (const SceneObjectRef ref : source.objects)
@@ -1816,8 +1822,6 @@ bool duplicateSelectedSceneGroup(SceneState& scene)
             SphereGeometry copy = original;
             copy.displayName = uniqueSceneObjectName(scene, sphereDisplayName(original, ref.index));
             copy.center = add3(original.center, delta);
-            copy.center = findFreePlacementOnFloor(scene, copy.center, copy.radius);
-            copy.center = placeSphereOnSupport(scene, copy.center, copy.radius);
             scene.spheres.push_back(copy);
             if (ref.index >= 0 && ref.index < static_cast<int>(scene.materials.size()))
             {
@@ -1839,8 +1843,6 @@ bool duplicateSelectedSceneGroup(SceneState& scene)
             MeshObject copy = original;
             copy.displayName = uniqueSceneObjectName(scene, original.displayName.empty() ? original.assetReference : original.displayName);
             copy.position = add3(original.position, delta);
-            copy.position = findFreePlacementOnFloor(scene, copy.position, meshFootprintRadius(copy));
-            copy.position = placeMeshOnSupport(scene, copy, copy.position);
             updateMeshObjectTransform(copy);
             scene.meshObjects.push_back(std::move(copy));
             copiedRefs.push_back(SceneObjectRef{kSceneObjectMesh, static_cast<int>(scene.meshObjects.size()) - 1});
