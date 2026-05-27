@@ -125,7 +125,9 @@ flowchart TD
     MeshClosestHit --> MeshMaterial{"Mesh material type"}
     MeshMaterial --> FloorFade{"Floor surface?"}
     FloorFade -->|near| MeshDiffuse["GGX direct lighting + shadow"]
-    FloorFade -->|far| HorizonBlend["Blend with horizon and skip expensive floor secondary rays"]
+    FloorFade -->|far floor| HorizonBlend["Capped horizon blend and cheaper distant floor shading"]
+    FloorFade -->|far object| ObjectHaze["Weak atmospheric horizon blend"]
+    ObjectHaze --> Output
     HorizonBlend --> Output
     MeshMaterial --> MeshDiffuse["GGX direct lighting + shadow"]
     MeshMaterial --> MeshMirror["Mirror reflection ray + roughness broadening"]

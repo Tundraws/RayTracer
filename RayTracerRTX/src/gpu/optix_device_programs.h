@@ -154,17 +154,17 @@ static __forceinline__ __device__ float3 environmentColor(const float3 rayDir)
 
 static __forceinline__ __device__ float floorFadeAmount(const float3 hitPoint, const MeshMaterialGpu material)
 {
-    if (material.isFloorSurface == 0)
-    {
-        return 0.0f;
-    }
-
     const float3 fromCamera = sub3(hitPoint, params.cameraPosition);
     const float distance = sqrtf(dot3(fromCamera, fromCamera));
     const float start = fmaxf(params.floorFadeDistance, 1.0f);
     const float softness = fmaxf(params.floorFadeSoftness, 1.0f);
-    const float t = saturate1((distance - start) / softness);
-    return t * t * (3.0f - 2.0f * t);
+    const float objectStart = material.isFloorSurface != 0 ? start : start * 1.18f;
+    const float objectSoftness = material.isFloorSurface != 0 ? softness : softness * 1.35f;
+    const float t = saturate1((distance - objectStart) / objectSoftness);
+    const float smooth = t * t * (3.0f - 2.0f * t);
+    return material.isFloorSurface != 0
+        ? smooth
+        : smooth * 0.18f;
 }
 
 static __forceinline__ __device__ float3 floorFadeColor()
@@ -742,7 +742,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
     float visibility = 1.0f;
     float ndotl = 0.0f;
     const float floorFade = floorFadeAmount(hitPoint, material);
-    const bool farFloor = material.isFloorSurface != 0 && floorFade > 0.70f;
+    const bool farFloor = material.isFloorSurface != 0 && floorFade > 0.90f;
     if (farFloor)
     {
         const float3 lightVector = sub3(params.lightPosition, hitPoint);
@@ -809,7 +809,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
         mul3(make_vec(1.0f, 1.0f, 1.0f), diffuseSpecularWeight * specular));
     localColor = add3(localColor, mul3(make_vec(diffuseColor.x * env.x, diffuseColor.y * env.y, diffuseColor.z * env.z), 0.10f));
 
-    const bool skipFloorSecondary = material.isFloorSurface != 0 && floorFade > 0.35f;
+    const bool skipFloorSecondary = material.isFloorSurface != 0 && floorFade > 0.75f;
 
     if (!skipFloorSecondary && material.materialType == MaterialMirror)
     {
@@ -909,7 +909,8 @@ static __forceinline__ __device__ float3 shadeMaterial(
 
     if (floorFade > 0.0f)
     {
-        localColor = lerp3(localColor, floorFadeColor(), floorFade);
+        const float fadeStrength = material.isFloorSurface != 0 ? 0.42f : 1.0f;
+        localColor = lerp3(localColor, floorFadeColor(), saturate1(floorFade * fadeStrength));
     }
 
     return localColor;
