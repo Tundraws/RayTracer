@@ -410,6 +410,22 @@ bool readSceneTuningFields(const JsonObject& object, SceneConfig& config, std::s
         }
         config.hasSkyIntensity = true;
     }
+    if (findField(object, "skyHorizonColor") != nullptr)
+    {
+        if (!readFloat3(object, "skyHorizonColor", config.skyHorizonColor, error))
+        {
+            return false;
+        }
+        config.hasSkyHorizonColor = true;
+    }
+    if (findField(object, "skyZenithColor") != nullptr)
+    {
+        if (!readFloat3(object, "skyZenithColor", config.skyZenithColor, error))
+        {
+            return false;
+        }
+        config.hasSkyZenithColor = true;
+    }
     if (findField(object, "lightIntensity") != nullptr)
     {
         if (!readFloatField(object, "lightIntensity", config.lightIntensity, error))
@@ -1271,6 +1287,24 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
         {
             result.config.environmentPath = path;
         }
+        if (findField(*environment, "horizonColor") != nullptr)
+        {
+            if (!readFloat3(*environment, "horizonColor", result.config.skyHorizonColor, error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.hasSkyHorizonColor = true;
+        }
+        if (findField(*environment, "zenithColor") != nullptr)
+        {
+            if (!readFloat3(*environment, "zenithColor", result.config.skyZenithColor, error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.hasSkyZenithColor = true;
+        }
         if (findField(*environment, "intensity") != nullptr)
         {
             if (!readFloatField(*environment, "intensity", result.config.environmentIntensity, error))
@@ -1348,6 +1382,14 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     {
         result.scene.skyIntensity = config.skyIntensity;
     }
+    if (config.hasSkyHorizonColor)
+    {
+        result.scene.skyHorizonColor = config.skyHorizonColor;
+    }
+    if (config.hasSkyZenithColor)
+    {
+        result.scene.skyZenithColor = config.skyZenithColor;
+    }
     if (config.hasLightIntensity)
     {
         result.scene.lightIntensity = config.lightIntensity;
@@ -1383,6 +1425,8 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     }
     result.scene.exposure = clampSceneExposure(result.scene.exposure);
     result.scene.skyIntensity = clampSceneSkyIntensity(result.scene.skyIntensity);
+    setSceneSkyHorizonColor(result.scene, result.scene.skyHorizonColor);
+    setSceneSkyZenithColor(result.scene, result.scene.skyZenithColor);
     result.scene.lightIntensity = clampSceneLightIntensity(result.scene.lightIntensity);
     appendMaterialWarnings(config, result);
     const std::map<std::string, SceneMaterialConfig> materialMap = makeMaterialMap(config.materials);
@@ -1634,7 +1678,11 @@ bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& 
     output << "  },\n";
     output << "  \"environment\": {\n";
     output << "    \"type\": \"" << jsonEscape(scene.environmentType.empty() ? "gradient" : scene.environmentType) << "\",\n";
-    output << "    \"intensity\": " << scene.environmentIntensity;
+    output << "    \"intensity\": " << scene.environmentIntensity << ",\n";
+    output << "    \"horizonColor\": ";
+    writeFloat3(scene.skyHorizonColor);
+    output << ",\n    \"zenithColor\": ";
+    writeFloat3(scene.skyZenithColor);
     if (!scene.environmentPath.empty())
     {
         output << ",\n    \"path\": \"" << jsonEscape(scene.environmentPath) << "\"\n";

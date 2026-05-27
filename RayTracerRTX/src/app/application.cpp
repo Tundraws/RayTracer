@@ -1296,6 +1296,18 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             const SceneState before = scene;
             applySceneEditResultWithUndo(appState, before, editor.setSkyIntensity(skyIntensity));
         }
+        float horizonColor[3] = {scene.skyHorizonColor.x, scene.skyHorizonColor.y, scene.skyHorizonColor.z};
+        if (ImGui::ColorEdit3(u8c(u8"\u0413\u043E\u0440\u0438\u0437\u043E\u043D\u0442"), horizonColor, ImGuiColorEditFlags_Float))
+        {
+            const SceneState before = scene;
+            applySceneEditResultWithUndo(appState, before, editor.setSkyHorizonColor(make_float3(horizonColor[0], horizonColor[1], horizonColor[2])));
+        }
+        float zenithColor[3] = {scene.skyZenithColor.x, scene.skyZenithColor.y, scene.skyZenithColor.z};
+        if (ImGui::ColorEdit3(u8c(u8"\u0412\u0435\u0440\u0445 \u043D\u0435\u0431\u0430"), zenithColor, ImGuiColorEditFlags_Float))
+        {
+            const SceneState before = scene;
+            applySceneEditResultWithUndo(appState, before, editor.setSkyZenithColor(make_float3(zenithColor[0], zenithColor[1], zenithColor[2])));
+        }
 
         ImGui::SeparatorText(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u044B"));
         builtInPrimitiveCombo(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C##primitive_add_combo"), appState.editorPrimitiveToAdd);

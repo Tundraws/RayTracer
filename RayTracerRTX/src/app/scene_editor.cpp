@@ -613,6 +613,20 @@ SceneEditResult SceneEditor::adjustSkyIntensity(const float delta)
     return makeLightingDirty(!equalFloat(before, scene_.skyIntensity));
 }
 
+SceneEditResult SceneEditor::setSkyHorizonColor(const float3 color)
+{
+    const float3 before = scene_.skyHorizonColor;
+    setSceneSkyHorizonColor(scene_, color);
+    return makeLightingDirty(!equal3(before, scene_.skyHorizonColor));
+}
+
+SceneEditResult SceneEditor::setSkyZenithColor(const float3 color)
+{
+    const float3 before = scene_.skyZenithColor;
+    setSceneSkyZenithColor(scene_, color);
+    return makeLightingDirty(!equal3(before, scene_.skyZenithColor));
+}
+
 SceneEditResult SceneEditor::setLightIntensity(const float value)
 {
     const float before = scene_.lightIntensity;

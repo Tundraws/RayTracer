@@ -66,6 +66,8 @@ struct SceneState
     float3 lightPosition;
     float exposure = 0.82f;
     float skyIntensity = 0.78f;
+    float3 skyHorizonColor = make_float3(0.62f, 0.70f, 0.78f);
+    float3 skyZenithColor = make_float3(0.12f, 0.18f, 0.30f);
     float lightIntensity = 0.95f;
     float areaLightRadius = 0.0f;
     float environmentIntensity = 1.0f;
@@ -119,6 +121,8 @@ bool setSelectedGroupScale(SceneState& scene, float3 scale);
 void moveLight(SceneState& scene, const float3 delta);
 void setSceneExposure(SceneState& scene, float value);
 void setSceneSkyIntensity(SceneState& scene, float value);
+void setSceneSkyHorizonColor(SceneState& scene, float3 color);
+void setSceneSkyZenithColor(SceneState& scene, float3 color);
 void setSceneLightIntensity(SceneState& scene, float value);
 void adjustSceneExposure(SceneState& scene, float delta);
 void adjustSceneSkyIntensity(SceneState& scene, float delta);

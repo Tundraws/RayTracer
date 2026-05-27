@@ -63,6 +63,10 @@ struct SceneConfig
     float exposure = 0.82f;
     bool hasSkyIntensity = false;
     float skyIntensity = 0.78f;
+    bool hasSkyHorizonColor = false;
+    float3 skyHorizonColor = make_float3(0.62f, 0.70f, 0.78f);
+    bool hasSkyZenithColor = false;
+    float3 skyZenithColor = make_float3(0.12f, 0.18f, 0.30f);
     bool hasLightIntensity = false;
     float lightIntensity = 0.95f;
     bool hasAreaLightRadius = false;

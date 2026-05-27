@@ -62,6 +62,12 @@ std::size_t makeAccumulationSignature(const SceneState& scene, const CameraState
     hashCombine(seed, hashFloat(scene.lightPosition.z));
     hashCombine(seed, hashFloat(scene.exposure));
     hashCombine(seed, hashFloat(scene.skyIntensity));
+    hashCombine(seed, hashFloat(scene.skyHorizonColor.x));
+    hashCombine(seed, hashFloat(scene.skyHorizonColor.y));
+    hashCombine(seed, hashFloat(scene.skyHorizonColor.z));
+    hashCombine(seed, hashFloat(scene.skyZenithColor.x));
+    hashCombine(seed, hashFloat(scene.skyZenithColor.y));
+    hashCombine(seed, hashFloat(scene.skyZenithColor.z));
     hashCombine(seed, hashFloat(scene.lightIntensity));
     hashCombine(seed, hashFloat(scene.areaLightRadius));
     hashCombine(seed, hashFloat(scene.environmentIntensity));
@@ -1460,6 +1466,8 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.lightPosition = scene.lightPosition;
     params.exposure = scene.exposure;
     params.skyIntensity = scene.skyIntensity;
+    params.skyHorizonColor = scene.skyHorizonColor;
+    params.skyZenithColor = scene.skyZenithColor;
     params.lightIntensity = scene.lightIntensity;
     params.areaLightRadius = scene.areaLightRadius;
     params.environmentIntensity = scene.environmentIntensity;

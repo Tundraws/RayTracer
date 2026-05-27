@@ -1665,7 +1665,7 @@ void testSceneConfigAreaLightAndEnvironment(TestContext& t)
         "raytracerrtx_area_environment_scene.json",
         "{\n"
         "  \"light\": {\"position\": [1, 4, -2], \"intensity\": 1.1, \"size\": 2.5},\n"
-        "  \"environment\": {\"type\": \"map\", \"path\": \"raytracerrtx_env_map.ppm\", \"intensity\": 1.6}\n"
+        "  \"environment\": {\"type\": \"map\", \"path\": \"raytracerrtx_env_map.ppm\", \"intensity\": 1.6, \"horizonColor\": [0.3, 0.4, 0.5], \"zenithColor\": [0.1, 0.2, 0.6]}\n"
         "}\n");
 
     const SceneConfigResult config = loadSceneConfigFile(configPath);
@@ -1677,6 +1677,8 @@ void testSceneConfigAreaLightAndEnvironment(TestContext& t)
     t.expect(scene.scene.environmentMap.width == 2u, "Environment PPM width should load.");
     t.expect(scene.scene.environmentMap.height == 1u, "Environment PPM height should load.");
     t.expect(scene.scene.environmentMap.pixels.size() == 2u, "Environment PPM pixels should load.");
+    t.expect(almostEqual(scene.scene.skyHorizonColor.x, 0.3f), "Environment horizon color should parse.");
+    t.expect(almostEqual(scene.scene.skyZenithColor.z, 0.6f), "Environment zenith color should parse.");
 }
 
 void testSceneConfigAreaEnvironmentFallbacks(TestContext& t)
@@ -2881,6 +2883,21 @@ void testSceneSkyIntensityChangesSafely(TestContext& t)
     t.expect(almostEqual(scene.skyIntensity, 0.6f), "Sky intensity control should decrease sky contribution.");
 }
 
+void testSceneSkyColorsClampSafely(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+
+    setSceneSkyHorizonColor(scene, make_float3(-1.0f, 0.5f, 4.0f));
+    setSceneSkyZenithColor(scene, make_float3(0.25f, -3.0f, 3.0f));
+
+    t.expect(almostEqual(scene.skyHorizonColor.x, 0.0f), "Sky horizon color should clamp low.");
+    t.expect(almostEqual(scene.skyHorizonColor.y, 0.5f), "Sky horizon color should keep valid component.");
+    t.expect(almostEqual(scene.skyHorizonColor.z, 2.0f), "Sky horizon color should clamp high.");
+    t.expect(almostEqual(scene.skyZenithColor.x, 0.25f), "Sky zenith color should keep valid component.");
+    t.expect(almostEqual(scene.skyZenithColor.y, 0.0f), "Sky zenith color should clamp low.");
+    t.expect(almostEqual(scene.skyZenithColor.z, 2.0f), "Sky zenith color should clamp high.");
+}
+
 void testSceneLightIntensityChangesSafely(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3425,6 +3442,7 @@ int main(int argc, char** argv)
     runTest("Move light clamp", testMoveLightClamp);
     runTest("Scene exposure changes safely", testSceneExposureChangesSafely);
     runTest("Scene sky intensity changes safely", testSceneSkyIntensityChangesSafely);
+    runTest("Scene sky colors clamp safely", testSceneSkyColorsClampSafely);
     runTest("Scene light intensity changes safely", testSceneLightIntensityChangesSafely);
     runTest("Scene tuning invalid values clamp", testSceneTuningInvalidValuesClamp);
     runTest("Clamp selected sphere index", testClampSceneSelectedSphereBounds);

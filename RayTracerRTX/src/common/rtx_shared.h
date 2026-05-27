@@ -323,6 +323,8 @@ struct LaunchParams
     float3 lightPosition;
     float exposure;
     float skyIntensity;
+    float3 skyHorizonColor;
+    float3 skyZenithColor;
     float lightIntensity;
     float areaLightRadius;
     float environmentIntensity;

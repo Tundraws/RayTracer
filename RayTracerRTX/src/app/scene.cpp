@@ -777,6 +777,8 @@ SceneState makeDefaultScene()
     scene.lightPosition = make_float3(10.0f, 14.0f, -10.0f);
     scene.exposure = 0.82f;
     scene.skyIntensity = 0.78f;
+    scene.skyHorizonColor = make_float3(0.62f, 0.70f, 0.78f);
+    scene.skyZenithColor = make_float3(0.12f, 0.18f, 0.30f);
     scene.lightIntensity = 0.95f;
     scene.areaLightRadius = 0.0f;
     scene.environmentIntensity = 1.0f;
@@ -796,6 +798,8 @@ SceneState makeBaseEditorScene()
     scene.lightPosition = make_float3(8.0f, 12.0f, -8.0f);
     scene.exposure = 0.78f;
     scene.skyIntensity = 0.72f;
+    scene.skyHorizonColor = make_float3(0.60f, 0.68f, 0.76f);
+    scene.skyZenithColor = make_float3(0.14f, 0.20f, 0.32f);
     scene.lightIntensity = 0.95f;
     scene.areaLightRadius = 2.0f;
     scene.environmentIntensity = 0.85f;
@@ -838,6 +842,8 @@ void clampScene(SceneState& scene)
         make_float3(40.0f, 40.0f, 40.0f));
     scene.exposure = clampSceneExposure(scene.exposure);
     scene.skyIntensity = clampSceneSkyIntensity(scene.skyIntensity);
+    scene.skyHorizonColor = clamp3(scene.skyHorizonColor, make_float3(0.0f, 0.0f, 0.0f), make_float3(2.0f, 2.0f, 2.0f));
+    scene.skyZenithColor = clamp3(scene.skyZenithColor, make_float3(0.0f, 0.0f, 0.0f), make_float3(2.0f, 2.0f, 2.0f));
     scene.lightIntensity = clampSceneLightIntensity(scene.lightIntensity);
     scene.areaLightRadius = clampSceneAreaLightRadius(scene.areaLightRadius);
     scene.environmentIntensity = clampSceneEnvironmentIntensity(scene.environmentIntensity);
@@ -1824,6 +1830,16 @@ void setSceneExposure(SceneState& scene, const float value)
 void setSceneSkyIntensity(SceneState& scene, const float value)
 {
     scene.skyIntensity = clampSceneSkyIntensity(value);
+}
+
+void setSceneSkyHorizonColor(SceneState& scene, const float3 color)
+{
+    scene.skyHorizonColor = clamp3(color, make_float3(0.0f, 0.0f, 0.0f), make_float3(2.0f, 2.0f, 2.0f));
+}
+
+void setSceneSkyZenithColor(SceneState& scene, const float3 color)
+{
+    scene.skyZenithColor = clamp3(color, make_float3(0.0f, 0.0f, 0.0f), make_float3(2.0f, 2.0f, 2.0f));
 }
 
 void setSceneLightIntensity(SceneState& scene, const float value)

@@ -169,9 +169,10 @@ supports:
   area-light soft shadows;
 - `environment`: optional object with `type`, `path`, and `intensity`; `path`
   currently supports small ASCII PPM (`P3`) lat-long maps, with fallback to
-  gradient sky when the file is missing or invalid;
+  gradient sky when the file is missing or invalid; gradient sky also accepts
+  `horizonColor` and `zenithColor`;
 - root-level or `render` object fields: `exposure`, `skyIntensity`,
-  `lightIntensity`;
+  `lightIntensity`, `skyHorizonColor`, and `skyZenithColor`;
 - `materials`: named material inputs with `name`, `type`, `baseColor`,
   `roughness`, `metallic`, `specularColor`, `ior`, `alpha`, `texture`/`map_Kd`,
   and `normalMap`;

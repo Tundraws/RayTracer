@@ -90,6 +90,8 @@ public:
     SceneEditResult adjustExposure(float delta);
     SceneEditResult setSkyIntensity(float value);
     SceneEditResult adjustSkyIntensity(float delta);
+    SceneEditResult setSkyHorizonColor(float3 color);
+    SceneEditResult setSkyZenithColor(float3 color);
     SceneEditResult setLightIntensity(float value);
     SceneEditResult adjustLightIntensity(float delta);
 
