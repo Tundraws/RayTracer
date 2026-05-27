@@ -39,6 +39,7 @@ struct AppState
     unsigned int progressiveSamples = 0;
     bool renderingPaused = false;
     bool imguiPanelVisible = true;
+    bool hudSummaryVisible = true;
     std::vector<SceneBuildResult> scenePresets;
     std::vector<SceneBuildResult> scenePresetDefaults;
     std::vector<std::wstring> scenePresetNames;

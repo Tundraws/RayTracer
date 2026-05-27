@@ -32,6 +32,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cwctype>
+#include <fstream>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -57,6 +58,8 @@ float gImguiPanelHeight = 0.0f;
 
 void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath = {});
 std::filesystem::path defaultSavedScenePath();
+std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window);
+bool saveFrameAsBmp(const std::filesystem::path& path, const std::vector<uchar4>& pixels, int width, int height, std::string& error);
 
 float3 add3(const float3 a, const float3 b)
 {
@@ -500,7 +503,7 @@ void drawHud(
     }
 
     const int panelX = 18;
-    const int panelY = 18;
+    const int panelY = 76;
 
     const int oldBkMode = SetBkMode(dc, TRANSPARENT);
     const COLORREF oldTextColor = SetTextColor(dc, RGB(0, 0, 0));
@@ -552,6 +555,61 @@ void drawHud(
     SelectObject(dc, oldFont);
     SetTextColor(dc, oldTextColor);
     SetBkMode(dc, oldBkMode);
+}
+
+void drawHudControlOverlay(
+    AppState& appState,
+    const FrameStats& stats,
+    GLFWwindow* window,
+    const std::vector<uchar4>& pixels)
+{
+    ImGui::SetNextWindowPos(ImVec2(14.0f, 14.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.72f);
+    ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoSavedSettings;
+    if (appState.cursorCaptured)
+    {
+        flags |= ImGuiWindowFlags_NoInputs;
+    }
+
+    if (!ImGui::Begin("##hud_control_overlay", nullptr, flags))
+    {
+        ImGui::End();
+        return;
+    }
+
+    ImGui::Text("FPS %.1f   GPU %.2f ms", stats.fps, stats.avgGpuMs);
+    if (ImGui::Button(appState.imguiPanelVisible ? u8c(u8"\u0423\u0431\u0440\u0430\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C") : u8c(u8"\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C")))
+    {
+        appState.imguiPanelVisible = !appState.imguiPanelVisible;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(appState.hudSummaryVisible ? u8c(u8"\u0423\u0431\u0440\u0430\u0442\u044C \u0441\u0432\u043E\u0434\u043A\u0443") : u8c(u8"\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u0441\u0432\u043E\u0434\u043A\u0443")))
+    {
+        appState.hudSummaryVisible = !appState.hudSummaryVisible;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(u8c(u8"\u0424\u043E\u0442\u043E\u043A\u0430\u0434\u0440")))
+    {
+        if (const std::optional<std::filesystem::path> path = saveScreenshotFileDialog(window))
+        {
+            std::string error;
+            if (saveFrameAsBmp(*path, pixels, gWidth, gHeight, error))
+            {
+                appState.lastUiMessage = "Р¤РѕС‚РѕРєР°РґСЂ СЃРѕС…СЂР°РЅРµРЅ: " + path->string();
+                appState.lastUiMessageIsError = false;
+            }
+            else
+            {
+                appState.lastUiMessage = error.empty() ? "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ С„РѕС‚РѕРєР°РґСЂ." : error;
+                appState.lastUiMessageIsError = true;
+                logError(appState.lastUiMessage);
+            }
+        }
+    }
+    ImGui::End();
 }
 
 void syncSelectedMeshMaterialToCombined(SceneState& scene)
@@ -684,6 +742,107 @@ std::optional<std::filesystem::path> openMeshFileDialog(GLFWwindow* window)
         return std::filesystem::path(fileName);
     }
     return std::nullopt;
+}
+
+std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window)
+{
+    wchar_t fileName[MAX_PATH] = L"RayTracerRTX_frame.bmp";
+
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = window != nullptr ? glfwGetWin32Window(window) : nullptr;
+    ofn.lpstrTitle = L"\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0444\u043E\u0442\u043E\u043A\u0430\u0434\u0440";
+    ofn.lpstrFilter =
+        L"BMP \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435 (*.bmp)\0*.bmp\0"
+        L"\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B (*.*)\0*.*\0";
+    ofn.lpstrFile = fileName;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrDefExt = L"bmp";
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (GetSaveFileNameW(&ofn) == TRUE)
+    {
+        return std::filesystem::path(fileName);
+    }
+    return std::nullopt;
+}
+
+void writeUint16(std::ofstream& output, const unsigned short value)
+{
+    output.put(static_cast<char>(value & 0xff));
+    output.put(static_cast<char>((value >> 8) & 0xff));
+}
+
+void writeUint32(std::ofstream& output, const unsigned int value)
+{
+    output.put(static_cast<char>(value & 0xff));
+    output.put(static_cast<char>((value >> 8) & 0xff));
+    output.put(static_cast<char>((value >> 16) & 0xff));
+    output.put(static_cast<char>((value >> 24) & 0xff));
+}
+
+bool saveFrameAsBmp(const std::filesystem::path& path, const std::vector<uchar4>& pixels, const int width, const int height, std::string& error)
+{
+    error.clear();
+    if (width <= 0 || height <= 0 || pixels.size() < static_cast<size_t>(width * height))
+    {
+        error = "РќРµС‚ РґР°РЅРЅС‹С… РєР°РґСЂР° РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ.";
+        return false;
+    }
+
+    std::ofstream output(path, std::ios::binary);
+    if (!output)
+    {
+        error = "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ С„Р°Р№Р» РґР»СЏ С„РѕС‚РѕРєР°РґСЂР°: " + path.string();
+        return false;
+    }
+
+    const unsigned int rowStride = static_cast<unsigned int>((width * 3 + 3) & ~3);
+    const unsigned int pixelDataSize = rowStride * static_cast<unsigned int>(height);
+    const unsigned int fileHeaderSize = 14;
+    const unsigned int dibHeaderSize = 40;
+    const unsigned int pixelOffset = fileHeaderSize + dibHeaderSize;
+    const unsigned int fileSize = pixelOffset + pixelDataSize;
+
+    output.put('B');
+    output.put('M');
+    writeUint32(output, fileSize);
+    writeUint16(output, 0);
+    writeUint16(output, 0);
+    writeUint32(output, pixelOffset);
+
+    writeUint32(output, dibHeaderSize);
+    writeUint32(output, static_cast<unsigned int>(width));
+    writeUint32(output, static_cast<unsigned int>(height));
+    writeUint16(output, 1);
+    writeUint16(output, 24);
+    writeUint32(output, 0);
+    writeUint32(output, pixelDataSize);
+    writeUint32(output, 2835);
+    writeUint32(output, 2835);
+    writeUint32(output, 0);
+    writeUint32(output, 0);
+
+    std::vector<unsigned char> row(rowStride, 0);
+    for (int y = 0; y < height; ++y)
+    {
+        std::fill(row.begin(), row.end(), 0);
+        for (int x = 0; x < width; ++x)
+        {
+            const uchar4 pixel = pixels[static_cast<size_t>((height - 1 - y) * width + x)];
+            row[static_cast<size_t>(x * 3 + 0)] = pixel.z;
+            row[static_cast<size_t>(x * 3 + 1)] = pixel.y;
+            row[static_cast<size_t>(x * 3 + 2)] = pixel.x;
+        }
+        output.write(reinterpret_cast<const char*>(row.data()), static_cast<std::streamsize>(row.size()));
+    }
+
+    if (!output)
+    {
+        error = "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїРёСЃР°С‚СЊ С„РѕС‚РѕРєР°РґСЂ: " + path.string();
+        return false;
+    }
+    return true;
 }
 
 bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPath)
@@ -2335,23 +2494,27 @@ void run_optix_app(const ApplicationOptions& options)
         ImGui_ImplOpenGL2_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        drawHudControlOverlay(appState, stats, window, pixels);
         drawImguiPanel(appState, stats, window);
         ImGui::Render();
         ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
-        drawHud(
-            window,
-            appState.scene,
-            stats,
-            appState.renderMode,
-            appState.renderQuality,
-            appState.hierarchySelectionKind,
-            appState.denoiserEnabled,
-            appState.denoiserAvailable,
-            appState.progressiveSamples,
-            appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(appState.scenePresetNames.size())
-                ? appState.scenePresetNames[static_cast<size_t>(appState.scenePresetIndex)]
-                : std::wstring{L"\u0421\u0432\u043E\u044F \u0441\u0446\u0435\u043D\u0430"});
+        if (appState.hudSummaryVisible)
+        {
+            drawHud(
+                window,
+                appState.scene,
+                stats,
+                appState.renderMode,
+                appState.renderQuality,
+                appState.hierarchySelectionKind,
+                appState.denoiserEnabled,
+                appState.denoiserAvailable,
+                appState.progressiveSamples,
+                appState.scenePresetIndex >= 0 && appState.scenePresetIndex < static_cast<int>(appState.scenePresetNames.size())
+                    ? appState.scenePresetNames[static_cast<size_t>(appState.scenePresetIndex)]
+                    : std::wstring{L"\u0421\u0432\u043E\u044F \u0441\u0446\u0435\u043D\u0430"});
+        }
         glfwPollEvents();
     }
 

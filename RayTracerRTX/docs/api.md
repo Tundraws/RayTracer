@@ -218,6 +218,9 @@ file dialog button for adding an additional `.obj`, `.gltf`, or `.glb` model to
 the current scene, plus a compact JSON reload button for JSON-backed presets.
 Loaded models are placed on the available floor/support panel when possible and
 shifted to a nearby free spot to avoid overlapping existing editable objects.
+The compact left overlay exposes quick controls for the right panel visibility,
+the short FPS/GPU summary, and saving the current framebuffer as a BMP snapshot
+through the native Windows save dialog.
 UI widgets are not unit-tested directly; the underlying state helpers are
 covered by tests.
 
