@@ -132,13 +132,15 @@ static __forceinline__ __device__ float3 environmentColor(const float3 rayDir)
     const float horizonGlow = expf(-18.0f * fabsf(rayDir.y));
     const float sun = powf(fmaxf(dot3(rayDir, normalize3(make_vec(0.35f, 0.55f, -0.75f))), 0.0f), 96.0f);
     const float3 ground = make_vec(0.20f, 0.22f, 0.21f);
-     const float3 horizon = params.skyHorizonColor;
-     const float3 zenith = params.skyZenithColor;
-     const float smoothT = t * t * (3.0f - 2.0f * t);
-     const float hardT = t >= 0.5f ? 1.0f : 0.0f;
-     const float gradientBlend = saturate1(params.skyGradientBlend);
-     const float blendT = hardT * (1.0f - gradientBlend) + smoothT * gradientBlend;
-     const float3 sky = lerp3(horizon, zenith, blendT);
+    const float3 horizon = params.skyHorizonColor;
+    const float3 zenith = params.skyZenithColor;
+    const float gradientBlend = saturate1(params.skyGradientBlend);
+    const float mixWidth = 0.04f + gradientBlend * 0.96f;
+    const float edge0 = 0.5f - 0.5f * mixWidth;
+    const float edge1 = 0.5f + 0.5f * mixWidth;
+    const float skyT = saturate1((t - edge0) / (edge1 - edge0));
+    const float blendT = skyT * skyT * (3.0f - 2.0f * skyT);
+    const float3 sky = lerp3(horizon, zenith, blendT);
     const float3 base = rayDir.y < 0.0f ? lerp3(ground, horizon, saturate1(rayDir.y + 1.0f)) : sky;
     return mul3(
         add3(add3(base, mul3(horizon, 0.04f * horizonGlow)), mul3(make_vec(1.0f, 0.86f, 0.58f), 1.2f * sun)),

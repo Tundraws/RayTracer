@@ -128,6 +128,7 @@ bool setSelectedMeshRotation(SceneState& scene, float3 rotation);
 bool setSelectedMeshScale(SceneState& scene, float3 scale);
 int findObjectGroupIndex(const SceneState& scene, SceneObjectRef ref);
 bool createSceneGroup(SceneState& scene, const std::vector<SceneObjectRef>& refs);
+bool duplicateSelectedSceneGroup(SceneState& scene);
 bool ungroupSelectedSceneGroup(SceneState& scene);
 bool removeSelectedSceneGroup(SceneState& scene);
 bool setSelectedGroupPosition(SceneState& scene, float3 position);

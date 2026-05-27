@@ -200,6 +200,37 @@ std::string uniqueSceneObjectName(const SceneState& scene, const std::string& re
     return base + " copy";
 }
 
+bool sceneGroupNameExists(const SceneState& scene, const std::string& name)
+{
+    for (const SceneGroup& group : scene.groups)
+    {
+        if (group.name == name)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string uniqueSceneGroupName(const SceneState& scene, const std::string& requestedName)
+{
+    const std::string base = trimDuplicateIndexSuffix(requestedName.empty() ? "Группа" : requestedName);
+    if (!sceneGroupNameExists(scene, base))
+    {
+        return base;
+    }
+
+    for (int suffix = 1; suffix < 10000; ++suffix)
+    {
+        const std::string candidate = base + " " + std::to_string(suffix);
+        if (!sceneGroupNameExists(scene, candidate))
+        {
+            return candidate;
+        }
+    }
+    return base + " copy";
+}
+
 bool isEnvironmentObject(const MeshObject& object)
 {
     return object.assetReference.rfind("environment:", 0) == 0;
@@ -1725,7 +1756,7 @@ bool createSceneGroup(SceneState& scene, const std::vector<SceneObjectRef>& refs
     }
 
     SceneGroup group;
-    group.name = std::string("\xD0\x93\xD1\x80\xD1\x83\xD0\xBF\xD0\xBF\xD0\xB0 ") + std::to_string(scene.groups.size() + 1);
+    group.name = uniqueSceneGroupName(scene, std::string("\xD0\x93\xD1\x80\xD1\x83\xD0\xBF\xD0\xBF\xD0\xB0"));
     group.objects = std::move(filtered);
     group.position = averageObjectPosition(scene, group.objects);
     group.rotation = make_float3(0.0f, 0.0f, 0.0f);
@@ -1733,6 +1764,105 @@ bool createSceneGroup(SceneState& scene, const std::vector<SceneObjectRef>& refs
 
     scene.groups.push_back(std::move(group));
     scene.selectedGroup = static_cast<int>(scene.groups.size()) - 1;
+    clampScene(scene);
+    return true;
+}
+
+bool duplicateSelectedSceneGroup(SceneState& scene)
+{
+    clampScene(scene);
+    if (scene.groups.empty() ||
+        scene.selectedGroup < 0 ||
+        scene.selectedGroup >= static_cast<int>(scene.groups.size()))
+    {
+        return false;
+    }
+
+    const SceneGroup source = scene.groups[static_cast<size_t>(scene.selectedGroup)];
+    std::vector<SceneObjectRef> copiedRefs;
+    copiedRefs.reserve(source.objects.size());
+
+    float maxRadius = 1.0f;
+    for (const SceneObjectRef ref : source.objects)
+    {
+        if (!isValidSceneObjectRef(scene, ref))
+        {
+            continue;
+        }
+        if (ref.kind == kSceneObjectSphere)
+        {
+            maxRadius = std::max(maxRadius, scene.spheres[static_cast<size_t>(ref.index)].radius);
+        }
+        else if (ref.kind == kSceneObjectMesh)
+        {
+            maxRadius = std::max(maxRadius, meshFootprintRadius(scene.meshObjects[static_cast<size_t>(ref.index)]));
+        }
+    }
+
+    const float spacing = std::max(3.0f, maxRadius * 2.5f);
+    const float3 groupTarget = findFreePlacementOnFloor(scene, add3(source.position, make_float3(spacing, 0.0f, 0.0f)), maxRadius);
+    const float3 delta = sub3(groupTarget, source.position);
+
+    for (const SceneObjectRef ref : source.objects)
+    {
+        if (!isValidSceneObjectRef(scene, ref))
+        {
+            continue;
+        }
+
+        if (ref.kind == kSceneObjectSphere)
+        {
+            const SphereGeometry& original = scene.spheres[static_cast<size_t>(ref.index)];
+            SphereGeometry copy = original;
+            copy.displayName = uniqueSceneObjectName(scene, sphereDisplayName(original, ref.index));
+            copy.center = add3(original.center, delta);
+            copy.center = findFreePlacementOnFloor(scene, copy.center, copy.radius);
+            copy.center = placeSphereOnSupport(scene, copy.center, copy.radius);
+            scene.spheres.push_back(copy);
+            if (ref.index >= 0 && ref.index < static_cast<int>(scene.materials.size()))
+            {
+                scene.materials.push_back(scene.materials[static_cast<size_t>(ref.index)]);
+            }
+            else
+            {
+                scene.materials.push_back(makeDefaultSphereMaterial());
+            }
+            copiedRefs.push_back(SceneObjectRef{kSceneObjectSphere, static_cast<int>(scene.spheres.size()) - 1});
+        }
+        else if (ref.kind == kSceneObjectMesh)
+        {
+            const MeshObject& original = scene.meshObjects[static_cast<size_t>(ref.index)];
+            if (isEnvironmentObject(original))
+            {
+                continue;
+            }
+            MeshObject copy = original;
+            copy.displayName = uniqueSceneObjectName(scene, original.displayName.empty() ? original.assetReference : original.displayName);
+            copy.position = add3(original.position, delta);
+            copy.position = findFreePlacementOnFloor(scene, copy.position, meshFootprintRadius(copy));
+            copy.position = placeMeshOnSupport(scene, copy, copy.position);
+            updateMeshObjectTransform(copy);
+            scene.meshObjects.push_back(std::move(copy));
+            copiedRefs.push_back(SceneObjectRef{kSceneObjectMesh, static_cast<int>(scene.meshObjects.size()) - 1});
+        }
+    }
+
+    if (copiedRefs.size() < 2)
+    {
+        syncCompatibilityMesh(scene);
+        clampScene(scene);
+        return !copiedRefs.empty();
+    }
+
+    SceneGroup group;
+    group.name = uniqueSceneGroupName(scene, source.name.empty() ? "Группа" : source.name);
+    group.objects = std::move(copiedRefs);
+    group.position = averageObjectPosition(scene, group.objects);
+    group.rotation = source.rotation;
+    group.scale = source.scale;
+    scene.groups.push_back(std::move(group));
+    scene.selectedGroup = static_cast<int>(scene.groups.size()) - 1;
+    syncCompatibilityMesh(scene);
     clampScene(scene);
     return true;
 }

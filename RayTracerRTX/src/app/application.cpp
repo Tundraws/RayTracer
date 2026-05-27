@@ -1505,6 +1505,14 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 applySceneEditResultWithUndo(appState, before, editor.setSelectedGroupScale(make_float3(scale[0], scale[1], scale[2])));
             }
 
+            if (ImGui::Button(u8c(u8"\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0433\u0440\u0443\u043F\u043F\u0443##copy_group")))
+            {
+                const SceneState before = scene;
+                applySceneEditResultWithUndo(appState, before, editor.duplicateSelectedObject(SceneHierarchySelectionGroup));
+                appState.hierarchySelectionKind = SceneHierarchySelectionGroup;
+                refreshMeshSelection();
+            }
+
             if (ImGui::Button(u8c(u8"\u0420\u0430\u0437\u0433\u0440\u0443\u043F\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C##ungroup")))
             {
                 const SceneState before = scene;

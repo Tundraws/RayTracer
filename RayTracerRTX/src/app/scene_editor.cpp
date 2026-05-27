@@ -271,6 +271,10 @@ SceneEditResult SceneEditor::duplicateSelectedObject(const int selectionKind)
     {
         return makeGeometryDirty(duplicateSelectedMeshObject(scene_));
     }
+    if (selectionKind == SceneHierarchySelectionGroup)
+    {
+        return makeGeometryDirty(duplicateSelectedSceneGroup(scene_));
+    }
     return makeGeometryDirty(false);
 }
 

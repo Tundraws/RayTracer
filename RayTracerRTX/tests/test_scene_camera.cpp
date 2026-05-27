@@ -2707,6 +2707,33 @@ void testSceneGroupDeleteRemovesChildren(TestContext& t)
     t.expect(scene.meshObjects.empty(), "Deleting a group should remove child meshes.");
 }
 
+void testSceneGroupDuplicateCreatesGroupedCopies(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    clearSceneObjects(scene);
+    addSphere(scene);
+    scene.spheres[0].displayName = "Шар";
+    addBuiltInMeshPrimitive(scene, BuiltInMeshCube);
+    scene.meshObjects[0].displayName = "Куб";
+    createSceneGroup(scene, {
+        SceneObjectRef{SceneHierarchySelectionSphere, 0},
+        SceneObjectRef{SceneHierarchySelectionMesh, 0}
+    });
+    scene.groups[0].name = "Набор";
+    scene.selectedGroup = 0;
+
+    const bool duplicated = duplicateSelectedSceneGroup(scene);
+
+    t.expect(duplicated, "Duplicating selected group should succeed.");
+    t.expect(scene.groups.size() == 2, "Duplicating a group should create a second group.");
+    t.expect(scene.spheres.size() == 2, "Duplicating a group should copy child sphere.");
+    t.expect(scene.meshObjects.size() == 2, "Duplicating a group should copy child mesh.");
+    t.expect(scene.groups.back().name == "Набор 1", "Duplicated group should receive a unique name.");
+    t.expect(scene.groups.back().objects.size() == 2, "Duplicated group should contain copied child refs.");
+    t.expect(scene.spheres.back().displayName == "Шар 1", "Duplicated grouped sphere should receive a unique name.");
+    t.expect(scene.meshObjects.back().displayName == "Куб 1", "Duplicated grouped mesh should receive a unique name.");
+}
+
 void testSceneGroupPrunesDeletedObject(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3472,6 +3499,7 @@ int main(int argc, char** argv)
     runTest("Scene group transform moves children", testSceneGroupTransformMovesChildren);
     runTest("Scene group ungroup keeps objects", testSceneGroupUngroupKeepsObjects);
     runTest("Scene group delete removes children", testSceneGroupDeleteRemovesChildren);
+    runTest("Scene group duplicate creates grouped copies", testSceneGroupDuplicateCreatesGroupedCopies);
     runTest("Scene group prunes deleted object", testSceneGroupPrunesDeletedObject);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Add sphere duplicates selected and finds free spot", testAddSphereDuplicatesSelectedAndFindsFreeSpot);
