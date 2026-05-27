@@ -98,6 +98,7 @@ Declared in `src/app/scene.h`.
 | `selectNextMeshObject(SceneState&)` | Selects the next mesh object for HUD/material editing |
 | `cycleSelectedMeshMaterialPreset(SceneState&)` | Cycles selected mesh material through diffuse, mirror, metal and dielectric presets |
 | `SceneEditor::setSelectedMeshMaterialProperties(...)` | Updates selected mesh material color, roughness, IOR, alpha and texture toggle through dirty flags |
+| `SceneEditor::setSelectedMeshBaseColorTexture(...)` | Loads a PNG/JPG/PPM base-color texture and assigns it to the selected mesh object |
 | `addBuiltInMeshPrimitive(SceneState&, int)` | Adds a built-in mesh primitive: cube, pyramid, or finite plane/panel |
 | `removeSelectedMeshObject(SceneState&)` | Removes selected mesh object; empty mesh object lists are valid |
 | `removeAllSpheres(SceneState&)` | Removes all analytic spheres and their materials |
@@ -140,14 +141,15 @@ The Dear ImGui material editor is organized into Russian UI sections:
 - `Поверхность`: base color/tint for matte, metal and glass-like materials;
 - `Отражение`: roughness, mirror blur and metal reflection controls;
 - `Прозрачность/стекло`: transparency, IOR and glass haze controls;
-- `Текстуры`: read-only diagnostics for base color texture, normal map,
+- `Текстуры`: base color texture assignment plus diagnostics for normal map,
   roughness map and metallic map.
 
-Texture paths are not edited directly in the panel. They come from OBJ/MTL,
-glTF/GLB or JSON scene input. The panel only reports whether a texture slot is
-missing, unresolved, or loaded with dimensions/channel count. Material edits go
-through `SceneEditor` methods so dirty flags can reset accumulation and request
-renderer refreshes consistently.
+The panel can assign a PNG, JPG/JPEG, or PPM base-color texture to the selected
+mesh object. Normal, roughness, and metallic texture paths still come from
+OBJ/MTL, glTF/GLB, or JSON scene input; for these slots the panel reports
+whether the texture is missing, unresolved, or loaded with dimensions/channel
+count. Material edits go through `SceneEditor` methods so dirty flags can reset
+accumulation and request renderer refreshes consistently.
 
 ## OBJ Mesh API
 

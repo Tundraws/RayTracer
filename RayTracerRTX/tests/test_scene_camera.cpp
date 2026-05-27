@@ -2489,6 +2489,51 @@ void testSceneEditorMeshRoughnessPreservesMaterialColors(TestContext& t)
     t.expect(almostEqual(object.mesh.materials[1].roughness, 0.77f), "Roughness edit should update second material roughness.");
 }
 
+void testSceneEditorMeshBaseColorTextureLoads(TestContext& t)
+{
+    const std::filesystem::path texturePath = writeFixtureBinaryFile("editor_base_color.png", tinyPngBytes());
+    SceneState scene = makeDefaultScene();
+    t.expect(!scene.meshObjects.empty(), "Default scene should have a mesh object.");
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+    MeshObject& object = scene.meshObjects[0];
+    const size_t textureCount = object.mesh.textures.size();
+
+    SceneEditor editor(scene);
+    const SceneEditResult result = editor.setSelectedMeshBaseColorTexture(texturePath);
+
+    t.expect(result.changed, "Loading a base color texture should report a change.");
+    t.expect(result.dirty.material, "Loading a base color texture should set material dirty.");
+    t.expect(!needsRendererSceneRebuild(result.dirty), "Loading a base color texture should use material sync.");
+    t.expect(object.mesh.textures.size() == textureCount + 1, "Texture should be appended to mesh texture list.");
+    const MeshMaterial& material = object.mesh.materials[0];
+    t.expect(material.textureEnabled == 1, "Loaded texture should be enabled.");
+    t.expect(material.textureIndex == static_cast<int>(textureCount), "Material should point to appended texture.");
+    t.expect(material.texturePath == texturePath.string(), "Material should store selected texture path.");
+    for (const MeshMaterial& meshMaterial : object.mesh.materials)
+    {
+        t.expect(meshMaterial.textureIndex == static_cast<int>(textureCount), "Texture assignment should apply to the whole selected mesh object.");
+    }
+    t.expect(object.mesh.textures.back().type == "baseColor", "Loaded texture should be marked as base color.");
+}
+
+void testSceneEditorMeshBaseColorTextureMissingSafe(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(!scene.meshObjects.empty(), "Default scene should have a mesh object.");
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+    MeshObject& object = scene.meshObjects[0];
+    const size_t textureCount = object.mesh.textures.size();
+
+    SceneEditor editor(scene);
+    const SceneEditResult result = editor.setSelectedMeshBaseColorTexture(std::filesystem::temp_directory_path() / "missing_editor_texture.png");
+
+    t.expect(!result.changed, "Missing texture should not change selected material.");
+    t.expect(result.dirty.material, "Missing texture result should keep material dirty category.");
+    t.expect(object.mesh.textures.size() == textureCount, "Missing texture should not append texture data.");
+}
+
 void testSceneEditorResetSphereMaterial(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3603,6 +3648,8 @@ int main(int argc, char** argv)
     runTest("SceneEditor mesh material properties clamp", testSceneEditorMeshMaterialPropertiesClamp);
     runTest("SceneEditor mesh material white does not reset source", testSceneEditorMeshMaterialWhiteDoesNotResetSource);
     runTest("SceneEditor mesh roughness preserves material colors", testSceneEditorMeshRoughnessPreservesMaterialColors);
+    runTest("SceneEditor mesh base color texture loads", testSceneEditorMeshBaseColorTextureLoads);
+    runTest("SceneEditor mesh base color texture missing safe", testSceneEditorMeshBaseColorTextureMissingSafe);
     runTest("SceneEditor reset sphere material", testSceneEditorResetSphereMaterial);
     runTest("SceneEditor reset mesh material", testSceneEditorResetMeshMaterial);
     runTest("Scene undo restores previous scene", testSceneUndoRestoresPreviousScene);

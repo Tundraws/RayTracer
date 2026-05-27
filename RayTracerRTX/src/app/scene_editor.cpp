@@ -1,5 +1,7 @@
 #include "scene_editor.h"
 
+#include "image_loader.h"
+
 #include <cmath>
 #include <utility>
 
@@ -534,6 +536,50 @@ SceneEditResult SceneEditor::setSelectedMeshMaterialProperties(const float3 colo
             !equalFloat(materialBefore.ior, objectMaterial.ior) ||
             !equalFloat(materialBefore.alpha, objectMaterial.alpha) ||
             materialBefore.textureEnabled != objectMaterial.textureEnabled;
+    }
+    if (changed)
+    {
+        syncSelectedMeshObjectMaterials(scene_);
+    }
+    return makeMeshMaterialDirty(changed);
+}
+
+SceneEditResult SceneEditor::setSelectedMeshBaseColorTexture(const std::filesystem::path& path)
+{
+    if (!hasSelectedMesh(scene_))
+    {
+        return makeMeshMaterialDirty(false);
+    }
+
+    MeshObject& object = scene_.meshObjects[static_cast<size_t>(scene_.selectedMeshObject)];
+    const int materialIndex = scene_.selectedMeshMaterial;
+    if (materialIndex < 0 || materialIndex >= static_cast<int>(object.mesh.materials.size()))
+    {
+        return makeMeshMaterialDirty(false);
+    }
+
+    MeshTexture texture;
+    if (!loadImageTexture(path, texture, "baseColor"))
+    {
+        return makeMeshMaterialDirty(false);
+    }
+
+    const int textureIndex = static_cast<int>(object.mesh.textures.size());
+    object.mesh.textures.push_back(std::move(texture));
+
+    bool changed = false;
+    for (MeshMaterial& material : object.mesh.materials)
+    {
+        const int previousTextureIndex = material.textureIndex;
+        const std::string previousTexturePath = material.texturePath;
+        const int previousTextureEnabled = material.textureEnabled;
+        material.textureIndex = textureIndex;
+        material.texturePath = path.string();
+        material.textureEnabled = 1;
+        changed = changed ||
+            previousTextureIndex != material.textureIndex ||
+            previousTexturePath != material.texturePath ||
+            previousTextureEnabled != material.textureEnabled;
     }
     if (changed)
     {

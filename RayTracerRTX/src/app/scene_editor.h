@@ -2,6 +2,8 @@
 
 #include "scene.h"
 
+#include <filesystem>
+
 struct SceneDirtyFlags
 {
     bool camera = false;
@@ -75,6 +77,7 @@ public:
     SceneEditResult setSelectedMeshRotation(float3 rotation);
     SceneEditResult setSelectedMeshScale(float3 scale);
     SceneEditResult setSelectedMeshMaterialProperties(float3 color, float roughness, float ior, float alpha, bool textureEnabled);
+    SceneEditResult setSelectedMeshBaseColorTexture(const std::filesystem::path& path);
     SceneEditResult setSelectedMeshMaterialType(int materialType);
     SceneEditResult resetSelectedMeshMaterial();
     SceneEditResult cycleSelectedMeshMaterialPreset();
