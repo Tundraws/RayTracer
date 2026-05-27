@@ -76,10 +76,6 @@ struct SceneConfig
     float areaLightRadius = 0.0f;
     bool hasEnvironmentIntensity = false;
     float environmentIntensity = 1.0f;
-    bool hasFloorFadeDistance = false;
-    float floorFadeDistance = 90.0f;
-    bool hasFloorFadeSoftness = false;
-    float floorFadeSoftness = 120.0f;
     std::string environmentType = "gradient";
     std::filesystem::path environmentPath;
 };

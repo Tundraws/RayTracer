@@ -880,8 +880,6 @@ SceneState makeDefaultScene()
     scene.lightIntensity = 0.95f;
     scene.areaLightRadius = 0.0f;
     scene.environmentIntensity = 1.0f;
-    scene.floorFadeDistance = 90.0f;
-    scene.floorFadeSoftness = 120.0f;
     scene.environmentType = "gradient";
     scene.showGroundPlane = false;
     scene.selectedSphere = 0;
@@ -904,8 +902,6 @@ SceneState makeBaseEditorScene()
     scene.lightIntensity = 0.95f;
     scene.areaLightRadius = 2.0f;
     scene.environmentIntensity = 0.85f;
-    scene.floorFadeDistance = 90.0f;
-    scene.floorFadeSoftness = 140.0f;
     scene.environmentType = "gradient";
     scene.showGroundPlane = false;
     scene.selectedSphere = 0;
@@ -951,8 +947,6 @@ void clampScene(SceneState& scene)
     scene.lightIntensity = clampSceneLightIntensity(scene.lightIntensity);
     scene.areaLightRadius = clampSceneAreaLightRadius(scene.areaLightRadius);
     scene.environmentIntensity = clampSceneEnvironmentIntensity(scene.environmentIntensity);
-    scene.floorFadeDistance = clampSceneFloorFadeDistance(scene.floorFadeDistance);
-    scene.floorFadeSoftness = clampSceneFloorFadeSoftness(scene.floorFadeSoftness);
 
     if (scene.selectedSphere < 0)
     {
@@ -2102,16 +2096,6 @@ void setSceneSkyGradientBlend(SceneState& scene, const float value)
 void setSceneLightIntensity(SceneState& scene, const float value)
 {
     scene.lightIntensity = clampSceneLightIntensity(value);
-}
-
-void setSceneFloorFadeDistance(SceneState& scene, const float value)
-{
-    scene.floorFadeDistance = clampSceneFloorFadeDistance(value);
-}
-
-void setSceneFloorFadeSoftness(SceneState& scene, const float value)
-{
-    scene.floorFadeSoftness = clampSceneFloorFadeSoftness(value);
 }
 
 void adjustSceneExposure(SceneState& scene, const float delta)

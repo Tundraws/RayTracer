@@ -442,22 +442,6 @@ bool readSceneTuningFields(const JsonObject& object, SceneConfig& config, std::s
         }
         config.hasLightIntensity = true;
     }
-    if (findField(object, "floorFadeDistance") != nullptr)
-    {
-        if (!readFloatField(object, "floorFadeDistance", config.floorFadeDistance, error))
-        {
-            return false;
-        }
-        config.hasFloorFadeDistance = true;
-    }
-    if (findField(object, "floorFadeSoftness") != nullptr)
-    {
-        if (!readFloatField(object, "floorFadeSoftness", config.floorFadeSoftness, error))
-        {
-            return false;
-        }
-        config.hasFloorFadeSoftness = true;
-    }
     return true;
 }
 
@@ -1407,24 +1391,6 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
             }
             result.config.hasEnvironmentIntensity = true;
         }
-        if (findField(*environment, "floorFadeDistance") != nullptr)
-        {
-            if (!readFloatField(*environment, "floorFadeDistance", result.config.floorFadeDistance, error))
-            {
-                result.error = error;
-                return result;
-            }
-            result.config.hasFloorFadeDistance = true;
-        }
-        if (findField(*environment, "floorFadeSoftness") != nullptr)
-        {
-            if (!readFloatField(*environment, "floorFadeSoftness", result.config.floorFadeSoftness, error))
-            {
-                result.error = error;
-                return result;
-            }
-            result.config.hasFloorFadeSoftness = true;
-        }
     }
 
     result.ok = true;
@@ -1517,20 +1483,10 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     {
         result.scene.environmentIntensity = config.environmentIntensity;
     }
-    if (config.hasFloorFadeDistance)
-    {
-        result.scene.floorFadeDistance = config.floorFadeDistance;
-    }
-    if (config.hasFloorFadeSoftness)
-    {
-        result.scene.floorFadeSoftness = config.floorFadeSoftness;
-    }
     result.scene.environmentType = config.environmentType.empty() ? "gradient" : config.environmentType;
     result.scene.environmentPath = config.environmentPath.string();
     result.scene.areaLightRadius = clampSceneAreaLightRadius(result.scene.areaLightRadius);
     result.scene.environmentIntensity = clampSceneEnvironmentIntensity(result.scene.environmentIntensity);
-    result.scene.floorFadeDistance = clampSceneFloorFadeDistance(result.scene.floorFadeDistance);
-    result.scene.floorFadeSoftness = clampSceneFloorFadeSoftness(result.scene.floorFadeSoftness);
     if (!config.environmentPath.empty())
     {
         const std::filesystem::path environmentPath = config.environmentPath.is_absolute()
@@ -1553,8 +1509,6 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     setSceneSkyHorizonColor(result.scene, result.scene.skyHorizonColor);
     setSceneSkyZenithColor(result.scene, result.scene.skyZenithColor);
     setSceneSkyGradientBlend(result.scene, result.scene.skyGradientBlend);
-    setSceneFloorFadeDistance(result.scene, result.scene.floorFadeDistance);
-    setSceneFloorFadeSoftness(result.scene, result.scene.floorFadeSoftness);
     result.scene.lightIntensity = clampSceneLightIntensity(result.scene.lightIntensity);
     appendMaterialWarnings(config, result);
     const std::map<std::string, SceneMaterialConfig> materialMap = makeMaterialMap(config.materials);
@@ -1805,9 +1759,7 @@ bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& 
     output << "  \"render\": {\n";
     output << "    \"exposure\": " << scene.exposure
            << ",\n    \"skyIntensity\": " << scene.skyIntensity
-           << ",\n    \"skyGradientBlend\": " << scene.skyGradientBlend
-           << ",\n    \"floorFadeDistance\": " << scene.floorFadeDistance
-           << ",\n    \"floorFadeSoftness\": " << scene.floorFadeSoftness << "\n";
+           << ",\n    \"skyGradientBlend\": " << scene.skyGradientBlend << "\n";
     output << "  },\n";
     output << "  \"environment\": {\n";
     output << "    \"type\": \"" << jsonEscape(scene.environmentType.empty() ? "gradient" : scene.environmentType) << "\",\n";
@@ -1817,8 +1769,6 @@ bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& 
     output << ",\n    \"zenithColor\": ";
     writeFloat3(scene.skyZenithColor);
     output << ",\n    \"gradientBlend\": " << scene.skyGradientBlend;
-    output << ",\n    \"floorFadeDistance\": " << scene.floorFadeDistance;
-    output << ",\n    \"floorFadeSoftness\": " << scene.floorFadeSoftness;
     if (!scene.environmentPath.empty())
     {
         output << ",\n    \"path\": \"" << jsonEscape(scene.environmentPath) << "\"\n";

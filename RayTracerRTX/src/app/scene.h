@@ -85,8 +85,6 @@ struct SceneState
     float lightIntensity = 0.95f;
     float areaLightRadius = 0.0f;
     float environmentIntensity = 1.0f;
-    float floorFadeDistance = 90.0f;
-    float floorFadeSoftness = 120.0f;
     std::string environmentType = "gradient";
     std::string environmentPath;
     MeshTexture environmentMap;
@@ -145,8 +143,6 @@ void setSceneSkyHorizonColor(SceneState& scene, float3 color);
 void setSceneSkyZenithColor(SceneState& scene, float3 color);
 void setSceneSkyGradientBlend(SceneState& scene, float value);
 void setSceneLightIntensity(SceneState& scene, float value);
-void setSceneFloorFadeDistance(SceneState& scene, float value);
-void setSceneFloorFadeSoftness(SceneState& scene, float value);
 void adjustSceneExposure(SceneState& scene, float delta);
 void adjustSceneSkyIntensity(SceneState& scene, float delta);
 void adjustSceneLightIntensity(SceneState& scene, float delta);

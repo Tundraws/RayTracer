@@ -1635,7 +1635,7 @@ void testSceneConfigTuningFields(TestContext& t)
     const std::filesystem::path configPath = writeFixtureFile(
         "scene_tuning.json",
         "{\n"
-        "  \"render\": {\"exposure\": 0.65, \"skyIntensity\": 0.55, \"floorFadeDistance\": 88.0, \"floorFadeSoftness\": 144.0},\n"
+        "  \"render\": {\"exposure\": 0.65, \"skyIntensity\": 0.55},\n"
         "  \"light\": {\"position\": [4, 7, -5], \"intensity\": 0.75}\n"
         "}\n");
 
@@ -1643,16 +1643,12 @@ void testSceneConfigTuningFields(TestContext& t)
     t.expect(config.ok, "Scene config with render tuning should load.");
     t.expect(config.config.hasExposure, "Scene config should mark exposure as present.");
     t.expect(config.config.hasSkyIntensity, "Scene config should mark sky intensity as present.");
-    t.expect(config.config.hasFloorFadeDistance, "Scene config should mark floor fade distance as present.");
-    t.expect(config.config.hasFloorFadeSoftness, "Scene config should mark floor fade softness as present.");
     t.expect(config.config.hasLightIntensity, "Scene config should mark light intensity as present.");
 
     const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
     t.expect(scene.ok, "Scene config with tuning and fallback mesh should build.");
     t.expect(almostEqual(scene.scene.exposure, 0.65f), "Scene config should apply exposure.");
     t.expect(almostEqual(scene.scene.skyIntensity, 0.55f), "Scene config should apply sky intensity.");
-    t.expect(almostEqual(scene.scene.floorFadeDistance, 88.0f), "Scene config should apply floor fade distance.");
-    t.expect(almostEqual(scene.scene.floorFadeSoftness, 144.0f), "Scene config should apply floor fade softness.");
     t.expect(almostEqual(scene.scene.lightIntensity, 0.75f), "Scene config should apply light intensity.");
 }
 
@@ -1663,8 +1659,6 @@ void testSceneConfigTuningClamps(TestContext& t)
         "{\n"
         "  \"exposure\": -4.0,\n"
         "  \"skyIntensity\": 42.0,\n"
-        "  \"floorFadeDistance\": -100.0,\n"
-        "  \"floorFadeSoftness\": 5000.0,\n"
         "  \"light\": {\"intensity\": -2.0}\n"
         "}\n");
 
@@ -1675,8 +1669,6 @@ void testSceneConfigTuningClamps(TestContext& t)
     t.expect(scene.ok, "Out-of-range tuning values should build through clamp/fallback.");
     t.expect(almostEqual(scene.scene.exposure, 0.1f), "Exposure should clamp to minimum.");
     t.expect(almostEqual(scene.scene.skyIntensity, 3.0f), "Sky intensity should clamp to maximum.");
-    t.expect(almostEqual(scene.scene.floorFadeDistance, 1.0f), "Floor fade distance should clamp to minimum.");
-    t.expect(almostEqual(scene.scene.floorFadeSoftness, 2000.0f), "Floor fade softness should clamp to maximum.");
     t.expect(almostEqual(scene.scene.lightIntensity, 0.0f), "Light intensity should clamp to minimum.");
 }
 
@@ -3143,17 +3135,6 @@ void testSceneSkyGradientBlendClampSafely(TestContext& t)
     t.expect(almostEqual(scene.skyGradientBlend, 1.0f), "Sky gradient blend should clamp high.");
 }
 
-void testSceneFloorFadeClampsSafely(TestContext& t)
-{
-    SceneState scene = makeDefaultScene();
-
-    setSceneFloorFadeDistance(scene, -25.0f);
-    setSceneFloorFadeSoftness(scene, 5000.0f);
-
-    t.expect(almostEqual(scene.floorFadeDistance, 1.0f), "Floor fade distance should clamp low.");
-    t.expect(almostEqual(scene.floorFadeSoftness, 2000.0f), "Floor fade softness should clamp high.");
-}
-
 void testSceneLightIntensityChangesSafely(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3170,13 +3151,9 @@ void testSceneTuningInvalidValuesClamp(TestContext& t)
     setSceneExposure(scene, -100.0f);
     setSceneSkyIntensity(scene, 100.0f);
     setSceneLightIntensity(scene, -50.0f);
-    setSceneFloorFadeDistance(scene, -50.0f);
-    setSceneFloorFadeSoftness(scene, 3000.0f);
     t.expect(almostEqual(scene.exposure, 0.1f), "Invalid exposure should clamp to supported minimum.");
     t.expect(almostEqual(scene.skyIntensity, 3.0f), "Invalid sky intensity should clamp to supported maximum.");
     t.expect(almostEqual(scene.lightIntensity, 0.0f), "Invalid light intensity should clamp to supported minimum.");
-    t.expect(almostEqual(scene.floorFadeDistance, 1.0f), "Invalid floor fade distance should clamp to supported minimum.");
-    t.expect(almostEqual(scene.floorFadeSoftness, 2000.0f), "Invalid floor fade softness should clamp to supported maximum.");
 }
 
 void testClampSceneSelectedSphereBounds(TestContext& t)
@@ -3710,7 +3687,6 @@ int main(int argc, char** argv)
     runTest("Scene sky intensity changes safely", testSceneSkyIntensityChangesSafely);
     runTest("Scene sky colors clamp safely", testSceneSkyColorsClampSafely);
     runTest("Scene sky gradient blend clamp safely", testSceneSkyGradientBlendClampSafely);
-    runTest("Scene floor fade clamps safely", testSceneFloorFadeClampsSafely);
     runTest("Scene light intensity changes safely", testSceneLightIntensityChangesSafely);
     runTest("Scene tuning invalid values clamp", testSceneTuningInvalidValuesClamp);
     runTest("Clamp selected sphere index", testClampSceneSelectedSphereBounds);

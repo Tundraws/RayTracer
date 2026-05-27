@@ -76,8 +76,6 @@ Declared in `src/app/scene.h`.
 | `lightIntensity` | `float` | Direct light intensity multiplier |
 | `areaLightRadius` | `float` | Area-light radius; zero keeps point-light behavior |
 | `environmentIntensity` | `float` | Extra multiplier for gradient sky or environment map |
-| `floorFadeDistance` | `float` | Distance from camera where editable floor panels start blending into the horizon color |
-| `floorFadeSoftness` | `float` | Smooth transition length for distant floor blending |
 | `environmentMap` | `MeshTexture` | Optional PPM lat-long environment map |
 | `selectedSphere` | `int` | Index used by interactive controls |
 | `selectedMeshObject` | `int` | Mesh object index used by interactive controls |
@@ -112,8 +110,6 @@ Declared in `src/app/scene.h`.
 | `setSceneExposure(SceneState&, float)` | Sets tone-mapping exposure with clamping |
 | `setSceneSkyIntensity(SceneState&, float)` | Sets environment-light intensity with clamping |
 | `setSceneLightIntensity(SceneState&, float)` | Sets direct-light intensity with clamping |
-| `setSceneFloorFadeDistance(SceneState&, float)` | Sets distant floor fade start distance with clamping |
-| `setSceneFloorFadeSoftness(SceneState&, float)` | Sets distant floor fade smoothness with clamping |
 | `adjustSceneExposure(SceneState&, float)` | Changes exposure from keyboard/HUD controls |
 | `adjustSceneSkyIntensity(SceneState&, float)` | Changes sky intensity from keyboard/HUD controls |
 | `adjustSceneLightIntensity(SceneState&, float)` | Changes light intensity from keyboard/HUD controls |
@@ -135,11 +131,7 @@ plane is intentionally finite, so it can represent floors, walls, ceilings and
 other editable rectangular surfaces.
 
 The visible floor in the default editor scene is also a finite mesh panel. The
-shader can fade distant floor hits into the horizon color through
-`floorFadeDistance` and `floorFadeSoftness`; this makes a large finite panel
-look less abrupt without adding an infinite-plane primitive. Very distant floor
-hits skip expensive secondary floor reflections and shadow visibility tracing.
-The older renderer-side service plane is hidden by default and is kept only as a
+older renderer-side service plane is hidden by default and is kept only as a
 compatibility fallback.
 
 ## Interactive Material Editor
@@ -183,7 +175,7 @@ supports:
   `horizonColor`, `zenithColor`, and `gradientBlend`;
 - root-level or `render` object fields: `exposure`, `skyIntensity`,
   `lightIntensity`, `skyHorizonColor`, `skyZenithColor`, and
-  `skyGradientBlend`, `floorFadeDistance`, and `floorFadeSoftness`;
+  `skyGradientBlend`;
 - `materials`: named material inputs with `name`, `type`, `baseColor`,
   `roughness`, `metallic`, `specularColor`, `ior`, `alpha`, `texture`/`map_Kd`,
   and `normalMap`;

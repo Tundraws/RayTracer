@@ -140,16 +140,6 @@ inline float clampSceneEnvironmentIntensity(const float value)
     return value < 0.0f ? 0.0f : (value > 4.0f ? 4.0f : value);
 }
 
-inline float clampSceneFloorFadeDistance(const float value)
-{
-    return value < 1.0f ? 1.0f : (value > 2000.0f ? 2000.0f : value);
-}
-
-inline float clampSceneFloorFadeSoftness(const float value)
-{
-    return value < 1.0f ? 1.0f : (value > 2000.0f ? 2000.0f : value);
-}
-
 inline float3 toneMapAndGammaCorrect(const float3 color, const float exposure = 1.0f)
 {
     return gammaCorrect(reinhardToneMap(make_float3(
@@ -314,7 +304,6 @@ struct MeshMaterialGpu
     unsigned int roughnessTextureOffset = 0;
     unsigned int roughnessTextureWidth = 0;
     unsigned int roughnessTextureHeight = 0;
-    int isFloorSurface = 0;
 };
 
 struct MeshObjectGpu
@@ -345,8 +334,6 @@ struct LaunchParams
     float lightIntensity;
     float areaLightRadius;
     float environmentIntensity;
-    float floorFadeDistance;
-    float floorFadeSoftness;
     SphereMaterial* materials;
     int sphereCount;
     MeshVertexGpu* meshVertices;

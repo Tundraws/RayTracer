@@ -1918,18 +1918,6 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             const SceneState before = scene;
             applySceneEditResultWithUndo(appState, before, editor.setSkyGradientBlend(skyGradientBlend));
         }
-        float floorFadeDistance = scene.floorFadeDistance;
-        if (ImGui::SliderFloat(u8c(u8"\u0414\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u044C fade \u043F\u043E\u043B\u0430"), &floorFadeDistance, 10.0f, 300.0f, "%.1f"))
-        {
-            const SceneState before = scene;
-            applySceneEditResultWithUndo(appState, before, editor.setFloorFadeDistance(floorFadeDistance));
-        }
-        float floorFadeSoftness = scene.floorFadeSoftness;
-        if (ImGui::SliderFloat(u8c(u8"\u041C\u044F\u0433\u043A\u043E\u0441\u0442\u044C fade \u043F\u043E\u043B\u0430"), &floorFadeSoftness, 10.0f, 400.0f, "%.1f"))
-        {
-            const SceneState before = scene;
-            applySceneEditResultWithUndo(appState, before, editor.setFloorFadeSoftness(floorFadeSoftness));
-        }
 
         ImGui::SeparatorText(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u044B"));
         builtInPrimitiveCombo(u8c(u8"\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C##primitive_add_combo"), appState.editorPrimitiveToAdd);

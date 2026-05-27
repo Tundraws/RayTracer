@@ -152,27 +152,6 @@ static __forceinline__ __device__ float3 environmentColor(const float3 rayDir)
         params.skyIntensity * params.environmentIntensity);
 }
 
-static __forceinline__ __device__ float floorFadeAmount(const float3 hitPoint, const MeshMaterialGpu material)
-{
-    if (material.isFloorSurface == 0)
-    {
-        return 0.0f;
-    }
-
-    const float3 fromCamera = sub3(hitPoint, params.cameraPosition);
-    const float distance = sqrtf(dot3(fromCamera, fromCamera));
-    const float start = fmaxf(params.floorFadeDistance, 1.0f);
-    const float softness = fmaxf(params.floorFadeSoftness, 1.0f);
-    const float t = saturate1((distance - start) / softness);
-    return t * t * (3.0f - 2.0f * t);
-}
-
-static __forceinline__ __device__ float3 floorFadeColor()
-{
-    const float3 horizonDir = normalize3(make_vec(0.0f, 0.02f, 1.0f));
-    return environmentColor(horizonDir);
-}
-
 static __forceinline__ __device__ float3 reinhardToneMapDevice(const float3 color)
 {
     return make_vec(
@@ -741,20 +720,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
     float lightDistance = 0.0f;
     float visibility = 1.0f;
     float ndotl = 0.0f;
-    const float floorFade = floorFadeAmount(hitPoint, material);
-    const bool farFloor = material.isFloorSurface != 0 && floorFade > 0.70f;
-    if (farFloor)
-    {
-        const float3 lightVector = sub3(params.lightPosition, hitPoint);
-        lightDistance = sqrtf(dot3(lightVector, lightVector));
-        lightDir = lightDistance > 0.0f ? mul3(lightVector, 1.0f / lightDistance) : make_vec(0.0f, 1.0f, 0.0f);
-        visibility = 1.0f;
-        ndotl = fmaxf(dot3(normal, lightDir), 0.0f);
-    }
-    else
-    {
-        evaluateDirectLight(hitPoint, normal, lightDir, lightDistance, visibility, ndotl);
-    }
+    evaluateDirectLight(hitPoint, normal, lightDir, lightDistance, visibility, ndotl);
     const float3 env = environmentColor(normal);
 
     const float ambient = 0.14f;
@@ -809,9 +775,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
         mul3(make_vec(1.0f, 1.0f, 1.0f), diffuseSpecularWeight * specular));
     localColor = add3(localColor, mul3(make_vec(diffuseColor.x * env.x, diffuseColor.y * env.y, diffuseColor.z * env.z), 0.10f));
 
-    const bool skipFloorSecondary = material.isFloorSurface != 0 && floorFade > 0.35f;
-
-    if (!skipFloorSecondary && material.materialType == MaterialMirror)
+    if (material.materialType == MaterialMirror)
     {
         if (depth < static_cast<unsigned int>(params.maxDepth))
         {
@@ -833,7 +797,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
             localColor = make_vec(0.231f, 0.251f, 0.251f);
         }
     }
-    else if (!skipFloorSecondary && material.materialType == MaterialMetal)
+    else if (material.materialType == MaterialMetal)
     {
         if (depth < static_cast<unsigned int>(params.maxDepth))
         {
@@ -853,7 +817,7 @@ static __forceinline__ __device__ float3 shadeMaterial(
                 mul3(material.color, (ambient + diffuse * 0.28f) * roughness));
         }
     }
-    else if (!skipFloorSecondary && material.materialType == MaterialDielectric)
+    else if (material.materialType == MaterialDielectric)
     {
         if (depth < static_cast<unsigned int>(params.maxDepth))
         {
@@ -899,17 +863,12 @@ static __forceinline__ __device__ float3 shadeMaterial(
         }
     }
 
-    if (!skipFloorSecondary && params.renderMode == RenderModeProgressive)
+    if (params.renderMode == RenderModeProgressive)
     {
         MeshMaterialGpu progressiveMaterial = material;
         progressiveMaterial.roughness = roughness;
         const float3 indirect = progressiveBounce(hitPoint, normal, rayDirection, diffuseColor, progressiveMaterial, depth);
         localColor = add3(mul3(localColor, 0.72f), mul3(indirect, 0.28f));
-    }
-
-    if (floorFade > 0.0f)
-    {
-        localColor = lerp3(localColor, floorFadeColor(), floorFade);
     }
 
     return localColor;

@@ -730,17 +730,3 @@ SceneEditResult SceneEditor::adjustLightIntensity(const float delta)
     adjustSceneLightIntensity(scene_, delta);
     return makeLightingDirty(!equalFloat(before, scene_.lightIntensity));
 }
-
-SceneEditResult SceneEditor::setFloorFadeDistance(const float value)
-{
-    const float before = scene_.floorFadeDistance;
-    setSceneFloorFadeDistance(scene_, value);
-    return makeLightingDirty(!equalFloat(before, scene_.floorFadeDistance));
-}
-
-SceneEditResult SceneEditor::setFloorFadeSoftness(const float value)
-{
-    const float before = scene_.floorFadeSoftness;
-    setSceneFloorFadeSoftness(scene_, value);
-    return makeLightingDirty(!equalFloat(before, scene_.floorFadeSoftness));
-}
