@@ -1426,6 +1426,11 @@ void applySelectedMeshMaterialToWholeObject(SceneState& scene)
     syncSelectedMeshMaterialToCombined(scene);
 }
 
+void syncSelectedMeshObjectMaterials(SceneState& scene)
+{
+    syncSelectedMeshMaterialToCombined(scene);
+}
+
 bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
 {
     clampScene(scene);

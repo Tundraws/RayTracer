@@ -2462,6 +2462,30 @@ void testSceneEditorMeshMaterialWhiteDoesNotResetSource(TestContext& t)
     t.expect(almostEqual(object.mesh.materials[0].roughness, 0.8f), "White edit should still apply roughness.");
 }
 
+void testSceneEditorMeshRoughnessPreservesMaterialColors(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(!scene.meshObjects.empty(), "Default scene should have a mesh object.");
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+    MeshObject& object = scene.meshObjects[0];
+    object.mesh.materials = {
+        MeshMaterial{make_float3(1.0f, 0.0f, 0.0f), MaterialDiffuse, "red"},
+        MeshMaterial{make_float3(0.0f, 1.0f, 0.0f), MaterialDiffuse, "green"}
+    };
+    object.sourceMaterials = object.mesh.materials;
+
+    SceneEditor editor(scene);
+    const SceneEditResult result = editor.setSelectedMeshMaterialProperties(object.mesh.materials[0].color, 0.77f, 1.5f, 1.0f, true);
+
+    t.expect(result.changed, "Changing mesh roughness should report a change.");
+    t.expect(result.dirty.material, "Changing mesh roughness should set material dirty.");
+    t.expect(almostEqual(object.mesh.materials[0].color.x, 1.0f), "Roughness edit should preserve first material color.");
+    t.expect(almostEqual(object.mesh.materials[1].color.y, 1.0f), "Roughness edit should preserve second material color.");
+    t.expect(almostEqual(object.mesh.materials[0].roughness, 0.77f), "Roughness edit should update first material roughness.");
+    t.expect(almostEqual(object.mesh.materials[1].roughness, 0.77f), "Roughness edit should update second material roughness.");
+}
+
 void testSceneEditorResetSphereMaterial(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3575,6 +3599,7 @@ int main(int argc, char** argv)
     runTest("SceneEditor material properties clamp", testSceneEditorMaterialPropertiesClamp);
     runTest("SceneEditor mesh material properties clamp", testSceneEditorMeshMaterialPropertiesClamp);
     runTest("SceneEditor mesh material white does not reset source", testSceneEditorMeshMaterialWhiteDoesNotResetSource);
+    runTest("SceneEditor mesh roughness preserves material colors", testSceneEditorMeshRoughnessPreservesMaterialColors);
     runTest("SceneEditor reset sphere material", testSceneEditorResetSphereMaterial);
     runTest("SceneEditor reset mesh material", testSceneEditorResetMeshMaterial);
     runTest("Scene undo restores previous scene", testSceneUndoRestoresPreviousScene);

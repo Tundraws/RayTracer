@@ -508,18 +508,37 @@ SceneEditResult SceneEditor::setSelectedMeshMaterialProperties(const float3 colo
 
     MeshMaterial& material = object.mesh.materials[static_cast<size_t>(materialIndex)];
     const MeshMaterial before = material;
-    material.color = clampColor(color);
-    material.roughness = clampMaterialRoughnessShared(roughness);
-    material.ior = clampMaterialIorShared(ior);
-    material.alpha = clampMaterialUnit(alpha);
-    material.textureEnabled = textureEnabled ? 1 : 0;
-    applySelectedMeshMaterialToWholeObject(scene_);
+    const float3 safeColor = clampColor(color);
+    const float safeRoughness = clampMaterialRoughnessShared(roughness);
+    const float safeIor = clampMaterialIorShared(ior);
+    const float safeAlpha = clampMaterialUnit(alpha);
+    const int safeTextureEnabled = textureEnabled ? 1 : 0;
+    const bool colorChanged = !equal3(before.color, safeColor);
 
-    return makeMeshMaterialDirty(!equal3(before.color, material.color) ||
-        !equalFloat(before.roughness, material.roughness) ||
-        !equalFloat(before.ior, material.ior) ||
-        !equalFloat(before.alpha, material.alpha) ||
-        before.textureEnabled != material.textureEnabled);
+    bool changed = false;
+    for (MeshMaterial& objectMaterial : object.mesh.materials)
+    {
+        const MeshMaterial materialBefore = objectMaterial;
+        if (colorChanged)
+        {
+            objectMaterial.color = safeColor;
+        }
+        objectMaterial.roughness = safeRoughness;
+        objectMaterial.ior = safeIor;
+        objectMaterial.alpha = safeAlpha;
+        objectMaterial.textureEnabled = safeTextureEnabled;
+        changed = changed ||
+            !equal3(materialBefore.color, objectMaterial.color) ||
+            !equalFloat(materialBefore.roughness, objectMaterial.roughness) ||
+            !equalFloat(materialBefore.ior, objectMaterial.ior) ||
+            !equalFloat(materialBefore.alpha, objectMaterial.alpha) ||
+            materialBefore.textureEnabled != objectMaterial.textureEnabled;
+    }
+    if (changed)
+    {
+        syncSelectedMeshObjectMaterials(scene_);
+    }
+    return makeMeshMaterialDirty(changed);
 }
 
 SceneEditResult SceneEditor::setSelectedMeshMaterialType(const int materialType)

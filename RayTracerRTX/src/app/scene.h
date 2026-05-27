@@ -114,6 +114,7 @@ void cycleSelectedMeshMaterialPreset(SceneState& scene);
 void setSelectedMeshMaterialType(SceneState& scene, int materialType);
 bool resetSelectedMeshMaterial(SceneState& scene);
 void applySelectedMeshMaterialToWholeObject(SceneState& scene);
+void syncSelectedMeshObjectMaterials(SceneState& scene);
 bool addBuiltInMeshPrimitive(SceneState& scene, int primitiveType);
 bool addMeshObjectToScene(SceneState& scene, MeshObject object);
 bool duplicateSelectedMeshObject(SceneState& scene);
