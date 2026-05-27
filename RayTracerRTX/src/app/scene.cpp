@@ -6,6 +6,7 @@
 #include <cmath>
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <utility>
 
 #ifndef RAYTRACERRTX_SOURCE_DIR
@@ -224,16 +225,28 @@ bool placementIsOnAvailableSupport(const SceneState& scene, const float x, const
 
 float meshBottomOffset(const MeshObject& object)
 {
-    if (object.assetReference.find("cube") != std::string::npos)
-    {
-        return std::max(0.0f, std::fabs(object.scale.y) * 0.5f);
-    }
     if (object.assetReference.find("panel") != std::string::npos ||
         object.assetReference.find("plane") != std::string::npos)
     {
         return 0.02f;
     }
-    return 0.0f;
+
+    if (object.mesh.vertices.empty())
+    {
+        return 0.0f;
+    }
+
+    float minY = std::numeric_limits<float>::max();
+    for (const MeshVertex& vertex : object.mesh.vertices)
+    {
+        const float3 scaled = make_float3(
+            vertex.position.x * object.scale.x,
+            vertex.position.y * object.scale.y,
+            vertex.position.z * object.scale.z);
+        const float3 local = rotateEulerXyz(scaled, object.rotation);
+        minY = std::min(minY, local.y);
+    }
+    return std::max(0.0f, -minY);
 }
 
 float3 placeSphereOnSupport(const SceneState& scene, const float3 position, const float radius)
@@ -263,7 +276,17 @@ float meshFootprintRadius(const MeshObject& object)
     {
         return std::max(0.8f, maxHorizontalScale * 0.72f);
     }
-    return std::max(0.9f, maxHorizontalScale * 0.82f);
+    float radius = maxHorizontalScale * 0.82f;
+    for (const MeshVertex& vertex : object.mesh.vertices)
+    {
+        const float3 scaled = make_float3(
+            vertex.position.x * object.scale.x,
+            vertex.position.y * object.scale.y,
+            vertex.position.z * object.scale.z);
+        const float3 local = rotateEulerXyz(scaled, object.rotation);
+        radius = std::max(radius, std::sqrt(local.x * local.x + local.z * local.z));
+    }
+    return std::max(0.9f, radius);
 }
 
 std::vector<SceneFootprint> collectEditableFootprints(const SceneState& scene)
@@ -1108,6 +1131,18 @@ void setSelectedSphereMaterialType(SceneState& scene, const int materialType)
     applyMaterialDefaults(material);
 }
 
+bool resetSelectedSphereMaterial(SceneState& scene)
+{
+    const int index = scene.selectedSphere;
+    if (index < 0 || index >= static_cast<int>(scene.materials.size()))
+    {
+        return false;
+    }
+
+    scene.materials[static_cast<size_t>(index)] = makeDefaultSphereMaterial();
+    return true;
+}
+
 void selectNextMeshObject(SceneState& scene)
 {
     if (scene.meshObjects.empty())
@@ -1179,6 +1214,54 @@ void setSelectedMeshMaterialType(SceneState& scene, const int materialType)
         applyMaterialDefaults(objectMaterial);
     }
     syncSelectedMeshMaterialToCombined(scene);
+}
+
+bool resetSelectedMeshMaterial(SceneState& scene)
+{
+    if (scene.meshObjects.empty())
+    {
+        return false;
+    }
+    clampScene(scene);
+    MeshObject& object = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+    if (object.mesh.materials.empty())
+    {
+        return false;
+    }
+
+    for (MeshMaterial& material : object.mesh.materials)
+    {
+        const std::string name = material.name;
+        const std::string texturePath = material.texturePath;
+        const int textureIndex = material.textureIndex;
+        const int textureEnabled = material.textureEnabled;
+        const std::string normalTexturePath = material.normalTexturePath;
+        const int normalTextureIndex = material.normalTextureIndex;
+        const std::string metallicTexturePath = material.metallicTexturePath;
+        const int metallicTextureIndex = material.metallicTextureIndex;
+        const std::string roughnessTexturePath = material.roughnessTexturePath;
+        const int roughnessTextureIndex = material.roughnessTextureIndex;
+
+        material = MeshMaterial{};
+        material.name = name;
+        material.color = make_float3(0.72f, 0.76f, 0.72f);
+        material.materialType = MaterialDiffuse;
+        material.specularColor = make_float3(0.72f, 0.72f, 0.72f);
+        material.roughness = 0.52f;
+        material.ior = 1.5f;
+        material.alpha = 1.0f;
+        material.texturePath = texturePath;
+        material.textureIndex = textureIndex;
+        material.textureEnabled = textureEnabled;
+        material.normalTexturePath = normalTexturePath;
+        material.normalTextureIndex = normalTextureIndex;
+        material.metallicTexturePath = metallicTexturePath;
+        material.metallicTextureIndex = metallicTextureIndex;
+        material.roughnessTexturePath = roughnessTexturePath;
+        material.roughnessTextureIndex = roughnessTextureIndex;
+    }
+    syncSelectedMeshMaterialToCombined(scene);
+    return true;
 }
 
 void applySelectedMeshMaterialToWholeObject(SceneState& scene)
@@ -1273,6 +1356,26 @@ bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
         object.displayName = object.displayName.empty() ? "built-in panel" : object.displayName;
     }
 
+    scene.meshObjects.push_back(std::move(object));
+    scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+    scene.selectedMeshMaterial = 0;
+    syncCompatibilityMesh(scene);
+    clampScene(scene);
+    return true;
+}
+
+bool addMeshObjectToScene(SceneState& scene, MeshObject object)
+{
+    clampScene(scene);
+    if (isEmptyMesh(object.mesh) || !hasValidMeshMaterialIndices(object.mesh))
+    {
+        return false;
+    }
+
+    const float placementRadius = meshFootprintRadius(object);
+    object.position = findFreePlacementOnFloor(scene, object.position, placementRadius);
+    object.position = placeMeshOnSupport(scene, object, object.position);
+    updateMeshObjectTransform(object);
     scene.meshObjects.push_back(std::move(object));
     scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
     scene.selectedMeshMaterial = 0;

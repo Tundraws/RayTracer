@@ -1,6 +1,7 @@
 #include "scene_editor.h"
 
 #include <cmath>
+#include <utility>
 
 namespace
 {
@@ -255,6 +256,11 @@ SceneEditResult SceneEditor::addMeshPrimitive(const int primitiveType)
     return makeGeometryDirty(addBuiltInMeshPrimitive(scene_, primitiveType));
 }
 
+SceneEditResult SceneEditor::addMeshObject(MeshObject object)
+{
+    return makeGeometryDirty(addMeshObjectToScene(scene_, std::move(object)));
+}
+
 SceneEditResult SceneEditor::deleteSelectedSphere()
 {
     return makeGeometryDirty(removeSelectedSphere(scene_));
@@ -378,6 +384,23 @@ SceneEditResult SceneEditor::setSelectedSphereMaterialType(const int materialTyp
         !equalFloat(before.roughness, after.roughness) ||
         !equalFloat(before.ior, after.ior) ||
         !equalFloat(before.alpha, after.alpha));
+}
+
+SceneEditResult SceneEditor::resetSelectedSphereMaterial()
+{
+    if (scene_.materials.empty() || !hasSelectedSphere(scene_))
+    {
+        return makeMaterialDirty(false);
+    }
+
+    const SphereMaterial before = scene_.materials[static_cast<size_t>(scene_.selectedSphere)];
+    const bool reset = ::resetSelectedSphereMaterial(scene_);
+    const SphereMaterial after = scene_.materials[static_cast<size_t>(scene_.selectedSphere)];
+    return makeMaterialDirty(reset && (before.materialType != after.materialType ||
+        !equal3(before.color, after.color) ||
+        !equalFloat(before.roughness, after.roughness) ||
+        !equalFloat(before.ior, after.ior) ||
+        !equalFloat(before.alpha, after.alpha)));
 }
 
 SceneEditResult SceneEditor::cycleSelectedSphereMaterialPreset()
@@ -504,6 +527,36 @@ SceneEditResult SceneEditor::setSelectedMeshMaterialType(const int materialType)
         !equalFloat(before.roughness, after.roughness) ||
         !equalFloat(before.ior, after.ior) ||
         !equalFloat(before.alpha, after.alpha));
+}
+
+SceneEditResult SceneEditor::resetSelectedMeshMaterial()
+{
+    if (!hasSelectedMesh(scene_))
+    {
+        return makeMeshMaterialDirty(false);
+    }
+
+    const MeshObject before = scene_.meshObjects[static_cast<size_t>(scene_.selectedMeshObject)];
+    const bool reset = ::resetSelectedMeshMaterial(scene_);
+    const MeshObject& after = scene_.meshObjects[static_cast<size_t>(scene_.selectedMeshObject)];
+    if (!reset || before.mesh.materials.size() != after.mesh.materials.size() || after.mesh.materials.empty())
+    {
+        return makeMeshMaterialDirty(false);
+    }
+
+    bool changed = false;
+    for (size_t i = 0; i < before.mesh.materials.size(); ++i)
+    {
+        const MeshMaterial& beforeMaterial = before.mesh.materials[i];
+        const MeshMaterial& afterMaterial = after.mesh.materials[i];
+        changed = changed ||
+            beforeMaterial.materialType != afterMaterial.materialType ||
+            !equal3(beforeMaterial.color, afterMaterial.color) ||
+            !equalFloat(beforeMaterial.roughness, afterMaterial.roughness) ||
+            !equalFloat(beforeMaterial.ior, afterMaterial.ior) ||
+            !equalFloat(beforeMaterial.alpha, afterMaterial.alpha);
+    }
+    return makeMeshMaterialDirty(changed);
 }
 
 SceneEditResult SceneEditor::cycleSelectedMeshMaterialPreset()

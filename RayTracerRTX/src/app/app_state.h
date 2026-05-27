@@ -61,6 +61,7 @@ struct AppState
     int hierarchySelectionIndex = 0;
     std::vector<int> groupSelectionSpheres;
     std::vector<int> groupSelectionMeshes;
+    std::vector<SceneState> undoStack;
 };
 
 struct FrameStats

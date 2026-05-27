@@ -50,6 +50,7 @@ public:
 
     SceneEditResult addSphere();
     SceneEditResult addMeshPrimitive(int primitiveType);
+    SceneEditResult addMeshObject(MeshObject object);
     SceneEditResult deleteSelectedSphere();
     SceneEditResult deleteSelectedMeshObject();
     SceneEditResult clearScene();
@@ -65,6 +66,7 @@ public:
     SceneEditResult setSelectedSphereMaterialProperties(float3 color, float roughness, float ior, float alpha);
     SceneEditResult moveSelectedSphere(float3 delta);
     SceneEditResult setSelectedSphereMaterialType(int materialType);
+    SceneEditResult resetSelectedSphereMaterial();
     SceneEditResult cycleSelectedSphereMaterialPreset();
 
     SceneEditResult setSelectedMeshPosition(float3 position);
@@ -72,6 +74,7 @@ public:
     SceneEditResult setSelectedMeshScale(float3 scale);
     SceneEditResult setSelectedMeshMaterialProperties(float3 color, float roughness, float ior, float alpha, bool textureEnabled);
     SceneEditResult setSelectedMeshMaterialType(int materialType);
+    SceneEditResult resetSelectedMeshMaterial();
     SceneEditResult cycleSelectedMeshMaterialPreset();
 
     SceneEditResult createGroup(const std::vector<SceneObjectRef>& refs);

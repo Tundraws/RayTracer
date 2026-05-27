@@ -206,10 +206,12 @@ explicit material type selection, texture enable/disable for textured mesh
 materials, exposure, sky intensity, light intensity, area-light size,
 environment intensity, material-specific roughness/transparency/IOR tuning,
 quality mode, progressive mode and denoiser toggle. It also provides a Windows
-file dialog button for loading an additional `.obj`, `.gltf`, or `.glb` model as
-a runtime scene preset, plus a compact JSON reload button for JSON-backed
-presets. UI widgets are not unit-tested directly; the underlying state helpers
-are covered by tests.
+file dialog button for adding an additional `.obj`, `.gltf`, or `.glb` model to
+the current scene, plus a compact JSON reload button for JSON-backed presets.
+Loaded models are placed on the available floor/support panel when possible and
+shifted to a nearby free spot to avoid overlapping existing editable objects.
+UI widgets are not unit-tested directly; the underlying state helpers are
+covered by tests.
 
 Scene config construction uses `AssetCache` as a small asset manager layer:
 mesh assets are cached by normalized path, and standalone image texture loads

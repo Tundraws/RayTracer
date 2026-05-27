@@ -5,6 +5,7 @@
 #include "../src/app/logger.h"
 #include "../src/app/material.h"
 #include "../src/app/obj_loader.h"
+#include "../src/app/renderer_controller.h"
 #include "../src/app/renderer_statistics.h"
 #include "../src/app/scene.h"
 #include "../src/app/scene_config.h"
@@ -1389,6 +1390,39 @@ void testAddBuiltInMeshUsesSupportPlaneHeight(TestContext& t)
     t.expect(almostEqual(cube.position.y, 2.0f + cube.scale.y * 0.5f), "Cube should stand on the support panel.");
 }
 
+void testAddLoadedMeshUsesSupportPlaneAndFreeSpot(TestContext& t)
+{
+    SceneState scene{};
+    MeshObject panel;
+    panel.assetReference = "built-in panel";
+    panel.displayName = "panel";
+    panel.mesh = createPlaneMesh();
+    panel.position = make_float3(0.0f, 1.5f, 0.0f);
+    panel.rotation = make_float3(0.0f, 0.0f, 0.0f);
+    panel.scale = make_float3(20.0f, 1.0f, 20.0f);
+    scene.meshObjects.push_back(panel);
+
+    MeshObject first;
+    first.assetReference = "external/model.obj";
+    first.displayName = "model.obj";
+    first.mesh = createCubeMesh();
+    first.position = make_float3(0.0f, 0.0f, 0.0f);
+    first.scale = make_float3(2.0f, 2.0f, 2.0f);
+
+    t.expect(addMeshObjectToScene(scene, first), "First loaded mesh should be added to current scene.");
+    const MeshObject& placedFirst = scene.meshObjects.back();
+    t.expect(almostEqual(placedFirst.position.y, 2.5f), "Loaded mesh should stand on the support panel using its vertex bounds.");
+
+    MeshObject second = first;
+    t.expect(addMeshObjectToScene(scene, second), "Second loaded mesh should also be added to current scene.");
+    const MeshObject& placedSecond = scene.meshObjects.back();
+    const float dx = placedSecond.position.x - placedFirst.position.x;
+    const float dz = placedSecond.position.z - placedFirst.position.z;
+    const float distance = std::sqrt(dx * dx + dz * dz);
+    t.expect(distance > 2.0f, "Second loaded mesh should be moved to a nearby free spot.");
+    t.expect(almostEqual(placedSecond.position.y, 2.5f), "Second loaded mesh should also stand on the support panel.");
+}
+
 void testRemoveSelectedMeshObjectSafe(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -2247,6 +2281,66 @@ void testSceneEditorMeshMaterialPropertiesClamp(TestContext& t)
     t.expect(almostEqual(material.ior, 1.01f), "Mesh material IOR should clamp low.");
     t.expect(almostEqual(material.alpha, 1.0f), "Mesh material alpha should clamp high.");
     t.expect(material.textureEnabled == 0, "Mesh material texture toggle should be stored.");
+}
+
+void testSceneEditorResetSphereMaterial(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    scene.selectedSphere = 0;
+    SceneEditor editor(scene);
+    editor.setSelectedSphereMaterialType(MaterialMetal);
+    editor.setSelectedSphereMaterialProperties(make_float3(1.0f, 0.0f, 0.0f), 0.9f, 2.0f, 0.4f);
+
+    const SceneEditResult result = editor.resetSelectedSphereMaterial();
+
+    t.expect(result.changed, "Resetting a changed sphere material should report a change.");
+    t.expect(result.dirty.material, "Reset sphere material should set material dirty.");
+    t.expect(scene.materials[0].materialType == MaterialDiffuse, "Reset sphere material should restore matte material type.");
+    t.expect(almostEqual(scene.materials[0].color.x, 0.72f), "Reset sphere material should restore default color.");
+    t.expect(almostEqual(scene.materials[0].roughness, 0.52f), "Reset sphere material should restore default roughness.");
+}
+
+void testSceneEditorResetMeshMaterial(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(!scene.meshObjects.empty(), "Default scene should have a mesh object.");
+    scene.selectedMeshObject = 0;
+    SceneEditor editor(scene);
+    editor.setSelectedMeshMaterialType(MaterialMetal);
+    editor.setSelectedMeshMaterialProperties(make_float3(1.0f, 0.0f, 0.0f), 0.9f, 2.0f, 0.4f, false);
+
+    const SceneEditResult result = editor.resetSelectedMeshMaterial();
+
+    t.expect(result.changed, "Resetting a changed mesh material should report a change.");
+    t.expect(result.dirty.material, "Reset mesh material should set material dirty.");
+    t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialDiffuse, "Reset mesh material should restore matte material type.");
+    t.expect(almostEqual(scene.meshObjects[0].mesh.materials[0].color.x, 0.72f), "Reset mesh material should restore default color.");
+    t.expect(hasValidMeshMaterialIndices(scene.meshObjects[0].mesh), "Reset mesh material should keep material indices valid.");
+}
+
+void testSceneUndoRestoresPreviousScene(TestContext& t)
+{
+    AppState appState;
+    appState.scene = makeDefaultScene();
+    appState.scene.selectedSphere = 0;
+    const float3 originalColor = appState.scene.materials[0].color;
+    SceneEditor editor(appState.scene);
+
+    const SceneState before = appState.scene;
+    applySceneEditResultWithUndo(
+        appState,
+        before,
+        editor.setSelectedSphereMaterialProperties(make_float3(0.05f, 0.10f, 0.15f), 0.75f, 1.8f, 0.6f));
+
+    t.expect(appState.undoStack.size() == 1, "Undo snapshot should be stored after a scene edit.");
+    t.expect(!almostEqual(appState.scene.materials[0].color.x, originalColor.x), "Scene edit should change the material before undo.");
+
+    const bool undone = undoLastSceneEdit(appState);
+
+    t.expect(undone, "Undo should succeed when a snapshot exists.");
+    t.expect(appState.undoStack.empty(), "Undo should consume one snapshot.");
+    t.expect(almostEqual(appState.scene.materials[0].color.x, originalColor.x), "Undo should restore previous material color.");
+    t.expect(appState.rendererSceneRebuildRequested, "Undo should request renderer refresh.");
 }
 
 void testSceneEditorMeshMaterialAvoidsRebuild(TestContext& t)
@@ -3225,6 +3319,9 @@ int main(int argc, char** argv)
     runTest("SceneEditor material dirty", testSceneEditorMaterialDirty);
     runTest("SceneEditor material properties clamp", testSceneEditorMaterialPropertiesClamp);
     runTest("SceneEditor mesh material properties clamp", testSceneEditorMeshMaterialPropertiesClamp);
+    runTest("SceneEditor reset sphere material", testSceneEditorResetSphereMaterial);
+    runTest("SceneEditor reset mesh material", testSceneEditorResetMeshMaterial);
+    runTest("Scene undo restores previous scene", testSceneUndoRestoresPreviousScene);
     runTest("SceneEditor mesh material avoids rebuild", testSceneEditorMeshMaterialAvoidsRebuild);
     runTest("SceneEditor mesh transform dirty", testSceneEditorMeshTransformDirty);
     runTest("SceneEditor sphere radius avoids rebuild", testSceneEditorSphereRadiusAvoidsRebuild);
@@ -3317,6 +3414,7 @@ int main(int argc, char** argv)
     runTest("Add built-in mesh primitives", testAddBuiltInMeshPrimitives);
     runTest("Add built-in mesh duplicates selected and finds free spot", testAddBuiltInMeshDuplicatesSelectedAndFindsFreeSpot);
     runTest("Add built-in mesh uses support plane height", testAddBuiltInMeshUsesSupportPlaneHeight);
+    runTest("Add loaded mesh uses support plane and free spot", testAddLoadedMeshUsesSupportPlaneAndFreeSpot);
     runTest("Remove selected mesh object safe", testRemoveSelectedMeshObjectSafe);
     runTest("Scene clear helpers", testSceneClearHelpers);
     runTest("Restore default scene objects", testRestoreDefaultSceneObjects);

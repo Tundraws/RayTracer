@@ -24,6 +24,30 @@ void markSceneEdited(AppState& appState, const bool changed, const bool rebuildS
     }
 }
 
+void pushUndoSnapshot(AppState& appState, const SceneState& scene)
+{
+    constexpr size_t maxUndoSnapshots = 32;
+    appState.undoStack.push_back(scene);
+    if (appState.undoStack.size() > maxUndoSnapshots)
+    {
+        appState.undoStack.erase(appState.undoStack.begin());
+    }
+}
+
+bool undoLastSceneEdit(AppState& appState)
+{
+    if (appState.undoStack.empty())
+    {
+        return false;
+    }
+
+    appState.scene = appState.undoStack.back();
+    appState.undoStack.pop_back();
+    invalidateAccumulation(appState);
+    requestRendererSceneRebuild(appState);
+    return true;
+}
+
 void applySceneEditResult(AppState& appState, const SceneEditResult& result)
 {
     if (!result.changed)
@@ -36,6 +60,15 @@ void applySceneEditResult(AppState& appState, const SceneEditResult& result)
     {
         requestRendererSceneRebuild(appState);
     }
+}
+
+void applySceneEditResultWithUndo(AppState& appState, const SceneState& before, const SceneEditResult& result)
+{
+    if (result.changed)
+    {
+        pushUndoSnapshot(appState, before);
+    }
+    applySceneEditResult(appState, result);
 }
 
 void applyQualityMode(AppState& appState)
