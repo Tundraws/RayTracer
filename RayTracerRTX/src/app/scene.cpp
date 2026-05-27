@@ -600,7 +600,7 @@ void addEditableFloor(SceneState& scene)
             "Пол",
             make_float3(0.0f, 0.0f, 0.0f),
             make_float3(0.0f, 0.0f, 0.0f),
-            make_float3(400.0f, 1.0f, 400.0f),
+            make_float3(4000.0f, 1.0f, 4000.0f),
             make_float3(0.48f, 0.50f, 0.48f)));
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
