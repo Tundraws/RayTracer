@@ -80,6 +80,7 @@ struct SceneState
 };
 
 SceneState makeDefaultScene();
+SceneState makeBaseEditorScene();
 void clampScene(SceneState& scene);
 bool addSphere(SceneState& scene);
 bool removeSelectedSphere(SceneState& scene);

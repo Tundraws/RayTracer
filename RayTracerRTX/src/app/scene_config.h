@@ -34,13 +34,25 @@ struct SceneMaterialConfig
 struct MeshObjectConfig
 {
     std::filesystem::path meshPath;
+    std::string primitive;
+    std::string name;
     MeshTransformConfig transform;
+    std::string materialOverride;
+};
+
+struct SphereConfig
+{
+    float3 position = make_float3(0.0f, 1.0f, 0.0f);
+    float radius = 1.0f;
     std::string materialOverride;
 };
 
 struct SceneConfig
 {
     std::vector<MeshObjectConfig> meshObjects;
+    bool hasMeshObjects = false;
+    std::vector<SphereConfig> spheres;
+    bool hasSpheres = false;
     std::vector<SceneMaterialConfig> materials;
     std::vector<std::string> sphereMaterialRefs;
     bool hasCamera = false;
@@ -95,4 +107,5 @@ bool reloadScenePresetFromConfig(
     std::string& error);
 bool applyScenePresetByIndex(const std::vector<SceneBuildResult>& presets, int index, SceneState& scene, CameraState& camera);
 bool saveScenePresetByIndex(std::vector<SceneBuildResult>& presets, int index, const SceneState& scene, const CameraState& camera);
+bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& scene, const CameraState& camera, std::string& error);
 bool resetSceneViewFromPreset(const SceneBuildResult& preset, SceneState& scene, CameraState& camera);

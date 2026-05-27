@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cctype>
 #include <fstream>
+#include <iomanip>
 #include <map>
 #include <sstream>
 #include <stdexcept>
@@ -546,6 +547,87 @@ SceneMaterialConfig makeDefaultSceneMaterialConfig(const std::string& name)
     return material;
 }
 
+std::string jsonEscape(const std::string& value)
+{
+    std::ostringstream out;
+    for (const char ch : value)
+    {
+        switch (ch)
+        {
+        case '\\':
+            out << "\\\\";
+            break;
+        case '"':
+            out << "\\\"";
+            break;
+        case '\n':
+            out << "\\n";
+            break;
+        case '\r':
+            out << "\\r";
+            break;
+        case '\t':
+            out << "\\t";
+            break;
+        default:
+            out << ch;
+            break;
+        }
+    }
+    return out.str();
+}
+
+const char* materialTypeToConfigName(const int materialType)
+{
+    switch (materialType)
+    {
+    case MaterialMirror:
+        return "mirror";
+    case MaterialMetal:
+        return "metal";
+    case MaterialDielectric:
+        return "glass";
+    default:
+        return "matte";
+    }
+}
+
+std::string meshPrimitiveName(const MeshObject& object)
+{
+    if (object.assetReference.find("cube") != std::string::npos)
+    {
+        return "cube";
+    }
+    if (object.assetReference.find("pyramid") != std::string::npos)
+    {
+        return "pyramid";
+    }
+    if (object.assetReference.find("panel") != std::string::npos ||
+        object.assetReference.find("plane") != std::string::npos ||
+        object.assetReference.find("environment:") == 0)
+    {
+        return "plane";
+    }
+    return {};
+}
+
+MeshData makePrimitiveMeshByName(const std::string& primitive)
+{
+    if (primitive == "cube")
+    {
+        return createCubeMesh();
+    }
+    if (primitive == "pyramid")
+    {
+        return createPyramidMesh();
+    }
+    if (primitive == "plane" || primitive == "panel")
+    {
+        return createPlaneMesh();
+    }
+    return {};
+}
+
 bool parseMaterialObject(
     const JsonObject& object,
     const std::string& fallbackName,
@@ -938,6 +1020,50 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
         }
     }
 
+    if (const JsonValue* spheresField = findField(*rootObject, "spheres"))
+    {
+        result.config.hasSpheres = true;
+        const JsonArray* spheres = asArray(*spheresField);
+        if (spheres == nullptr)
+        {
+            result.error = "'spheres' must be an array";
+            return result;
+        }
+
+        for (const JsonValue& item : *spheres)
+        {
+            const JsonObject* sphereObject = asObject(item);
+            if (sphereObject == nullptr)
+            {
+                result.error = "Each spheres item must be an object";
+                return result;
+            }
+
+            SphereConfig sphere;
+            std::string error;
+            if (!readFloat3(*sphereObject, "position", sphere.position, error) ||
+                !readFloatField(*sphereObject, "radius", sphere.radius, error))
+            {
+                result.error = error;
+                return result;
+            }
+            if (const JsonValue* materialField = findField(*sphereObject, "material"))
+            {
+                if (!parseMaterialReference(
+                        *materialField,
+                        result.config,
+                        "sphere_material_" + std::to_string(result.config.spheres.size()),
+                        sphere.materialOverride,
+                        error))
+                {
+                    result.error = error;
+                    return result;
+                }
+            }
+            result.config.spheres.push_back(std::move(sphere));
+        }
+    }
+
     if (const JsonValue* meshField = findField(*rootObject, "mesh"))
     {
         const std::string* meshPath = asString(*meshField);
@@ -949,10 +1075,12 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
         MeshObjectConfig meshObject;
         meshObject.meshPath = *meshPath;
         result.config.meshObjects.push_back(std::move(meshObject));
+        result.config.hasMeshObjects = true;
     }
 
     if (const JsonValue* meshObjectsField = findField(*rootObject, "meshObjects"))
     {
+        result.config.hasMeshObjects = true;
         const JsonArray* meshObjects = asArray(*meshObjectsField);
         if (meshObjects == nullptr)
         {
@@ -974,15 +1102,34 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
             {
                 pathField = findField(*object, "mesh");
             }
+            const JsonValue* primitiveField = findField(*object, "primitive");
             const std::string* path = pathField != nullptr ? asString(*pathField) : nullptr;
-            if (path == nullptr)
+            const std::string* primitive = primitiveField != nullptr ? asString(*primitiveField) : nullptr;
+            if (path == nullptr && primitive == nullptr)
             {
-                result.error = "Each mesh object must define string 'path'";
+                result.error = "Each mesh object must define string 'path' or 'primitive'";
                 return result;
             }
 
             MeshObjectConfig meshObject;
-            meshObject.meshPath = *path;
+            if (path != nullptr)
+            {
+                meshObject.meshPath = *path;
+            }
+            if (primitive != nullptr)
+            {
+                meshObject.primitive = *primitive;
+            }
+            if (const JsonValue* nameField = findField(*object, "name"))
+            {
+                const std::string* name = asString(*nameField);
+                if (name == nullptr)
+                {
+                    result.error = "'name' must be a string";
+                    return result;
+                }
+                meshObject.name = *name;
+            }
             std::string error;
             if (!readFloat3(*object, "position", meshObject.transform.position, error) ||
                 !readFloat3(*object, "rotation", meshObject.transform.rotation, error) ||
@@ -1168,8 +1315,12 @@ SceneBuildResult buildDefaultSceneInput()
 {
     SceneBuildResult result;
     result.ok = true;
-    result.scene = makeDefaultScene();
+    result.scene = makeBaseEditorScene();
     result.camera = CameraState{};
+    result.camera.position = make_float3(0.0f, 7.0f, -16.0f);
+    result.camera.yaw = 90.0f;
+    result.camera.pitch = -22.0f;
+    result.camera.fov = 48.0f;
     return result;
 }
 
@@ -1235,11 +1386,49 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     result.scene.lightIntensity = clampSceneLightIntensity(result.scene.lightIntensity);
     appendMaterialWarnings(config, result);
     const std::map<std::string, SceneMaterialConfig> materialMap = makeMaterialMap(config.materials);
+    if (config.hasSpheres)
+    {
+        result.scene.spheres.clear();
+        result.scene.materials.clear();
+        for (const SphereConfig& sphereConfig : config.spheres)
+        {
+            result.scene.spheres.push_back({sphereConfig.position, sphereConfig.radius});
+            SphereMaterial material{make_float3(0.72f, 0.76f, 0.72f), MaterialDiffuse, make_float3(0.72f, 0.72f, 0.72f), 0.52f, 1.5f, 1.0f};
+            if (!sphereConfig.materialOverride.empty())
+            {
+                const auto found = materialMap.find(sphereConfig.materialOverride);
+                if (found != materialMap.end())
+                {
+                    material = toSphereMaterial(found->second);
+                }
+                else
+                {
+                    const std::string warning = "Sphere material '" + sphereConfig.materialOverride + "' was not found; default sphere material was kept.";
+                    result.warnings.push_back(warning);
+                    logWarning(warning);
+                }
+            }
+            result.scene.materials.push_back(material);
+        }
+    }
+    else if (!config.sphereMaterialRefs.empty() && result.scene.spheres.empty())
+    {
+        result.scene.spheres.push_back({make_float3(0.0f, 1.25f, 0.0f), 1.25f});
+        result.scene.materials.push_back({make_float3(0.72f, 0.76f, 0.72f), MaterialDiffuse, make_float3(0.72f, 0.72f, 0.72f), 0.52f, 1.5f, 1.0f});
+    }
     applySphereMaterialConfig(config, materialMap, result);
 
     if (config.meshObjects.empty())
     {
-        const std::string warning = "Scene config has no mesh objects; using default demo mesh.";
+        if (config.hasMeshObjects)
+        {
+            result.scene.meshObjects.clear();
+            result.scene.mesh = {};
+            clampScene(result.scene);
+            return result;
+        }
+
+        const std::string warning = "Scene config has no mesh objects; using default editor scene.";
         result.warnings.push_back(warning);
         logWarning(warning);
         return result;
@@ -1249,20 +1438,40 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     std::vector<MeshObject> meshObjects;
     for (const MeshObjectConfig& object : config.meshObjects)
     {
-        const std::filesystem::path meshPath = resolvePath(object.meshPath, baseDirectory);
-        const ObjLoadResult& loaded = assets.loadMesh(meshPath);
-        if (!loaded.ok)
+        MeshData objectMesh;
+        std::filesystem::path meshPath;
+        if (!object.primitive.empty())
         {
-            result.ok = false;
-            result.error = loaded.error;
-            logError(result.error);
-            return result;
+            objectMesh = makePrimitiveMeshByName(object.primitive);
+            if (isEmptyMesh(objectMesh))
+            {
+                result.ok = false;
+                result.error = "Unknown built-in mesh primitive: " + object.primitive;
+                logError(result.error);
+                return result;
+            }
         }
-        MeshData objectMesh = loaded.mesh;
+        else
+        {
+            meshPath = resolvePath(object.meshPath, baseDirectory);
+            const ObjLoadResult& loaded = assets.loadMesh(meshPath);
+            if (!loaded.ok)
+            {
+                result.ok = false;
+                result.error = loaded.error;
+                logError(result.error);
+                return result;
+            }
+            objectMesh = loaded.mesh;
+        }
         applyMeshMaterialOverride(object, materialMap, objectMesh, result);
         MeshObject meshObject;
-        meshObject.assetReference = meshPath.string();
-        meshObject.displayName = meshPath.filename().string().empty() ? meshPath.string() : meshPath.filename().string();
+        meshObject.assetReference = object.primitive.empty() ? meshPath.string() : "built-in " + object.primitive;
+        meshObject.displayName = !object.name.empty()
+            ? object.name
+            : (object.primitive.empty()
+                ? (meshPath.filename().string().empty() ? meshPath.string() : meshPath.filename().string())
+                : object.primitive);
         meshObject.mesh = objectMesh;
         meshObject.position = object.transform.position;
         meshObject.rotation = object.transform.rotation;
@@ -1370,6 +1579,124 @@ bool saveScenePresetByIndex(std::vector<SceneBuildResult>& presets, const int in
     preset.scene = scene;
     preset.camera = camera;
     clampScene(preset.scene);
+    return true;
+}
+
+bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& scene, const CameraState& camera, std::string& error)
+{
+    error.clear();
+    std::ofstream output(path, std::ios::binary);
+    if (!output)
+    {
+        error = "Could not open scene file for writing: " + path.string();
+        return false;
+    }
+
+    output << std::fixed << std::setprecision(3);
+    const auto writeFloat3 = [&output](const float3 value)
+    {
+        output << "[" << value.x << ", " << value.y << ", " << value.z << "]";
+    };
+    const auto writeSphereMaterial = [&output, &writeFloat3](const SphereMaterial& material)
+    {
+        output << "{ \"type\": \"" << materialTypeToConfigName(material.materialType) << "\", \"baseColor\": ";
+        writeFloat3(material.color);
+        output << ", \"roughness\": " << material.roughness
+               << ", \"ior\": " << material.ior
+               << ", \"alpha\": " << material.alpha << " }";
+    };
+    const auto writeMeshMaterial = [&output, &writeFloat3](const MeshMaterial& material)
+    {
+        output << "{ \"type\": \"" << materialTypeToConfigName(material.materialType) << "\", \"baseColor\": ";
+        writeFloat3(material.color);
+        output << ", \"roughness\": " << material.roughness
+               << ", \"ior\": " << material.ior
+               << ", \"alpha\": " << material.alpha << " }";
+    };
+
+    output << "{\n";
+    output << "  \"camera\": {\n";
+    output << "    \"position\": ";
+    writeFloat3(camera.position);
+    output << ",\n    \"yaw\": " << camera.yaw
+           << ",\n    \"pitch\": " << camera.pitch
+           << ",\n    \"fov\": " << camera.fov << "\n";
+    output << "  },\n";
+    output << "  \"light\": {\n";
+    output << "    \"position\": ";
+    writeFloat3(scene.lightPosition);
+    output << ",\n    \"intensity\": " << scene.lightIntensity
+           << ",\n    \"size\": " << scene.areaLightRadius << "\n";
+    output << "  },\n";
+    output << "  \"render\": {\n";
+    output << "    \"exposure\": " << scene.exposure
+           << ",\n    \"skyIntensity\": " << scene.skyIntensity << "\n";
+    output << "  },\n";
+    output << "  \"environment\": {\n";
+    output << "    \"type\": \"" << jsonEscape(scene.environmentType.empty() ? "gradient" : scene.environmentType) << "\",\n";
+    output << "    \"intensity\": " << scene.environmentIntensity;
+    if (!scene.environmentPath.empty())
+    {
+        output << ",\n    \"path\": \"" << jsonEscape(scene.environmentPath) << "\"\n";
+    }
+    else
+    {
+        output << "\n";
+    }
+    output << "  },\n";
+
+    output << "  \"spheres\": [\n";
+    for (size_t i = 0; i < scene.spheres.size(); ++i)
+    {
+        const SphereGeometry& sphere = scene.spheres[i];
+        output << "    { \"position\": ";
+        writeFloat3(sphere.center);
+        output << ", \"radius\": " << sphere.radius;
+        if (i < scene.materials.size())
+        {
+            output << ", \"material\": ";
+            writeSphereMaterial(scene.materials[i]);
+        }
+        output << " }" << (i + 1 < scene.spheres.size() ? "," : "") << "\n";
+    }
+    output << "  ],\n";
+
+    output << "  \"meshObjects\": [\n";
+    for (size_t i = 0; i < scene.meshObjects.size(); ++i)
+    {
+        const MeshObject& object = scene.meshObjects[i];
+        const std::string primitive = meshPrimitiveName(object);
+        output << "    {\n";
+        output << "      \"name\": \"" << jsonEscape(object.displayName) << "\",\n";
+        if (!primitive.empty())
+        {
+            output << "      \"primitive\": \"" << primitive << "\",\n";
+        }
+        else
+        {
+            output << "      \"path\": \"" << jsonEscape(object.assetReference) << "\",\n";
+        }
+        output << "      \"position\": ";
+        writeFloat3(object.position);
+        output << ",\n      \"rotation\": ";
+        writeFloat3(object.rotation);
+        output << ",\n      \"scale\": ";
+        writeFloat3(object.scale);
+        if (!object.mesh.materials.empty())
+        {
+            output << ",\n      \"material\": ";
+            writeMeshMaterial(object.mesh.materials.front());
+        }
+        output << "\n    }" << (i + 1 < scene.meshObjects.size() ? "," : "") << "\n";
+    }
+    output << "  ]\n";
+    output << "}\n";
+
+    if (!output)
+    {
+        error = "Could not write complete scene file: " + path.string();
+        return false;
+    }
     return true;
 }
 

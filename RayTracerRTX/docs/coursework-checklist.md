@@ -84,7 +84,7 @@
 | Demo textured OBJ mesh | `assets/meshes/textured_demo.obj`, `assets/meshes/textured_cube.obj`, `assets/meshes/textured_demo.mtl`, `assets/meshes/checker.ppm`, `assets/meshes/checker_normal.ppm` |
 | Demo material showcase mesh | `assets/meshes/material_showcase.obj`, `assets/meshes/material_showcase.mtl` |
 | Demo glTF mesh | `assets/meshes/minimal_gltf.gltf`, `assets/meshes/minimal_gltf.bin` |
-| Demo scene configs | `assets/scenes/demo_scene.json`, `assets/scenes/textured_scene.json`, `assets/scenes/textured_cube_scene.json`, `assets/scenes/multi_mesh_scene.json`, `assets/scenes/material_showcase_scene.json`, `assets/scenes/path_tracing_demo_scene.json`, `assets/scenes/gltf_scene.json` |
+| Demo scene configs | Public presets: `assets/scenes/clean_floor_scene.json`, `assets/scenes/floating_sphere_scene.json`. Additional test/example configs remain in `assets/scenes` for loader coverage. |
 | Docker / Compose | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
 | README | `README.md`, `RayTracerRTX/README.md` |
 | Architecture diagrams | `docs/architecture.md` |

@@ -17,12 +17,12 @@ The executable accepts optional scene input arguments:
 
 ```powershell
 RayTracerRTX.exe --mesh RayTracerRTX/assets/meshes/demo.obj
-RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/demo_scene.json
+RayTracerRTX.exe --scene RayTracerRTX/assets/scenes/clean_floor_scene.json
 ```
 
 `--mesh` loads one OBJ or glTF mesh into the default scene. `--scene` loads a
-JSON scene config with `meshObjects`, `camera`, `light`, image tuning fields,
-and mesh transform fields.
+JSON scene config with `spheres`, `meshObjects`, `camera`, `light`, image tuning
+fields, and transform fields.
 Invalid input prints a diagnostic message and falls back to the default scene.
 Warnings and errors are also appended to `RayTracerRTX.log` in the current
 working directory through the lightweight logger in `src/app/logger.*`.
@@ -36,7 +36,7 @@ cosine-weighted matte bounces, rough reflection bounces for mirror/metal
 materials, a max-depth limit, and Russian roulette termination. It is still a
 coursework quality mode, not a full offline path tracer.
 The lightweight runtime controls also expose a short public preset list with `G`
-(base scene, material scene, and one mesh scene),
+(clean floor scene and floating sphere scene),
 selected mesh object cycling with `B`, selected mesh material preset cycling
 with `V`, and selected sphere material preset cycling with `M`.
 Pressing `C` restores the current preset camera and light without changing the
@@ -159,8 +159,11 @@ Declared in `src/app/scene_config.h`.
 supports:
 
 - `mesh`: shorthand path for one OBJ or glTF mesh;
-- `meshObjects`: array of mesh objects with `path`, `position`, `rotation`, and
-  `scale`;
+- `spheres`: explicit analytic sphere objects with `position`, `radius`, and
+  optional inline/named `material`;
+- `meshObjects`: array of mesh objects with either `path` for OBJ/glTF/GLB or
+  `primitive` for built-in `cube`, `pyramid`, or `plane`, plus `position`,
+  `rotation`, `scale`, optional `name`, and optional `material`;
 - `camera`: `position`, `yaw`, `pitch`, `fov`;
 - `light`: `position`, optional `intensity`, and optional `size`/`radius` for
   area-light soft shadows;
@@ -172,14 +175,17 @@ supports:
 - `materials`: named material inputs with `name`, `type`, `baseColor`,
   `roughness`, `metallic`, `specularColor`, `ior`, `alpha`, `texture`/`map_Kd`,
   and `normalMap`;
-- `sphereMaterials`: material names or inline material objects assigned to the
-  default spheres by index;
+- `sphereMaterials`: legacy material names or inline material objects assigned
+  to spheres by index;
 - mesh object `material` or `materialOverride`: material name or inline material
   object applied to all materials of that mesh object.
 
 If image-tuning fields are missing, the default scene values are used. Numeric
 values outside the supported range are clamped so old or experimental scene
-files do not make the renderer unstable.
+files do not make the renderer unstable. `saveSceneToConfigFile(...)` writes the
+current camera, light, spheres, built-in primitives, loaded mesh objects, and
+basic material parameters back to JSON; the ImGui button saves to
+`RayTracerRTX/assets/scenes/saved_scene.json`.
 
 JSON material `type` accepts `matte`, `mirror`, `metal`, and `glass`. The loader
 also accepts `diffuse` as an alias for `matte` and `dielectric` as an alias for

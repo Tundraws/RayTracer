@@ -1461,8 +1461,8 @@ void testRestoreDefaultSceneObjects(TestContext& t)
     clearSceneObjects(scene);
 
     t.expect(restoreDefaultSceneObjects(scene), "Restoring default objects should succeed.");
-    t.expect(!scene.spheres.empty(), "Default spheres should be restored.");
-    t.expect(!scene.meshObjects.empty(), "Default mesh objects should be restored.");
+    t.expect(scene.spheres.empty(), "Clean editor default should not restore demo spheres.");
+    t.expect(scene.meshObjects.size() == 1, "Clean editor default should restore only the floor panel.");
     t.expect(!scene.showGroundPlane, "Default scene should use editable mesh floor instead of service plane.");
 }
 
@@ -1742,6 +1742,52 @@ void testSceneConfigMaterialAssignedToMesh(TestContext& t)
     t.expect(scene.scene.mesh.materials[0].materialType == MaterialMirror, "Combined mesh should receive JSON material override.");
 }
 
+void testSceneConfigBuiltInPrimitiveAndExplicitSpheres(TestContext& t)
+{
+    const std::filesystem::path configPath = writeFixtureFile(
+        "json_builtin_primitive_scene.json",
+        "{\n"
+        "  \"spheres\": [{\"position\": [0, 3, 0], \"radius\": 1.25, \"material\": {\"type\": \"metal\", \"baseColor\": [0.4, 0.6, 0.9]}}],\n"
+        "  \"meshObjects\": [{\"name\": \"floor\", \"primitive\": \"plane\", \"scale\": [20, 1, 20]}]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Built-in primitive scene config should parse: " + config.error);
+    t.expect(config.config.hasSpheres, "Explicit spheres should be tracked.");
+    t.expect(config.config.hasMeshObjects, "Explicit mesh objects should be tracked.");
+
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Built-in primitive scene should build.");
+    t.expect(scene.scene.spheres.size() == 1, "Explicit sphere list should replace default spheres.");
+    t.expect(scene.scene.materials[0].materialType == MaterialMetal, "Inline sphere material should be applied.");
+    t.expect(scene.scene.meshObjects.size() == 1, "One built-in plane should be created.");
+    t.expect(scene.scene.meshObjects[0].assetReference.find("plane") != std::string::npos, "Built-in plane should be stored as mesh object.");
+}
+
+void testSceneConfigSaveCurrentScene(TestContext& t)
+{
+    SceneState scene = makeBaseEditorScene();
+    addSphere(scene);
+    scene.spheres.back().center = make_float3(0.0f, 2.0f, 0.0f);
+    scene.spheres.back().radius = 2.0f;
+    CameraState camera{};
+    camera.position = make_float3(0.0f, 6.0f, -12.0f);
+    camera.yaw = 90.0f;
+    camera.pitch = -15.0f;
+    camera.fov = 50.0f;
+
+    const std::filesystem::path savePath = std::filesystem::temp_directory_path() / "raytracerrtx_obj_loader_tests" / "saved_scene_roundtrip.json";
+    std::string error;
+    t.expect(saveSceneToConfigFile(savePath, scene, camera, error), "Scene should save to JSON: " + error);
+
+    const SceneConfigResult config = loadSceneConfigFile(savePath);
+    t.expect(config.ok, "Saved scene should parse again: " + config.error);
+    const SceneBuildResult loaded = buildSceneFromConfig(config.config, savePath.parent_path());
+    t.expect(loaded.ok, "Saved scene should build again.");
+    t.expect(loaded.scene.spheres.size() == 1, "Saved sphere should round-trip.");
+    t.expect(!loaded.scene.meshObjects.empty(), "Saved floor panel should round-trip.");
+}
+
 void testSceneConfigInvalidMaterialTypeFallback(TestContext& t)
 {
     const std::filesystem::path configPath = writeFixtureFile(
@@ -1830,16 +1876,15 @@ void testSceneConfigOldSceneStillLoads(TestContext& t)
     t.expect(config.ok, "Old scene config without JSON materials should still parse.");
     const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
     t.expect(scene.ok, "Old scene config without JSON materials should still build.");
-    t.expect(scene.scene.materials.size() == 3, "Old scene config should keep default sphere materials.");
+    t.expect(scene.scene.materials.empty(), "Old scene config should keep the clean default without spheres.");
     t.expect(!scene.scene.meshObjects.empty(), "Old scene config should keep fallback demo mesh.");
 }
 
 void testAllDemoSceneConfigsLoad(TestContext& t)
 {
     const std::vector<std::string> scenes = {
-        "demo_scene.json",
-        "textured_cube_scene.json",
-        "material_showcase_scene.json"
+        "clean_floor_scene.json",
+        "floating_sphere_scene.json"
     };
 
     for (const std::string& fileName : scenes)
@@ -1860,9 +1905,11 @@ void testAllDemoSceneConfigsLoad(TestContext& t)
 
         const SceneBuildResult scene = buildSceneFromConfig(config.config, scenePath.parent_path());
         t.expect(scene.ok, "Demo scene config should build: " + fileName + " " + scene.error);
-        t.expect(!scene.scene.meshObjects.empty(), "Demo scene should contain mesh objects: " + fileName);
-        t.expect(hasValidMeshMaterialIndices(scene.scene.mesh), "Demo scene combined mesh material indices should be valid: " + fileName);
-        t.expect(scene.scene.spheres.size() >= 3, "Public demo scene should keep visible default spheres: " + fileName);
+        t.expect(!scene.scene.meshObjects.empty() || !scene.scene.spheres.empty(), "Demo scene should contain visible objects: " + fileName);
+        if (!scene.scene.meshObjects.empty())
+        {
+            t.expect(hasValidMeshMaterialIndices(scene.scene.mesh), "Demo scene combined mesh material indices should be valid: " + fileName);
+        }
     }
 }
 
@@ -1946,8 +1993,8 @@ void testSceneConfigFallbackDemoScene(TestContext& t)
 {
     const SceneBuildResult scene = buildDefaultSceneInput();
     t.expect(scene.ok, "Default scene input should build.");
-    t.expect(!isEmptyMesh(scene.scene.mesh), "Default scene input should keep fallback/demo mesh.");
-    t.expect(!scene.scene.meshObjects.empty(), "Default scene input should keep mesh object list.");
+    t.expect(scene.scene.spheres.empty(), "Default editor scene should start without spheres.");
+    t.expect(scene.scene.meshObjects.size() == 1, "Default editor scene should keep one large floor panel.");
     t.expect(hasValidMeshMaterialIndices(scene.scene.mesh), "Default scene input mesh material indices should be valid.");
     t.expect(scene.scene.exposure > 0.0f, "Default scene input should keep exposure.");
     t.expect(scene.scene.skyIntensity > 0.0f, "Default scene input should keep sky intensity.");
@@ -3430,6 +3477,8 @@ int main(int argc, char** argv)
     runTest("Scene config JSON material parses", testSceneConfigJsonMaterialParses);
     runTest("Scene config material assigned to sphere", testSceneConfigMaterialAssignedToSphere);
     runTest("Scene config material assigned to mesh", testSceneConfigMaterialAssignedToMesh);
+    runTest("Scene config built-in primitive and explicit spheres", testSceneConfigBuiltInPrimitiveAndExplicitSpheres);
+    runTest("Scene config save current scene", testSceneConfigSaveCurrentScene);
     runTest("Scene config invalid material type fallback", testSceneConfigInvalidMaterialTypeFallback);
     runTest("Scene config invalid JSON fails cleanly", testSceneConfigInvalidJsonFailsCleanly);
     runTest("Scene config invalid material config fails cleanly", testSceneConfigInvalidMaterialConfigFailsCleanly);

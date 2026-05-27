@@ -600,7 +600,7 @@ void addEditableFloor(SceneState& scene)
             "Пол",
             make_float3(0.0f, 0.0f, 0.0f),
             make_float3(0.0f, 0.0f, 0.0f),
-            make_float3(18.0f, 1.0f, 18.0f),
+            make_float3(80.0f, 1.0f, 80.0f),
             make_float3(0.48f, 0.50f, 0.48f)));
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
@@ -784,6 +784,25 @@ SceneState makeDefaultScene()
     scene.showGroundPlane = false;
     scene.selectedSphere = 0;
     scene.selectedMeshObject = scene.meshObjects.size() > 1 ? 1 : 0;
+    scene.selectedMeshMaterial = 0;
+    clampScene(scene);
+    return scene;
+}
+
+SceneState makeBaseEditorScene()
+{
+    SceneState scene;
+    addEditableFloor(scene);
+    scene.lightPosition = make_float3(8.0f, 12.0f, -8.0f);
+    scene.exposure = 0.78f;
+    scene.skyIntensity = 0.72f;
+    scene.lightIntensity = 0.95f;
+    scene.areaLightRadius = 2.0f;
+    scene.environmentIntensity = 0.85f;
+    scene.environmentType = "gradient";
+    scene.showGroundPlane = false;
+    scene.selectedSphere = 0;
+    scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
     clampScene(scene);
     return scene;
@@ -1460,7 +1479,7 @@ bool clearSceneObjects(SceneState& scene)
 
 bool restoreDefaultSceneObjects(SceneState& scene)
 {
-    const SceneState defaults = makeDefaultScene();
+    const SceneState defaults = makeBaseEditorScene();
     scene.spheres = defaults.spheres;
     scene.materials = defaults.materials;
     scene.meshObjects = defaults.meshObjects;

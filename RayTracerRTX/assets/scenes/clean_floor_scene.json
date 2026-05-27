@@ -1,0 +1,36 @@
+{
+  "camera": {
+    "position": [0.0, 7.0, -16.0],
+    "yaw": 90.0,
+    "pitch": -22.0,
+    "fov": 48.0
+  },
+  "light": {
+    "position": [8.0, 12.0, -8.0],
+    "intensity": 0.95,
+    "size": 2.0
+  },
+  "render": {
+    "exposure": 0.78,
+    "skyIntensity": 0.72
+  },
+  "environment": {
+    "type": "gradient",
+    "intensity": 0.85
+  },
+  "spheres": [],
+  "meshObjects": [
+    {
+      "name": "Пол",
+      "primitive": "plane",
+      "position": [0.0, 0.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [80.0, 1.0, 80.0],
+      "material": {
+        "type": "matte",
+        "baseColor": [0.48, 0.50, 0.48],
+        "roughness": 0.64
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "camera": {
+    "position": [0.0, 3.5, -10.0],
+    "yaw": 90.0,
+    "pitch": -4.0,
+    "fov": 46.0
+  },
+  "light": {
+    "position": [5.0, 8.0, -6.0],
+    "intensity": 1.05,
+    "size": 1.5
+  },
+  "render": {
+    "exposure": 0.80,
+    "skyIntensity": 0.78
+  },
+  "environment": {
+    "type": "gradient",
+    "intensity": 0.90
+  },
+  "spheres": [
+    {
+      "position": [0.0, 2.8, 0.0],
+      "radius": 1.35,
+      "material": {
+        "type": "metal",
+        "baseColor": [0.62, 0.76, 0.92],
+        "roughness": 0.18
+      }
+    }
+  ],
+  "meshObjects": []
+}

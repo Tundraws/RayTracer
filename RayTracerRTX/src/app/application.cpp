@@ -56,6 +56,7 @@ float gImguiPanelWidth = 0.0f;
 float gImguiPanelHeight = 0.0f;
 
 void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath = {});
+std::filesystem::path defaultSavedScenePath();
 
 float3 add3(const float3 a, const float3 b)
 {
@@ -1243,6 +1244,25 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 loadUserMeshPreset(appState, *meshPath);
             }
         }
+        ImGui::SameLine();
+        if (ImGui::Button(u8c(u8"\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C JSON")))
+        {
+            const std::filesystem::path savePath = defaultSavedScenePath();
+            std::error_code ec;
+            std::filesystem::create_directories(savePath.parent_path(), ec);
+            std::string error;
+            if (saveSceneToConfigFile(savePath, scene, appState.camera, error))
+            {
+                appState.lastUiMessage = "Сцена сохранена: " + savePath.string();
+                appState.lastUiMessageIsError = false;
+            }
+            else
+            {
+                appState.lastUiMessage = error.empty() ? "Не удалось сохранить сцену." : error;
+                appState.lastUiMessageIsError = true;
+                logError(appState.lastUiMessage);
+            }
+        }
         ImGui::SeparatorText(u8c(u8"\u041E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0435"));
         environmentModeCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##environment_mode"), appState.environmentMode);
         if (ImGui::Button(u8c(u8"\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C")))
@@ -2026,6 +2046,16 @@ std::filesystem::path findSceneAsset(const std::string& fileName)
     return {};
 }
 
+std::filesystem::path defaultSavedScenePath()
+{
+    const std::filesystem::path sourceDir = RAYTRACERRTX_SOURCE_DIR;
+    if (!sourceDir.empty())
+    {
+        return sourceDir.parent_path() / "assets" / "scenes" / "saved_scene.json";
+    }
+    return std::filesystem::path("RayTracerRTX") / "assets" / "scenes" / "saved_scene.json";
+}
+
 void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath)
 {
     if (!preset.ok)
@@ -2128,8 +2158,7 @@ void run_optix_app(const ApplicationOptions& options)
     {
         addScenePreset(appState, buildDefaultSceneInput(), L"\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
     }
-    addSceneConfigPreset(appState, "material_showcase_scene.json", L"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B");
-    addSceneConfigPreset(appState, "textured_cube_scene.json", L"\u041F\u043E\u043B\u0438\u0433\u043E\u043D\u0430\u043B\u044C\u043D\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C");
+    addSceneConfigPreset(appState, "floating_sphere_scene.json", L"\u0421\u0444\u0435\u0440\u0430 \u0432 \u0432\u043E\u0437\u0434\u0443\u0445\u0435");
     glfwSetWindowUserPointer(window, &appState);
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
