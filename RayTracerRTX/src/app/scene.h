@@ -30,6 +30,7 @@ struct MeshObject
     std::string assetReference;
     std::string displayName;
     MeshData mesh;
+    std::vector<MeshMaterial> sourceMaterials;
     float3 position = make_float3(0.0f, 0.0f, 0.0f);
     float3 rotation = make_float3(0.0f, 0.0f, 0.0f);
     float3 scale = make_float3(1.0f, 1.0f, 1.0f);

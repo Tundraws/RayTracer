@@ -16,6 +16,7 @@
 
 #include "test_framework.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -1835,6 +1836,67 @@ void testSceneConfigSaveCurrentScene(TestContext& t)
     t.expect(!loaded.scene.meshObjects.empty(), "Saved floor panel should round-trip.");
 }
 
+void testSceneConfigSaveExternalMeshKeepsSourceMaterials(TestContext& t)
+{
+    writeFixtureFile(
+        "json_source_materials.mtl",
+        "newmtl red_source\n"
+        "Kd 1.0 0.0 0.0\n"
+        "\n"
+        "newmtl green_source\n"
+        "Kd 0.0 1.0 0.0\n");
+    writeFixtureFile(
+        "json_source_materials.obj",
+        "mtllib json_source_materials.mtl\n"
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "v 1 1 0\n"
+        "usemtl red_source\n"
+        "f 1 2 3\n"
+        "usemtl green_source\n"
+        "f 2 4 3\n");
+    const std::filesystem::path configPath = writeFixtureFile(
+        "json_source_materials_scene.json",
+        "{\n"
+        "  \"meshObjects\": [{\"path\": \"json_source_materials.obj\"}]\n"
+        "}\n");
+
+    const SceneConfigResult config = loadSceneConfigFile(configPath);
+    t.expect(config.ok, "Source material scene should parse: " + config.error);
+    const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
+    t.expect(scene.ok, "Source material scene should build.");
+    t.expect(scene.scene.meshObjects.size() == 1, "Source material scene should keep one mesh object.");
+    const auto hasMaterialColor = [](const MeshData& mesh, const std::string& name, const float3 color)
+    {
+        return std::any_of(mesh.materials.begin(), mesh.materials.end(), [&](const MeshMaterial& material)
+        {
+            return material.name == name &&
+                almostEqual(material.color.x, color.x) &&
+                almostEqual(material.color.y, color.y) &&
+                almostEqual(material.color.z, color.z);
+        });
+    };
+    t.expect(scene.scene.meshObjects[0].mesh.materials.size() >= 2, "OBJ source materials should be loaded.");
+    t.expect(hasMaterialColor(scene.scene.meshObjects[0].mesh, "red_source", make_float3(1.0f, 0.0f, 0.0f)), "Red source material should be loaded.");
+    t.expect(hasMaterialColor(scene.scene.meshObjects[0].mesh, "green_source", make_float3(0.0f, 1.0f, 0.0f)), "Green source material should be loaded.");
+
+    CameraState camera{};
+    const std::filesystem::path savePath = std::filesystem::temp_directory_path() / "raytracerrtx_obj_loader_tests" / "saved_source_materials_scene.json";
+    std::string error;
+    t.expect(saveSceneToConfigFile(savePath, scene.scene, camera, error), "External mesh scene should save: " + error);
+    const std::string savedJson = readTextFile(savePath);
+    t.expect(savedJson.find("\"material\"") == std::string::npos, "Unchanged external mesh materials should not be replaced by a JSON override.");
+
+    const SceneConfigResult savedConfig = loadSceneConfigFile(savePath);
+    t.expect(savedConfig.ok, "Saved source material scene should parse: " + savedConfig.error);
+    const SceneBuildResult loaded = buildSceneFromConfig(savedConfig.config, savePath.parent_path());
+    t.expect(loaded.ok, "Saved source material scene should build.");
+    t.expect(loaded.scene.meshObjects[0].mesh.materials.size() >= 2, "Saved external mesh should reload source material count.");
+    t.expect(hasMaterialColor(loaded.scene.meshObjects[0].mesh, "red_source", make_float3(1.0f, 0.0f, 0.0f)), "Saved external mesh should preserve red source material.");
+    t.expect(hasMaterialColor(loaded.scene.meshObjects[0].mesh, "green_source", make_float3(0.0f, 1.0f, 0.0f)), "Saved external mesh should preserve green source material.");
+}
+
 void testSceneConfigInvalidMaterialTypeFallback(TestContext& t)
 {
     const std::filesystem::path configPath = writeFixtureFile(
@@ -2399,6 +2461,9 @@ void testSceneEditorResetMeshMaterial(TestContext& t)
     SceneState scene = makeDefaultScene();
     t.expect(!scene.meshObjects.empty(), "Default scene should have a mesh object.");
     scene.selectedMeshObject = 0;
+    const float3 sourceColor = scene.meshObjects[0].sourceMaterials.empty()
+        ? scene.meshObjects[0].mesh.materials[0].color
+        : scene.meshObjects[0].sourceMaterials[0].color;
     SceneEditor editor(scene);
     editor.setSelectedMeshMaterialType(MaterialMetal);
     editor.setSelectedMeshMaterialProperties(make_float3(1.0f, 0.0f, 0.0f), 0.9f, 2.0f, 0.4f, false);
@@ -2408,7 +2473,7 @@ void testSceneEditorResetMeshMaterial(TestContext& t)
     t.expect(result.changed, "Resetting a changed mesh material should report a change.");
     t.expect(result.dirty.material, "Reset mesh material should set material dirty.");
     t.expect(scene.meshObjects[0].mesh.materials[0].materialType == MaterialDiffuse, "Reset mesh material should restore matte material type.");
-    t.expect(almostEqual(scene.meshObjects[0].mesh.materials[0].color.x, 0.72f), "Reset mesh material should restore default color.");
+    t.expect(almostEqual(scene.meshObjects[0].mesh.materials[0].color.x, sourceColor.x), "Reset mesh material should restore source color.");
     t.expect(hasValidMeshMaterialIndices(scene.meshObjects[0].mesh), "Reset mesh material should keep material indices valid.");
 }
 
@@ -3605,6 +3670,7 @@ int main(int argc, char** argv)
     runTest("Scene config material assigned to mesh", testSceneConfigMaterialAssignedToMesh);
     runTest("Scene config built-in primitive and explicit spheres", testSceneConfigBuiltInPrimitiveAndExplicitSpheres);
     runTest("Scene config save current scene", testSceneConfigSaveCurrentScene);
+    runTest("Scene config save external mesh keeps source materials", testSceneConfigSaveExternalMeshKeepsSourceMaterials);
     runTest("Scene config invalid material type fallback", testSceneConfigInvalidMaterialTypeFallback);
     runTest("Scene config invalid JSON fails cleanly", testSceneConfigInvalidJsonFailsCleanly);
     runTest("Scene config invalid material config fails cleanly", testSceneConfigInvalidMaterialConfigFailsCleanly);

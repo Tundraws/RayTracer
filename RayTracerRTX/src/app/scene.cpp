@@ -129,6 +129,7 @@ MeshObject makeBuiltInMeshObject(MeshData mesh, std::string name, const float3 p
     object.assetReference = name;
     object.displayName = std::move(name);
     object.mesh = std::move(mesh);
+    object.sourceMaterials = object.mesh.materials;
     object.position = position;
     object.rotation = rotation;
     object.scale = scale;
@@ -866,6 +867,7 @@ SceneState makeDefaultScene()
     defaultMeshObject.assetReference = "assets/meshes/demo.obj";
     defaultMeshObject.displayName = "Demo OBJ";
     defaultMeshObject.mesh = scene.mesh;
+    defaultMeshObject.sourceMaterials = defaultMeshObject.mesh.materials;
     scene.meshObjects = {std::move(defaultMeshObject)};
     addEditableFloor(scene);
     scene.mesh = scene.meshObjects.size() > 1 ? scene.meshObjects[1].mesh : scene.mesh;
@@ -1357,6 +1359,13 @@ bool resetSelectedMeshMaterial(SceneState& scene)
     if (object.mesh.materials.empty())
     {
         return false;
+    }
+
+    if (!object.sourceMaterials.empty() && object.sourceMaterials.size() == object.mesh.materials.size())
+    {
+        object.mesh.materials = object.sourceMaterials;
+        syncSelectedMeshMaterialToCombined(scene);
+        return true;
     }
 
     for (MeshMaterial& material : object.mesh.materials)

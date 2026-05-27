@@ -229,6 +229,11 @@ Scene config construction uses `AssetCache` as a small asset manager layer:
 mesh assets are cached by normalized path, and standalone image texture loads
 can be cached by path and texture type. The cache keeps repeated mesh references
 from re-reading the same OBJ/glTF/GLB asset during scene construction.
+For external OBJ/glTF/GLB mesh objects, the scene keeps a copy of the source
+materials loaded from the asset. Saving a scene omits a mesh material override
+while those source materials are unchanged, so reopening the JSON reloads the
+original per-material colors/textures from the model file instead of replacing
+them with a single fallback color.
 
 The application keeps auxiliary JSON assets for tests and examples, but the
 runtime preset selector intentionally exposes only a small demonstration set so

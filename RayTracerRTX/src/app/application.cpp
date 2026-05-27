@@ -1102,6 +1102,10 @@ bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPat
     MeshObject object = std::move(loaded.scene.meshObjects.front());
     object.assetReference = meshPath.string();
     object.displayName = meshPath.filename().string().empty() ? meshPath.string() : meshPath.filename().string();
+    if (object.sourceMaterials.empty())
+    {
+        object.sourceMaterials = object.mesh.materials;
+    }
     applySceneEditResultWithUndo(appState, before, editor.addMeshObject(std::move(object)));
     saveCurrentScenePreset(appState);
     appState.hierarchySelectionKind = SceneHierarchySelectionMesh;

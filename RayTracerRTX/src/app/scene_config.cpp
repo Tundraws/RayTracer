@@ -978,6 +978,52 @@ void applyMeshMaterialOverride(
     }
 }
 
+bool equalFloat(const float a, const float b)
+{
+    return std::fabs(a - b) <= 0.0005f;
+}
+
+bool equalFloat3(const float3 a, const float3 b)
+{
+    return equalFloat(a.x, b.x) && equalFloat(a.y, b.y) && equalFloat(a.z, b.z);
+}
+
+bool equalMeshMaterialForSave(const MeshMaterial& a, const MeshMaterial& b)
+{
+    return a.materialType == b.materialType &&
+        equalFloat3(a.color, b.color) &&
+        equalFloat3(a.specularColor, b.specularColor) &&
+        equalFloat(a.roughness, b.roughness) &&
+        equalFloat(a.ior, b.ior) &&
+        equalFloat(a.alpha, b.alpha) &&
+        a.texturePath == b.texturePath &&
+        a.textureIndex == b.textureIndex &&
+        a.textureEnabled == b.textureEnabled &&
+        a.normalTexturePath == b.normalTexturePath &&
+        a.normalTextureIndex == b.normalTextureIndex &&
+        a.metallicTexturePath == b.metallicTexturePath &&
+        a.metallicTextureIndex == b.metallicTextureIndex &&
+        a.roughnessTexturePath == b.roughnessTexturePath &&
+        a.roughnessTextureIndex == b.roughnessTextureIndex;
+}
+
+bool meshObjectUsesSourceMaterials(const MeshObject& object)
+{
+    if (object.sourceMaterials.empty() || object.sourceMaterials.size() != object.mesh.materials.size())
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < object.mesh.materials.size(); ++i)
+    {
+        if (!equalMeshMaterialForSave(object.mesh.materials[i], object.sourceMaterials[i]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 SceneConfigResult parseSceneConfig(const JsonValue& root)
 {
     SceneConfigResult result;
@@ -1540,6 +1586,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
             }
             objectMesh = loaded.mesh;
         }
+        std::vector<MeshMaterial> sourceMaterials = objectMesh.materials;
         applyMeshMaterialOverride(object, materialMap, objectMesh, result);
         MeshObject meshObject;
         meshObject.assetReference = object.primitive.empty() ? meshPath.string() : "built-in " + object.primitive;
@@ -1549,6 +1596,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
                 ? (meshPath.filename().string().empty() ? meshPath.string() : meshPath.filename().string())
                 : object.primitive);
         meshObject.mesh = objectMesh;
+        meshObject.sourceMaterials = std::move(sourceMaterials);
         meshObject.position = object.transform.position;
         meshObject.rotation = object.transform.rotation;
         meshObject.scale = object.transform.scale;
@@ -1769,7 +1817,7 @@ bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& 
         writeFloat3(object.rotation);
         output << ",\n      \"scale\": ";
         writeFloat3(object.scale);
-        if (!object.mesh.materials.empty())
+        if (!object.mesh.materials.empty() && !meshObjectUsesSourceMaterials(object))
         {
             output << ",\n      \"material\": ";
             writeMeshMaterial(object.mesh.materials.front());
