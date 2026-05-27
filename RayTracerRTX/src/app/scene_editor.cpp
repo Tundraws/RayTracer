@@ -35,21 +35,6 @@ bool hasSelectedMesh(const SceneState& scene)
     return scene.selectedMeshObject >= 0 && scene.selectedMeshObject < static_cast<int>(scene.meshObjects.size());
 }
 
-bool isExternalMeshObject(const MeshObject& object)
-{
-    return !object.assetReference.empty() && object.assetReference.rfind("built-in ", 0) != 0;
-}
-
-bool isSourceMaterialColorRequest(const MeshObject& object, const float3 color)
-{
-    return isExternalMeshObject(object) &&
-        !object.sourceMaterials.empty() &&
-        object.sourceMaterials.size() == object.mesh.materials.size() &&
-        color.x >= 0.995f &&
-        color.y >= 0.995f &&
-        color.z >= 0.995f;
-}
-
 bool hasSelectedGroup(const SceneState& scene)
 {
     return scene.selectedGroup >= 0 && scene.selectedGroup < static_cast<int>(scene.groups.size());
@@ -523,11 +508,6 @@ SceneEditResult SceneEditor::setSelectedMeshMaterialProperties(const float3 colo
 
     MeshMaterial& material = object.mesh.materials[static_cast<size_t>(materialIndex)];
     const MeshMaterial before = material;
-    if (isSourceMaterialColorRequest(object, color))
-    {
-        return makeMeshMaterialDirty(::resetSelectedMeshMaterial(scene_));
-    }
-
     material.color = clampColor(color);
     material.roughness = clampMaterialRoughnessShared(roughness);
     material.ior = clampMaterialIorShared(ior);

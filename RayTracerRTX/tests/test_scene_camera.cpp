@@ -2439,6 +2439,29 @@ void testSceneEditorMeshMaterialPropertiesClamp(TestContext& t)
     t.expect(material.textureEnabled == 0, "Mesh material texture toggle should be stored.");
 }
 
+void testSceneEditorMeshMaterialWhiteDoesNotResetSource(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+    t.expect(!scene.meshObjects.empty(), "Default scene should have a mesh object.");
+    scene.selectedMeshObject = 0;
+    scene.selectedMeshMaterial = 0;
+    MeshObject& object = scene.meshObjects[0];
+    t.expect(!object.mesh.materials.empty(), "Default mesh should have a material.");
+    object.sourceMaterials = object.mesh.materials;
+    object.sourceMaterials[0].color = make_float3(0.0f, 1.0f, 0.0f);
+    object.mesh.materials[0].color = make_float3(1.0f, 1.0f, 1.0f);
+    object.mesh.materials[0].roughness = 0.25f;
+
+    SceneEditor editor(scene);
+    const SceneEditResult result = editor.setSelectedMeshMaterialProperties(make_float3(1.0f, 1.0f, 1.0f), 0.8f, 1.5f, 1.0f, true);
+
+    t.expect(result.changed, "Changing roughness on a white mesh material should report a change.");
+    t.expect(result.dirty.material, "Changing roughness on a white mesh material should set material dirty.");
+    t.expect(almostEqual(object.mesh.materials[0].color.x, 1.0f), "White edit should keep explicit white color.");
+    t.expect(almostEqual(object.mesh.materials[0].color.y, 1.0f), "White edit should not reset to source green.");
+    t.expect(almostEqual(object.mesh.materials[0].roughness, 0.8f), "White edit should still apply roughness.");
+}
+
 void testSceneEditorResetSphereMaterial(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3551,6 +3574,7 @@ int main(int argc, char** argv)
     runTest("SceneEditor material dirty", testSceneEditorMaterialDirty);
     runTest("SceneEditor material properties clamp", testSceneEditorMaterialPropertiesClamp);
     runTest("SceneEditor mesh material properties clamp", testSceneEditorMeshMaterialPropertiesClamp);
+    runTest("SceneEditor mesh material white does not reset source", testSceneEditorMeshMaterialWhiteDoesNotResetSource);
     runTest("SceneEditor reset sphere material", testSceneEditorResetSphereMaterial);
     runTest("SceneEditor reset mesh material", testSceneEditorResetMeshMaterial);
     runTest("Scene undo restores previous scene", testSceneUndoRestoresPreviousScene);
