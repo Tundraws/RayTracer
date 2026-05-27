@@ -1423,6 +1423,32 @@ void testAddLoadedMeshUsesSupportPlaneAndFreeSpot(TestContext& t)
     t.expect(almostEqual(placedSecond.position.y, 2.5f), "Second loaded mesh should also stand on the support panel.");
 }
 
+void testMeshScaleKeepsObjectOnSupportPlane(TestContext& t)
+{
+    SceneState scene{};
+    MeshObject panel;
+    panel.assetReference = "built-in panel";
+    panel.displayName = "panel";
+    panel.mesh = createPlaneMesh();
+    panel.position = make_float3(0.0f, 0.0f, 0.0f);
+    panel.rotation = make_float3(0.0f, 0.0f, 0.0f);
+    panel.scale = make_float3(30.0f, 1.0f, 30.0f);
+    scene.meshObjects.push_back(panel);
+
+    MeshObject cube;
+    cube.assetReference = "built-in cube";
+    cube.displayName = "cube";
+    cube.mesh = createCubeMesh();
+    cube.position = make_float3(0.0f, 0.0f, 0.0f);
+    cube.scale = make_float3(1.0f, 1.0f, 1.0f);
+    t.expect(addMeshObjectToScene(scene, cube), "Cube should be added to support plane.");
+    scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
+
+    t.expect(setSelectedMeshScale(scene, make_float3(3.0f, 5.0f, 3.0f)), "Scaling selected cube should succeed.");
+    const MeshObject& scaled = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+    t.expect(almostEqual(scaled.position.y, 2.5f), "Scaled cube should keep its bottom on Y=0 support plane.");
+}
+
 void testRemoveSelectedMeshObjectSafe(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
@@ -3462,6 +3488,7 @@ int main(int argc, char** argv)
     runTest("Add built-in mesh duplicates selected and finds free spot", testAddBuiltInMeshDuplicatesSelectedAndFindsFreeSpot);
     runTest("Add built-in mesh uses support plane height", testAddBuiltInMeshUsesSupportPlaneHeight);
     runTest("Add loaded mesh uses support plane and free spot", testAddLoadedMeshUsesSupportPlaneAndFreeSpot);
+    runTest("Mesh scale keeps object on support plane", testMeshScaleKeepsObjectOnSupportPlane);
     runTest("Remove selected mesh object safe", testRemoveSelectedMeshObjectSafe);
     runTest("Scene clear helpers", testSceneClearHelpers);
     runTest("Restore default scene objects", testRestoreDefaultSceneObjects);

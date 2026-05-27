@@ -25,7 +25,7 @@
       "primitive": "plane",
       "position": [0.0, 0.0, 0.0],
       "rotation": [0.0, 0.0, 0.0],
-      "scale": [80.0, 1.0, 80.0],
+      "scale": [400.0, 1.0, 400.0],
       "material": {
         "type": "matte",
         "baseColor": [0.48, 0.50, 0.48],

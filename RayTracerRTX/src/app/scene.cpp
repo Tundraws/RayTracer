@@ -600,7 +600,7 @@ void addEditableFloor(SceneState& scene)
             "Пол",
             make_float3(0.0f, 0.0f, 0.0f),
             make_float3(0.0f, 0.0f, 0.0f),
-            make_float3(80.0f, 1.0f, 80.0f),
+            make_float3(400.0f, 1.0f, 400.0f),
             make_float3(0.48f, 0.50f, 0.48f)));
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
@@ -1561,7 +1561,15 @@ bool setSelectedMeshScale(SceneState& scene, const float3 scale)
         return false;
     }
 
+    const float floorY = supportFloorYAt(scene, object->position.x, object->position.z);
+    const float bottomBefore = object->position.y - meshBottomOffset(*object);
+    const bool keepOnSupport = !isHorizontalSupportPanel(*object) && std::fabs(bottomBefore - floorY) <= 0.15f;
+
     object->scale = clamp3(scale, make_float3(0.05f, 0.05f, 0.05f), make_float3(100.0f, 100.0f, 100.0f));
+    if (keepOnSupport)
+    {
+        object->position.y = floorY + meshBottomOffset(*object);
+    }
     updateMeshObjectTransform(*object);
     return true;
 }
