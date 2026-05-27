@@ -100,6 +100,8 @@ public:
     SceneEditResult setSkyGradientBlend(float value);
     SceneEditResult setLightIntensity(float value);
     SceneEditResult adjustLightIntensity(float delta);
+    SceneEditResult setFloorFadeDistance(float value);
+    SceneEditResult setFloorFadeSoftness(float value);
 
 private:
     SceneState& scene_;

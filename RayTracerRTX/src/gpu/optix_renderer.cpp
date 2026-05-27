@@ -23,6 +23,7 @@
 #include <iomanip>
 #include <iostream>
 #include <functional>
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <cstring>
@@ -72,6 +73,8 @@ std::size_t makeAccumulationSignature(const SceneState& scene, const CameraState
     hashCombine(seed, hashFloat(scene.lightIntensity));
     hashCombine(seed, hashFloat(scene.areaLightRadius));
     hashCombine(seed, hashFloat(scene.environmentIntensity));
+    hashCombine(seed, hashFloat(scene.floorFadeDistance));
+    hashCombine(seed, hashFloat(scene.floorFadeSoftness));
     hashCombine(seed, std::hash<std::string>{}(scene.environmentPath));
     for (const SphereGeometry& sphere : scene.spheres)
     {
@@ -655,6 +658,11 @@ void OptixRenderer::createScene(const SceneState& scene)
         {
             continue;
         }
+        const bool isFloorSurface =
+            object.assetReference.rfind("environment:", 0) == 0 &&
+            std::fabs(object.position.y) <= 0.02f &&
+            std::fabs(object.rotation.x) <= 1.0f &&
+            std::fabs(object.rotation.z) <= 1.0f;
 
         const unsigned int vertexOffset = static_cast<unsigned int>(meshVertices.size());
         const unsigned int triangleOffset = static_cast<unsigned int>(meshTriangles.size());
@@ -688,6 +696,7 @@ void OptixRenderer::createScene(const SceneState& scene)
                 material.roughness,
                 material.ior,
                 material.alpha};
+            materialGpu.isFloorSurface = isFloorSurface ? 1 : 0;
             if (material.textureEnabled != 0 &&
                 material.textureIndex >= 0 &&
                 static_cast<size_t>(material.textureIndex) < object.mesh.textures.size())
@@ -1473,6 +1482,8 @@ void OptixRenderer::renderFrame(const SceneState& scene, const CameraState& came
     params.lightIntensity = scene.lightIntensity;
     params.areaLightRadius = scene.areaLightRadius;
     params.environmentIntensity = scene.environmentIntensity;
+    params.floorFadeDistance = scene.floorFadeDistance;
+    params.floorFadeSoftness = scene.floorFadeSoftness;
     params.materials = reinterpret_cast<SphereMaterial*>(dMaterials);
     params.sphereCount = static_cast<int>(scene.spheres.size());
     params.meshVertices = reinterpret_cast<MeshVertexGpu*>(dMeshVertices);

@@ -91,7 +91,7 @@ sequenceDiagram
     ObjLoader-->>Cache: MeshData with tangents, materials, textures
     Cache->>Scene: Build MeshObject list from cached assets and transforms
     App->>Scene: Move sphere, light, or toggle material
-    App->>Scene: Tune exposure, sky intensity, light intensity, area light, and environment
+    App->>Scene: Tune exposure, sky intensity, light intensity, area light, environment, and distant floor fade
     App->>Cache: F5 reload current JSON scene config, keeping previous scene on failure
     App->>Renderer: Optional P toggle for progressive accumulation
     App->>Renderer: Optional N toggle for OptiX denoiser
@@ -123,6 +123,10 @@ flowchart TD
     MeshClosestHit --> NormalMap["Optional tangent-space normal map"]
     NormalMap --> MeshMaterial
     MeshClosestHit --> MeshMaterial{"Mesh material type"}
+    MeshMaterial --> FloorFade{"Floor surface?"}
+    FloorFade -->|near| MeshDiffuse["GGX direct lighting + shadow"]
+    FloorFade -->|far| HorizonBlend["Blend with horizon and skip expensive floor secondary rays"]
+    HorizonBlend --> Output
     MeshMaterial --> MeshDiffuse["GGX direct lighting + shadow"]
     MeshMaterial --> MeshMirror["Mirror reflection ray + roughness broadening"]
     MeshMaterial --> MeshMetal["Metallic GGX + tinted rough reflection"]
