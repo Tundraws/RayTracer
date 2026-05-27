@@ -42,6 +42,7 @@ struct MeshObjectConfig
 
 struct SphereConfig
 {
+    std::string name;
     float3 position = make_float3(0.0f, 1.0f, 0.0f);
     float radius = 1.0f;
     std::string materialOverride;
@@ -67,6 +68,8 @@ struct SceneConfig
     float3 skyHorizonColor = make_float3(0.62f, 0.70f, 0.78f);
     bool hasSkyZenithColor = false;
     float3 skyZenithColor = make_float3(0.12f, 0.18f, 0.30f);
+    bool hasSkyGradientBlend = false;
+    float skyGradientBlend = 1.0f;
     bool hasLightIntensity = false;
     float lightIntensity = 0.95f;
     bool hasAreaLightRadius = false;

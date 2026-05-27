@@ -426,6 +426,14 @@ bool readSceneTuningFields(const JsonObject& object, SceneConfig& config, std::s
         }
         config.hasSkyZenithColor = true;
     }
+    if (findField(object, "skyGradientBlend") != nullptr)
+    {
+        if (!readFloatField(object, "skyGradientBlend", config.skyGradientBlend, error))
+        {
+            return false;
+        }
+        config.hasSkyGradientBlend = true;
+    }
     if (findField(object, "lightIntensity") != nullptr)
     {
         if (!readFloatField(object, "lightIntensity", config.lightIntensity, error))
@@ -1057,6 +1065,16 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
 
             SphereConfig sphere;
             std::string error;
+            if (const JsonValue* nameField = findField(*sphereObject, "name"))
+            {
+                const std::string* name = asString(*nameField);
+                if (name == nullptr)
+                {
+                    result.error = "'name' must be a string";
+                    return result;
+                }
+                sphere.name = *name;
+            }
             if (!readFloat3(*sphereObject, "position", sphere.position, error) ||
                 !readFloatField(*sphereObject, "radius", sphere.radius, error))
             {
@@ -1305,6 +1323,15 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
             }
             result.config.hasSkyZenithColor = true;
         }
+        if (findField(*environment, "gradientBlend") != nullptr)
+        {
+            if (!readFloatField(*environment, "gradientBlend", result.config.skyGradientBlend, error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.hasSkyGradientBlend = true;
+        }
         if (findField(*environment, "intensity") != nullptr)
         {
             if (!readFloatField(*environment, "intensity", result.config.environmentIntensity, error))
@@ -1390,6 +1417,10 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     {
         result.scene.skyZenithColor = config.skyZenithColor;
     }
+    if (config.hasSkyGradientBlend)
+    {
+        result.scene.skyGradientBlend = config.skyGradientBlend;
+    }
     if (config.hasLightIntensity)
     {
         result.scene.lightIntensity = config.lightIntensity;
@@ -1427,6 +1458,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     result.scene.skyIntensity = clampSceneSkyIntensity(result.scene.skyIntensity);
     setSceneSkyHorizonColor(result.scene, result.scene.skyHorizonColor);
     setSceneSkyZenithColor(result.scene, result.scene.skyZenithColor);
+    setSceneSkyGradientBlend(result.scene, result.scene.skyGradientBlend);
     result.scene.lightIntensity = clampSceneLightIntensity(result.scene.lightIntensity);
     appendMaterialWarnings(config, result);
     const std::map<std::string, SceneMaterialConfig> materialMap = makeMaterialMap(config.materials);
@@ -1436,7 +1468,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
         result.scene.materials.clear();
         for (const SphereConfig& sphereConfig : config.spheres)
         {
-            result.scene.spheres.push_back({sphereConfig.position, sphereConfig.radius});
+            result.scene.spheres.push_back({sphereConfig.name, sphereConfig.position, sphereConfig.radius});
             SphereMaterial material{make_float3(0.72f, 0.76f, 0.72f), MaterialDiffuse, make_float3(0.72f, 0.72f, 0.72f), 0.52f, 1.5f, 1.0f};
             if (!sphereConfig.materialOverride.empty())
             {
@@ -1457,7 +1489,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     }
     else if (!config.sphereMaterialRefs.empty() && result.scene.spheres.empty())
     {
-        result.scene.spheres.push_back({make_float3(0.0f, 1.25f, 0.0f), 1.25f});
+        result.scene.spheres.push_back({"Сфера", make_float3(0.0f, 1.25f, 0.0f), 1.25f});
         result.scene.materials.push_back({make_float3(0.72f, 0.76f, 0.72f), MaterialDiffuse, make_float3(0.72f, 0.72f, 0.72f), 0.52f, 1.5f, 1.0f});
     }
     applySphereMaterialConfig(config, materialMap, result);
@@ -1674,7 +1706,8 @@ bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& 
     output << "  },\n";
     output << "  \"render\": {\n";
     output << "    \"exposure\": " << scene.exposure
-           << ",\n    \"skyIntensity\": " << scene.skyIntensity << "\n";
+           << ",\n    \"skyIntensity\": " << scene.skyIntensity
+           << ",\n    \"skyGradientBlend\": " << scene.skyGradientBlend << "\n";
     output << "  },\n";
     output << "  \"environment\": {\n";
     output << "    \"type\": \"" << jsonEscape(scene.environmentType.empty() ? "gradient" : scene.environmentType) << "\",\n";
@@ -1683,6 +1716,7 @@ bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& 
     writeFloat3(scene.skyHorizonColor);
     output << ",\n    \"zenithColor\": ";
     writeFloat3(scene.skyZenithColor);
+    output << ",\n    \"gradientBlend\": " << scene.skyGradientBlend;
     if (!scene.environmentPath.empty())
     {
         output << ",\n    \"path\": \"" << jsonEscape(scene.environmentPath) << "\"\n";
@@ -1697,7 +1731,12 @@ bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& 
     for (size_t i = 0; i < scene.spheres.size(); ++i)
     {
         const SphereGeometry& sphere = scene.spheres[i];
-        output << "    { \"position\": ";
+        output << "    { ";
+        if (!sphere.displayName.empty())
+        {
+            output << "\"name\": \"" << jsonEscape(sphere.displayName) << "\", ";
+        }
+        output << "\"position\": ";
         writeFloat3(sphere.center);
         output << ", \"radius\": " << sphere.radius;
         if (i < scene.materials.size())

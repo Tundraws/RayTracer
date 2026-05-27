@@ -5,12 +5,24 @@
 
 #include <array>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct SphereGeometry
 {
+    SphereGeometry() = default;
+    SphereGeometry(float3 centerValue, float radiusValue)
+        : center(centerValue), radius(radiusValue)
+    {
+    }
+    SphereGeometry(std::string nameValue, float3 centerValue, float radiusValue)
+        : displayName(std::move(nameValue)), center(centerValue), radius(radiusValue)
+    {
+    }
+
+    std::string displayName;
     float3 center;
-    float radius;
+    float radius = 1.0f;
 };
 
 struct MeshObject
@@ -68,6 +80,7 @@ struct SceneState
     float skyIntensity = 0.78f;
     float3 skyHorizonColor = make_float3(0.62f, 0.70f, 0.78f);
     float3 skyZenithColor = make_float3(0.12f, 0.18f, 0.30f);
+    float skyGradientBlend = 1.0f;
     float lightIntensity = 0.95f;
     float areaLightRadius = 0.0f;
     float environmentIntensity = 1.0f;
@@ -85,6 +98,7 @@ SceneState makeDefaultScene();
 SceneState makeBaseEditorScene();
 void clampScene(SceneState& scene);
 bool addSphere(SceneState& scene);
+bool duplicateSelectedSphere(SceneState& scene);
 bool removeSelectedSphere(SceneState& scene);
 void setSelectedSphereRadius(SceneState& scene, float radius);
 void setSelectedSphereColor(SceneState& scene, float3 color);
@@ -101,6 +115,7 @@ bool resetSelectedMeshMaterial(SceneState& scene);
 void applySelectedMeshMaterialToWholeObject(SceneState& scene);
 bool addBuiltInMeshPrimitive(SceneState& scene, int primitiveType);
 bool addMeshObjectToScene(SceneState& scene, MeshObject object);
+bool duplicateSelectedMeshObject(SceneState& scene);
 bool removeSelectedMeshObject(SceneState& scene);
 bool removeAllSpheres(SceneState& scene);
 bool removeAllMeshObjects(SceneState& scene);
@@ -123,6 +138,7 @@ void setSceneExposure(SceneState& scene, float value);
 void setSceneSkyIntensity(SceneState& scene, float value);
 void setSceneSkyHorizonColor(SceneState& scene, float3 color);
 void setSceneSkyZenithColor(SceneState& scene, float3 color);
+void setSceneSkyGradientBlend(SceneState& scene, float value);
 void setSceneLightIntensity(SceneState& scene, float value);
 void adjustSceneExposure(SceneState& scene, float delta);
 void adjustSceneSkyIntensity(SceneState& scene, float delta);

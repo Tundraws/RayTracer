@@ -136,6 +136,70 @@ MeshObject makeBuiltInMeshObject(MeshData mesh, std::string name, const float3 p
     return object;
 }
 
+std::string trimDuplicateIndexSuffix(std::string name)
+{
+    while (!name.empty() && name.back() == ' ')
+    {
+        name.pop_back();
+    }
+
+    size_t pos = name.size();
+    while (pos > 0 && name[pos - 1] >= '0' && name[pos - 1] <= '9')
+    {
+        --pos;
+    }
+    if (pos < name.size() && pos > 0 && name[pos - 1] == ' ')
+    {
+        name.erase(pos - 1);
+    }
+    return name.empty() ? "Object" : name;
+}
+
+std::string sphereDisplayName(const SphereGeometry& sphere, const int index)
+{
+    return sphere.displayName.empty()
+        ? std::string("Сфера ") + std::to_string(index + 1)
+        : sphere.displayName;
+}
+
+bool sceneObjectNameExists(const SceneState& scene, const std::string& name)
+{
+    for (int i = 0; i < static_cast<int>(scene.spheres.size()); ++i)
+    {
+        if (sphereDisplayName(scene.spheres[static_cast<size_t>(i)], i) == name)
+        {
+            return true;
+        }
+    }
+    for (const MeshObject& object : scene.meshObjects)
+    {
+        if ((!object.displayName.empty() ? object.displayName : object.assetReference) == name)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string uniqueSceneObjectName(const SceneState& scene, const std::string& requestedName)
+{
+    const std::string base = trimDuplicateIndexSuffix(requestedName.empty() ? "Object" : requestedName);
+    if (!sceneObjectNameExists(scene, base))
+    {
+        return base;
+    }
+
+    for (int suffix = 1; suffix < 10000; ++suffix)
+    {
+        const std::string candidate = base + " " + std::to_string(suffix);
+        if (!sceneObjectNameExists(scene, candidate))
+        {
+            return candidate;
+        }
+    }
+    return base + " copy";
+}
+
 bool isEnvironmentObject(const MeshObject& object)
 {
     return object.assetReference.rfind("environment:", 0) == 0;
@@ -779,6 +843,7 @@ SceneState makeDefaultScene()
     scene.skyIntensity = 0.78f;
     scene.skyHorizonColor = make_float3(0.62f, 0.70f, 0.78f);
     scene.skyZenithColor = make_float3(0.12f, 0.18f, 0.30f);
+    scene.skyGradientBlend = 1.0f;
     scene.lightIntensity = 0.95f;
     scene.areaLightRadius = 0.0f;
     scene.environmentIntensity = 1.0f;
@@ -800,6 +865,7 @@ SceneState makeBaseEditorScene()
     scene.skyIntensity = 0.72f;
     scene.skyHorizonColor = make_float3(0.60f, 0.68f, 0.76f);
     scene.skyZenithColor = make_float3(0.14f, 0.20f, 0.32f);
+    scene.skyGradientBlend = 1.0f;
     scene.lightIntensity = 0.95f;
     scene.areaLightRadius = 2.0f;
     scene.environmentIntensity = 0.85f;
@@ -844,6 +910,7 @@ void clampScene(SceneState& scene)
     scene.skyIntensity = clampSceneSkyIntensity(scene.skyIntensity);
     scene.skyHorizonColor = clamp3(scene.skyHorizonColor, make_float3(0.0f, 0.0f, 0.0f), make_float3(2.0f, 2.0f, 2.0f));
     scene.skyZenithColor = clamp3(scene.skyZenithColor, make_float3(0.0f, 0.0f, 0.0f), make_float3(2.0f, 2.0f, 2.0f));
+    scene.skyGradientBlend = clampSceneSkyGradientBlend(scene.skyGradientBlend);
     scene.lightIntensity = clampSceneLightIntensity(scene.lightIntensity);
     scene.areaLightRadius = clampSceneAreaLightRadius(scene.areaLightRadius);
     scene.environmentIntensity = clampSceneEnvironmentIntensity(scene.environmentIntensity);
@@ -896,7 +963,7 @@ bool addSphere(SceneState& scene)
 {
     clampScene(scene);
 
-    SphereGeometry sphere{make_float3(0.0f, 1.25f, -2.5f), 1.25f};
+    SphereGeometry sphere{"Сфера", make_float3(0.0f, 1.25f, -2.5f), 1.25f};
     SphereMaterial material = makeDefaultSphereMaterial();
 
     if (!scene.spheres.empty() &&
@@ -904,6 +971,7 @@ bool addSphere(SceneState& scene)
         scene.selectedSphere < static_cast<int>(scene.spheres.size()))
     {
         const SphereGeometry& selected = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
+        sphere.displayName = sphereDisplayName(selected, scene.selectedSphere);
         sphere.radius = selected.radius;
         sphere.center = findAdjacentPlacementOnFloor(
             scene,
@@ -918,12 +986,18 @@ bool addSphere(SceneState& scene)
     }
     sphere.center = findFreePlacementOnFloor(scene, sphere.center, sphere.radius);
     sphere.center = placeSphereOnSupport(scene, sphere.center, sphere.radius);
+    sphere.displayName = uniqueSceneObjectName(scene, sphere.displayName);
 
     scene.spheres.push_back(sphere);
     scene.materials.push_back(material);
     scene.selectedSphere = static_cast<int>(scene.spheres.size()) - 1;
     clampScene(scene);
     return true;
+}
+
+bool duplicateSelectedSphere(SceneState& scene)
+{
+    return addSphere(scene);
 }
 
 bool removeSelectedSphere(SceneState& scene)
@@ -1380,6 +1454,7 @@ bool addBuiltInMeshPrimitive(SceneState& scene, const int primitiveType)
     {
         object.displayName = object.displayName.empty() ? "built-in panel" : object.displayName;
     }
+    object.displayName = uniqueSceneObjectName(scene, object.displayName);
 
     scene.meshObjects.push_back(std::move(object));
     scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
@@ -1398,6 +1473,11 @@ bool addMeshObjectToScene(SceneState& scene, MeshObject object)
     }
 
     const float placementRadius = meshFootprintRadius(object);
+    object.displayName = uniqueSceneObjectName(
+        scene,
+        object.displayName.empty()
+            ? (object.assetReference.empty() ? "Модель" : std::filesystem::path(object.assetReference).filename().string())
+            : object.displayName);
     object.position = findFreePlacementOnFloor(scene, object.position, placementRadius);
     object.position = placeMeshOnSupport(scene, object, object.position);
     updateMeshObjectTransform(object);
@@ -1407,6 +1487,26 @@ bool addMeshObjectToScene(SceneState& scene, MeshObject object)
     syncCompatibilityMesh(scene);
     clampScene(scene);
     return true;
+}
+
+bool duplicateSelectedMeshObject(SceneState& scene)
+{
+    clampScene(scene);
+    const MeshObject* selected = selectedMeshObject(scene);
+    if (selected == nullptr || isEnvironmentObject(*selected))
+    {
+        return false;
+    }
+
+    MeshObject object = *selected;
+    const float placementRadius = meshFootprintRadius(object);
+    const float3 preferred = findAdjacentPlacementOnFloor(
+        scene,
+        SceneFootprint{selected->position.x, selected->position.z, meshFootprintRadius(*selected)},
+        selected->position,
+        placementRadius);
+    object.position = preferred;
+    return addMeshObjectToScene(scene, std::move(object));
 }
 
 bool removeSelectedMeshObject(SceneState& scene)
@@ -1840,6 +1940,11 @@ void setSceneSkyHorizonColor(SceneState& scene, const float3 color)
 void setSceneSkyZenithColor(SceneState& scene, const float3 color)
 {
     scene.skyZenithColor = clamp3(color, make_float3(0.0f, 0.0f, 0.0f), make_float3(2.0f, 2.0f, 2.0f));
+}
+
+void setSceneSkyGradientBlend(SceneState& scene, const float value)
+{
+    scene.skyGradientBlend = clampSceneSkyGradientBlend(value);
 }
 
 void setSceneLightIntensity(SceneState& scene, const float value)

@@ -363,7 +363,10 @@ std::string selectedSceneObjectLabel(const SceneState& scene, const int selectio
         scene.selectedSphere >= 0 &&
         scene.selectedSphere < static_cast<int>(scene.spheres.size()))
     {
-        return std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1);
+        const SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
+        return sphere.displayName.empty()
+            ? std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1)
+            : sphere.displayName;
     }
 
     if (selectionKind == SceneHierarchySelectionMesh &&
@@ -1152,7 +1155,10 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 ImGui::EndDisabled();
             }
             ImGui::SameLine();
-            const std::string label = std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1) + "##hier_sphere_" + std::to_string(i);
+            const std::string sphereName = scene.spheres[static_cast<size_t>(i)].displayName.empty()
+                ? std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(i + 1)
+                : scene.spheres[static_cast<size_t>(i)].displayName;
+            const std::string label = sphereName + "##hier_sphere_" + std::to_string(i);
             const bool selected = appState.hierarchySelectionKind == HierarchySelectionSphere && scene.selectedSphere == i;
             if (ImGui::Selectable(label.c_str(), selected))
             {
@@ -1307,6 +1313,17 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         {
             const SceneState before = scene;
             applySceneEditResultWithUndo(appState, before, editor.setSkyZenithColor(make_float3(zenithColor[0], zenithColor[1], zenithColor[2])));
+        }
+        if (ImGui::Button(u8c(u8"\u0413\u043E\u0440\u0438\u0437\u043E\u043D\u0442 = \u0432\u0435\u0440\u0445 \u043D\u0435\u0431\u0430##match_sky_colors")))
+        {
+            const SceneState before = scene;
+            applySceneEditResultWithUndo(appState, before, editor.setSkyHorizonColor(scene.skyZenithColor));
+        }
+        float skyGradientBlend = scene.skyGradientBlend;
+        if (ImGui::SliderFloat(u8c(u8"\u0420\u0430\u0437\u043C\u044B\u0442\u0438\u0435 \u0433\u0440\u0430\u0434\u0438\u0435\u043D\u0442\u0430"), &skyGradientBlend, 0.0f, 1.0f, "%.2f"))
+        {
+            const SceneState before = scene;
+            applySceneEditResultWithUndo(appState, before, editor.setSkyGradientBlend(skyGradientBlend));
         }
 
         ImGui::SeparatorText(u8c(u8"\u041E\u0431\u044A\u0435\u043A\u0442\u044B"));
@@ -1521,6 +1538,23 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         {
             clampScene(scene);
             SphereGeometry& sphere = scene.spheres[static_cast<size_t>(scene.selectedSphere)];
+            char nameBuffer[128]{};
+            const std::string currentName = sphere.displayName.empty()
+                ? std::string(u8c(u8"\u0421\u0444\u0435\u0440\u0430 ")) + std::to_string(scene.selectedSphere + 1)
+                : sphere.displayName;
+            std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", currentName.c_str());
+            if (ImGui::InputText(u8c(u8"\u0418\u043C\u044F##sphere_name"), nameBuffer, sizeof(nameBuffer)))
+            {
+                sphere.displayName = nameBuffer;
+            }
+            if (ImGui::Button(u8c(u8"\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442##copy_sphere")))
+            {
+                const SceneState before = scene;
+                applySceneEditResultWithUndo(appState, before, editor.duplicateSelectedObject(SceneHierarchySelectionSphere));
+                appState.hierarchySelectionKind = SceneHierarchySelectionSphere;
+                refreshMeshSelection();
+            }
+            ImGui::SameLine();
             if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0441\u0444\u0435\u0440\u0443")))
             {
                 const SceneState before = scene;
@@ -1568,6 +1602,14 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             {
                 selectedMeshObject->displayName = nameBuffer;
             }
+            if (ImGui::Button(u8c(u8"\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442##copy_mesh")))
+            {
+                const SceneState before = scene;
+                applySceneEditResultWithUndo(appState, before, editor.duplicateSelectedObject(SceneHierarchySelectionMesh));
+                appState.hierarchySelectionKind = SceneHierarchySelectionMesh;
+                refreshMeshSelection();
+            }
+            ImGui::SameLine();
             if (ImGui::Button(u8c(u8"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043C\u043E\u0434\u0435\u043B\u044C")))
             {
                 const SceneState before = scene;

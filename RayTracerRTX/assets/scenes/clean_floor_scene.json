@@ -18,7 +18,8 @@
     "type": "gradient",
     "intensity": 0.85,
     "horizonColor": [0.60, 0.68, 0.76],
-    "zenithColor": [0.14, 0.20, 0.32]
+    "zenithColor": [0.14, 0.20, 0.32],
+    "gradientBlend": 1.0
   },
   "spheres": [],
   "meshObjects": [

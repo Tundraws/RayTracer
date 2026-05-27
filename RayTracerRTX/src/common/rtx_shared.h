@@ -125,6 +125,11 @@ inline float clampSceneSkyIntensity(const float value)
     return value < 0.0f ? 0.0f : (value > 3.0f ? 3.0f : value);
 }
 
+inline float clampSceneSkyGradientBlend(const float value)
+{
+    return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+}
+
 inline float clampSceneAreaLightRadius(const float value)
 {
     return value < 0.0f ? 0.0f : (value > 12.0f ? 12.0f : value);
@@ -325,6 +330,7 @@ struct LaunchParams
     float skyIntensity;
     float3 skyHorizonColor;
     float3 skyZenithColor;
+    float skyGradientBlend;
     float lightIntensity;
     float areaLightRadius;
     float environmentIntensity;

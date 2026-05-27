@@ -159,8 +159,8 @@ Declared in `src/app/scene_config.h`.
 supports:
 
 - `mesh`: shorthand path for one OBJ or glTF mesh;
-- `spheres`: explicit analytic sphere objects with `position`, `radius`, and
-  optional inline/named `material`;
+- `spheres`: explicit analytic sphere objects with optional `name`,
+  `position`, `radius`, and optional inline/named `material`;
 - `meshObjects`: array of mesh objects with either `path` for OBJ/glTF/GLB or
   `primitive` for built-in `cube`, `pyramid`, or `plane`, plus `position`,
   `rotation`, `scale`, optional `name`, and optional `material`;
@@ -170,9 +170,10 @@ supports:
 - `environment`: optional object with `type`, `path`, and `intensity`; `path`
   currently supports small ASCII PPM (`P3`) lat-long maps, with fallback to
   gradient sky when the file is missing or invalid; gradient sky also accepts
-  `horizonColor` and `zenithColor`;
+  `horizonColor`, `zenithColor`, and `gradientBlend`;
 - root-level or `render` object fields: `exposure`, `skyIntensity`,
-  `lightIntensity`, `skyHorizonColor`, and `skyZenithColor`;
+  `lightIntensity`, `skyHorizonColor`, `skyZenithColor`, and
+  `skyGradientBlend`;
 - `materials`: named material inputs with `name`, `type`, `baseColor`,
   `roughness`, `metallic`, `specularColor`, `ior`, `alpha`, `texture`/`map_Kd`,
   and `normalMap`;

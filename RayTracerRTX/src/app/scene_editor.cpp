@@ -261,6 +261,19 @@ SceneEditResult SceneEditor::addMeshObject(MeshObject object)
     return makeGeometryDirty(addMeshObjectToScene(scene_, std::move(object)));
 }
 
+SceneEditResult SceneEditor::duplicateSelectedObject(const int selectionKind)
+{
+    if (selectionKind == SceneHierarchySelectionSphere)
+    {
+        return makeGeometryDirty(duplicateSelectedSphere(scene_));
+    }
+    if (selectionKind == SceneHierarchySelectionMesh)
+    {
+        return makeGeometryDirty(duplicateSelectedMeshObject(scene_));
+    }
+    return makeGeometryDirty(false);
+}
+
 SceneEditResult SceneEditor::deleteSelectedSphere()
 {
     return makeGeometryDirty(removeSelectedSphere(scene_));
@@ -625,6 +638,13 @@ SceneEditResult SceneEditor::setSkyZenithColor(const float3 color)
     const float3 before = scene_.skyZenithColor;
     setSceneSkyZenithColor(scene_, color);
     return makeLightingDirty(!equal3(before, scene_.skyZenithColor));
+}
+
+SceneEditResult SceneEditor::setSkyGradientBlend(const float value)
+{
+    const float before = scene_.skyGradientBlend;
+    setSceneSkyGradientBlend(scene_, value);
+    return makeLightingDirty(!equalFloat(before, scene_.skyGradientBlend));
 }
 
 SceneEditResult SceneEditor::setLightIntensity(const float value)

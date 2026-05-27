@@ -51,6 +51,7 @@ public:
     SceneEditResult addSphere();
     SceneEditResult addMeshPrimitive(int primitiveType);
     SceneEditResult addMeshObject(MeshObject object);
+    SceneEditResult duplicateSelectedObject(int selectionKind);
     SceneEditResult deleteSelectedSphere();
     SceneEditResult deleteSelectedMeshObject();
     SceneEditResult clearScene();
@@ -92,6 +93,7 @@ public:
     SceneEditResult adjustSkyIntensity(float delta);
     SceneEditResult setSkyHorizonColor(float3 color);
     SceneEditResult setSkyZenithColor(float3 color);
+    SceneEditResult setSkyGradientBlend(float value);
     SceneEditResult setLightIntensity(float value);
     SceneEditResult adjustLightIntensity(float delta);
 

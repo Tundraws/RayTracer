@@ -1421,6 +1421,24 @@ void testAddLoadedMeshUsesSupportPlaneAndFreeSpot(TestContext& t)
     const float distance = std::sqrt(dx * dx + dz * dz);
     t.expect(distance > 2.0f, "Second loaded mesh should be moved to a nearby free spot.");
     t.expect(almostEqual(placedSecond.position.y, 2.5f), "Second loaded mesh should also stand on the support panel.");
+    t.expect(placedSecond.displayName == "model.obj 1", "Second loaded mesh should receive a unique name.");
+}
+
+void testDuplicateSelectedMeshUsesRenamedBaseName(TestContext& t)
+{
+    SceneState scene{};
+    MeshObject first;
+    first.assetReference = "external/Pot B Medium.glb";
+    first.displayName = "Горшок";
+    first.mesh = createCubeMesh();
+    first.scale = make_float3(1.0f, 1.0f, 1.0f);
+
+    t.expect(addMeshObjectToScene(scene, first), "First mesh should be added.");
+    scene.selectedMeshObject = 0;
+    t.expect(duplicateSelectedMeshObject(scene), "Selected renamed mesh should duplicate.");
+    t.expect(scene.meshObjects.back().displayName == "Горшок 1", "Duplicated renamed mesh should use renamed base name.");
+    t.expect(duplicateSelectedMeshObject(scene), "Second mesh duplicate should succeed.");
+    t.expect(scene.meshObjects.back().displayName == "Горшок 2", "Second mesh duplicate should increment suffix.");
 }
 
 void testMeshScaleKeepsObjectOnSupportPlane(TestContext& t)
@@ -1665,7 +1683,7 @@ void testSceneConfigAreaLightAndEnvironment(TestContext& t)
         "raytracerrtx_area_environment_scene.json",
         "{\n"
         "  \"light\": {\"position\": [1, 4, -2], \"intensity\": 1.1, \"size\": 2.5},\n"
-        "  \"environment\": {\"type\": \"map\", \"path\": \"raytracerrtx_env_map.ppm\", \"intensity\": 1.6, \"horizonColor\": [0.3, 0.4, 0.5], \"zenithColor\": [0.1, 0.2, 0.6]}\n"
+        "  \"environment\": {\"type\": \"map\", \"path\": \"raytracerrtx_env_map.ppm\", \"intensity\": 1.6, \"horizonColor\": [0.3, 0.4, 0.5], \"zenithColor\": [0.1, 0.2, 0.6], \"gradientBlend\": 0.35}\n"
         "}\n");
 
     const SceneConfigResult config = loadSceneConfigFile(configPath);
@@ -1679,6 +1697,7 @@ void testSceneConfigAreaLightAndEnvironment(TestContext& t)
     t.expect(scene.scene.environmentMap.pixels.size() == 2u, "Environment PPM pixels should load.");
     t.expect(almostEqual(scene.scene.skyHorizonColor.x, 0.3f), "Environment horizon color should parse.");
     t.expect(almostEqual(scene.scene.skyZenithColor.z, 0.6f), "Environment zenith color should parse.");
+    t.expect(almostEqual(scene.scene.skyGradientBlend, 0.35f), "Environment gradient blend should parse.");
 }
 
 void testSceneConfigAreaEnvironmentFallbacks(TestContext& t)
@@ -2724,6 +2743,7 @@ void testAddSphereDuplicatesSelectedAndFindsFreeSpot(TestContext& t)
 {
     SceneState scene = makeDefaultScene();
     scene.selectedSphere = 0;
+    scene.spheres[0].displayName = "Сфера";
     scene.spheres[0].radius = 3.0f;
     scene.spheres[0].center = make_float3(0.0f, 3.0f, 0.0f);
     scene.materials[0].color = make_float3(0.1f, 0.5f, 0.9f);
@@ -2739,6 +2759,20 @@ void testAddSphereDuplicatesSelectedAndFindsFreeSpot(TestContext& t)
     t.expect(almostEqual(added.center.y, added.radius), "Duplicated sphere should stay on the floor.");
     t.expect(distance > added.radius + scene.spheres[0].radius, "Duplicated sphere should not touch the selected sphere.");
     t.expect(almostEqual(material.color.z, 0.9f), "Duplicated sphere should keep selected material color.");
+    t.expect(added.displayName == "Сфера 1", "Duplicated sphere should receive a unique object name.");
+}
+
+void testDuplicateSelectedSphereUsesRenamedBaseName(TestContext& t)
+{
+    SceneState scene{};
+    scene.spheres.push_back({"Горшок", make_float3(0.0f, 1.0f, 0.0f), 1.0f});
+    scene.materials.push_back({make_float3(0.72f, 0.76f, 0.72f), MaterialDiffuse, make_float3(0.72f, 0.72f, 0.72f), 0.52f, 1.5f, 1.0f});
+    scene.selectedSphere = 0;
+
+    t.expect(duplicateSelectedSphere(scene), "Selected renamed sphere should duplicate.");
+    t.expect(scene.spheres.back().displayName == "Горшок 1", "Duplicated renamed sphere should use renamed base name.");
+    t.expect(duplicateSelectedSphere(scene), "Second duplicate should succeed.");
+    t.expect(scene.spheres.back().displayName == "Горшок 2", "Second duplicate should increment unique suffix.");
 }
 
 void testAddSphereUsesSupportPlaneHeight(TestContext& t)
@@ -2896,6 +2930,16 @@ void testSceneSkyColorsClampSafely(TestContext& t)
     t.expect(almostEqual(scene.skyZenithColor.x, 0.25f), "Sky zenith color should keep valid component.");
     t.expect(almostEqual(scene.skyZenithColor.y, 0.0f), "Sky zenith color should clamp low.");
     t.expect(almostEqual(scene.skyZenithColor.z, 2.0f), "Sky zenith color should clamp high.");
+}
+
+void testSceneSkyGradientBlendClampSafely(TestContext& t)
+{
+    SceneState scene = makeDefaultScene();
+
+    setSceneSkyGradientBlend(scene, -1.0f);
+    t.expect(almostEqual(scene.skyGradientBlend, 0.0f), "Sky gradient blend should clamp low.");
+    setSceneSkyGradientBlend(scene, 2.0f);
+    t.expect(almostEqual(scene.skyGradientBlend, 1.0f), "Sky gradient blend should clamp high.");
 }
 
 void testSceneLightIntensityChangesSafely(TestContext& t)
@@ -3431,6 +3475,7 @@ int main(int argc, char** argv)
     runTest("Scene group prunes deleted object", testSceneGroupPrunesDeletedObject);
     runTest("Add sphere selects new sphere", testAddSphereSelectsNewSphere);
     runTest("Add sphere duplicates selected and finds free spot", testAddSphereDuplicatesSelectedAndFindsFreeSpot);
+    runTest("Duplicate selected sphere uses renamed base name", testDuplicateSelectedSphereUsesRenamedBaseName);
     runTest("Add sphere uses support plane height", testAddSphereUsesSupportPlaneHeight);
     runTest("Remove selected sphere keeps scene valid", testRemoveSelectedSphereKeepsSceneValid);
     runTest("Remove last sphere safe", testRemoveLastSphereSafe);
@@ -3443,6 +3488,7 @@ int main(int argc, char** argv)
     runTest("Scene exposure changes safely", testSceneExposureChangesSafely);
     runTest("Scene sky intensity changes safely", testSceneSkyIntensityChangesSafely);
     runTest("Scene sky colors clamp safely", testSceneSkyColorsClampSafely);
+    runTest("Scene sky gradient blend clamp safely", testSceneSkyGradientBlendClampSafely);
     runTest("Scene light intensity changes safely", testSceneLightIntensityChangesSafely);
     runTest("Scene tuning invalid values clamp", testSceneTuningInvalidValuesClamp);
     runTest("Clamp selected sphere index", testClampSceneSelectedSphereBounds);
@@ -3506,6 +3552,7 @@ int main(int argc, char** argv)
     runTest("Add built-in mesh duplicates selected and finds free spot", testAddBuiltInMeshDuplicatesSelectedAndFindsFreeSpot);
     runTest("Add built-in mesh uses support plane height", testAddBuiltInMeshUsesSupportPlaneHeight);
     runTest("Add loaded mesh uses support plane and free spot", testAddLoadedMeshUsesSupportPlaneAndFreeSpot);
+    runTest("Duplicate selected mesh uses renamed base name", testDuplicateSelectedMeshUsesRenamedBaseName);
     runTest("Mesh scale keeps object on support plane", testMeshScaleKeepsObjectOnSupportPlane);
     runTest("Remove selected mesh object safe", testRemoveSelectedMeshObjectSafe);
     runTest("Scene clear helpers", testSceneClearHelpers);
