@@ -23,7 +23,8 @@ enum HierarchySelectionKind
     HierarchySelectionLight = 2,
     HierarchySelectionSphere = 3,
     HierarchySelectionMesh = 4,
-    HierarchySelectionGroup = 5
+    HierarchySelectionGroup = 5,
+    HierarchySelectionRender = 6
 };
 
 struct AppState

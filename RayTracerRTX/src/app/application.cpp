@@ -1613,20 +1613,49 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             values.erase(found);
         }
     };
+    const auto drawRenderPanel = [&]()
+    {
+        ImGui::Text("FPS: %.1f", stats.fps);
+        ImGui::Text("CPU frame: %.2f ms", stats.avgHostMs);
+        ImGui::Text("GPU: %.2f ms", stats.avgGpuMs);
+        ImGui::Text("%s: %zu", u8c(u8"\u0421\u0444\u0435\u0440\u044B"), rendererStatistics.sphereCount);
+        ImGui::Text("%s: %zu", u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), rendererStatistics.meshObjectCount);
+        ImGui::Text("%s: %zu", u8c(u8"\u0422\u0440\u0435\u0443\u0433\u043E\u043B\u044C\u043D\u0438\u043A\u0438"), rendererStatistics.triangleCount);
+        ImGui::Text("%s: %zu", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B"), rendererStatistics.materialCount);
+        ImGui::Text("%s: %u", u8c(u8"\u0421\u044D\u043C\u043F\u043B\u044B"), rendererStatistics.accumulationSamples);
+        ImGui::Text("%s: %s", u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"),
+            appState.denoiserEnabled ? (appState.denoiserAvailable ? u8c(u8"\u0432\u043A\u043B") : u8c(u8"\u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D")) : u8c(u8"\u0432\u044B\u043A\u043B"));
+        ImGui::TextWrapped("%s", u8c(u8"VRAM: \u043D\u0435 \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0430\u0435\u0442\u0441\u044F, \u0447\u0442\u043E\u0431\u044B UI \u043D\u0435 \u0437\u0430\u0432\u0438\u0441\u0435\u043B \u043E\u0442 CUDA runtime \u0432 \u043F\u0430\u043D\u0435\u043B\u0438."));
+        int selectedRenderMode = appState.renderMode;
+        if (renderModeCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##renderer_mode"), selectedRenderMode))
+        {
+            appState.renderMode = selectedRenderMode;
+            applySceneEditResult(appState, makeRenderSettingsDirty());
+        }
+        int selectedQuality = appState.renderQuality;
+        if (qualityCombo(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E##scene_quality"), selectedQuality))
+        {
+            appState.renderQuality = selectedQuality;
+            applyQualityMode(appState);
+        }
+        if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C##renderer_denoiser"), &appState.denoiserEnabled))
+        {
+            applySceneEditResult(appState, makeRenderSettingsDirty());
+        }
+        if (ImGui::Checkbox(u8c(u8"\u041F\u0430\u0443\u0437\u0430 \u0440\u0435\u043D\u0434\u0435\u0440\u0430##renderer_pause"), &appState.renderingPaused))
+        {
+            applySceneEditResult(appState, makeRenderSettingsDirty());
+        }
+        if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435##reset_accumulation")))
+        {
+            invalidateAccumulation(appState);
+        }
+    };
 
     ImGui::BeginChild("HierarchyPanel", ImVec2(hierarchyWidth, childHeight), true);
-    ImGui::TextUnformatted(u8c(u8"\u0418\u0435\u0440\u0430\u0440\u0445\u0438\u044F"));
     if (ImGui::Selectable(u8c(u8"\u0421\u0446\u0435\u043D\u0430"), appState.hierarchySelectionKind == HierarchySelectionScene))
     {
         selectHierarchy(SceneHierarchySelectionScene, 0);
-    }
-    if (ImGui::Selectable(u8c(u8"\u041A\u0430\u043C\u0435\u0440\u0430"), appState.hierarchySelectionKind == HierarchySelectionCamera))
-    {
-        selectHierarchy(SceneHierarchySelectionCamera, 0);
-    }
-    if (ImGui::Selectable(u8c(u8"\u0421\u0432\u0435\u0442"), appState.hierarchySelectionKind == HierarchySelectionLight))
-    {
-        selectHierarchy(SceneHierarchySelectionLight, 0);
     }
     if (ImGui::TreeNodeEx(u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), ImGuiTreeNodeFlags_DefaultOpen))
     {
@@ -1702,6 +1731,19 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
         }
         ImGui::TreePop();
     }
+    ImGui::Separator();
+    if (ImGui::Selectable(u8c(u8"\u0421\u0432\u0435\u0442"), appState.hierarchySelectionKind == HierarchySelectionLight))
+    {
+        selectHierarchy(SceneHierarchySelectionLight, 0);
+    }
+    if (ImGui::Selectable(u8c(u8"\u0420\u0435\u043D\u0434\u0435\u0440"), appState.hierarchySelectionKind == HierarchySelectionRender))
+    {
+        selectHierarchy(SceneHierarchySelectionRender, 0);
+    }
+    if (ImGui::Selectable(u8c(u8"\u041A\u0430\u043C\u0435\u0440\u0430"), appState.hierarchySelectionKind == HierarchySelectionCamera))
+    {
+        selectHierarchy(SceneHierarchySelectionCamera, 0);
+    }
     ImGui::EndChild();
     ImGui::SameLine();
 
@@ -1742,7 +1784,6 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 loadUserMeshPreset(appState, *meshPath);
             }
         }
-        ImGui::SameLine();
         if (ImGui::Button(u8c(u8"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C JSON...")))
         {
             if (const std::optional<std::filesystem::path> scenePath = openSceneFileDialog(window))
@@ -1805,17 +1846,21 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             applySceneEditResultWithUndo(appState, before, editor.setSkyIntensity(skyIntensity));
         }
         float horizonColor[3] = {scene.skyHorizonColor.x, scene.skyHorizonColor.y, scene.skyHorizonColor.z};
+        ImGui::PushItemWidth(std::min(210.0f, ImGui::GetContentRegionAvail().x));
         if (ImGui::ColorEdit3(u8c(u8"\u0413\u043E\u0440\u0438\u0437\u043E\u043D\u0442"), horizonColor, ImGuiColorEditFlags_Float))
         {
             const SceneState before = scene;
             applySceneEditResultWithUndo(appState, before, editor.setSkyHorizonColor(make_float3(horizonColor[0], horizonColor[1], horizonColor[2])));
         }
+        ImGui::PopItemWidth();
         float zenithColor[3] = {scene.skyZenithColor.x, scene.skyZenithColor.y, scene.skyZenithColor.z};
+        ImGui::PushItemWidth(std::min(210.0f, ImGui::GetContentRegionAvail().x));
         if (ImGui::ColorEdit3(u8c(u8"\u0412\u0435\u0440\u0445 \u043D\u0435\u0431\u0430"), zenithColor, ImGuiColorEditFlags_Float))
         {
             const SceneState before = scene;
             applySceneEditResultWithUndo(appState, before, editor.setSkyZenithColor(make_float3(zenithColor[0], zenithColor[1], zenithColor[2])));
         }
+        ImGui::PopItemWidth();
         if (ImGui::Button(u8c(u8"\u0413\u043E\u0440\u0438\u0437\u043E\u043D\u0442 = \u0432\u0435\u0440\u0445 \u043D\u0435\u0431\u0430##match_sky_colors")))
         {
             const SceneState before = scene;
@@ -1907,43 +1952,10 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             appState.groupSelectionSpheres.clear();
             appState.groupSelectionMeshes.clear();
         }
-
-        ImGui::SeparatorText(u8c(u8"\u0420\u0435\u043D\u0434\u0435\u0440"));
-        ImGui::Text("FPS: %.1f", stats.fps);
-        ImGui::Text("CPU frame: %.2f ms", stats.avgHostMs);
-        ImGui::Text("GPU: %.2f ms", stats.avgGpuMs);
-        ImGui::Text("%s: %zu", u8c(u8"\u0421\u0444\u0435\u0440\u044B"), rendererStatistics.sphereCount);
-        ImGui::Text("%s: %zu", u8c(u8"\u041C\u043E\u0434\u0435\u043B\u0438"), rendererStatistics.meshObjectCount);
-        ImGui::Text("%s: %zu", u8c(u8"\u0422\u0440\u0435\u0443\u0433\u043E\u043B\u044C\u043D\u0438\u043A\u0438"), rendererStatistics.triangleCount);
-        ImGui::Text("%s: %zu", u8c(u8"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B"), rendererStatistics.materialCount);
-        ImGui::Text("%s: %u", u8c(u8"\u0421\u044D\u043C\u043F\u043B\u044B"), rendererStatistics.accumulationSamples);
-        ImGui::Text("%s: %s", u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C"),
-            appState.denoiserEnabled ? (appState.denoiserAvailable ? u8c(u8"\u0432\u043A\u043B") : u8c(u8"\u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D")) : u8c(u8"\u0432\u044B\u043A\u043B"));
-        ImGui::TextWrapped("%s", u8c(u8"VRAM: \u043D\u0435 \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0430\u0435\u0442\u0441\u044F, \u0447\u0442\u043E\u0431\u044B UI \u043D\u0435 \u0437\u0430\u0432\u0438\u0441\u0435\u043B \u043E\u0442 CUDA runtime \u0432 \u043F\u0430\u043D\u0435\u043B\u0438."));
-        int selectedRenderMode = appState.renderMode;
-        if (renderModeCombo(u8c(u8"\u0420\u0435\u0436\u0438\u043C##renderer_mode"), selectedRenderMode))
-        {
-            appState.renderMode = selectedRenderMode;
-            applySceneEditResult(appState, makeRenderSettingsDirty());
-        }
-        int selectedQuality = appState.renderQuality;
-        if (qualityCombo(u8c(u8"\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E##scene_quality"), selectedQuality))
-        {
-            appState.renderQuality = selectedQuality;
-            applyQualityMode(appState);
-        }
-        if (ImGui::Checkbox(u8c(u8"\u0428\u0443\u043C\u043E\u043F\u043E\u0434\u0430\u0432\u0438\u0442\u0435\u043B\u044C##renderer_denoiser"), &appState.denoiserEnabled))
-        {
-            applySceneEditResult(appState, makeRenderSettingsDirty());
-        }
-        if (ImGui::Checkbox(u8c(u8"\u041F\u0430\u0443\u0437\u0430 \u0440\u0435\u043D\u0434\u0435\u0440\u0430##renderer_pause"), &appState.renderingPaused))
-        {
-            applySceneEditResult(appState, makeRenderSettingsDirty());
-        }
-        if (ImGui::Button(u8c(u8"\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u043A\u043E\u043F\u043B\u0435\u043D\u0438\u0435##reset_accumulation")))
-        {
-            invalidateAccumulation(appState);
-        }
+    }
+    else if (appState.hierarchySelectionKind == HierarchySelectionRender)
+    {
+        drawRenderPanel();
     }
     else if (appState.hierarchySelectionKind == HierarchySelectionCamera)
     {

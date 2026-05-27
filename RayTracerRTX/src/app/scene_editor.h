@@ -26,7 +26,8 @@ enum SceneHierarchySelectionKind
     SceneHierarchySelectionLight = 2,
     SceneHierarchySelectionSphere = 3,
     SceneHierarchySelectionMesh = 4,
-    SceneHierarchySelectionGroup = 5
+    SceneHierarchySelectionGroup = 5,
+    SceneHierarchySelectionRender = 6
 };
 
 bool hasDirtyFlags(const SceneDirtyFlags& dirty);

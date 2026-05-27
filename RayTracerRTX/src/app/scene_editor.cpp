@@ -98,7 +98,8 @@ bool selectHierarchyObject(SceneState& scene, const int selectionKind, const int
 
     return selectionKind == SceneHierarchySelectionScene ||
         selectionKind == SceneHierarchySelectionCamera ||
-        selectionKind == SceneHierarchySelectionLight;
+        selectionKind == SceneHierarchySelectionLight ||
+        selectionKind == SceneHierarchySelectionRender;
 }
 
 bool selectPreviousSceneObject(SceneState& scene, int& selectionKind)
