@@ -17,9 +17,9 @@
   "environment": {
     "type": "gradient",
     "intensity": 0.85,
-    "horizonColor": [0.60, 0.68, 0.76],
-    "zenithColor": [0.14, 0.20, 0.32],
-    "gradientBlend": 1.0
+    "horizonColor": [1.0, 0.431, 0.0],
+    "zenithColor": [0.216, 0.478, 1.0],
+    "gradientBlend": 0.15
   },
   "spheres": [],
   "meshObjects": [
@@ -31,7 +31,7 @@
       "scale": [4000.0, 1.0, 4000.0],
       "material": {
         "type": "matte",
-        "baseColor": [0.48, 0.50, 0.48],
+        "baseColor": [0.40, 1.00, 0.40],
         "roughness": 0.64
       }
     }

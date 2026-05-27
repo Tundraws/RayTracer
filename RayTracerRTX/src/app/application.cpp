@@ -20,6 +20,9 @@
 #endif
 #include <windows.h>
 #include <commdlg.h>
+#include <objbase.h>
+#include <wincodec.h>
+#pragma comment(lib, "windowscodecs.lib")
 
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -59,7 +62,7 @@ float gImguiPanelHeight = 0.0f;
 void addScenePreset(AppState& appState, SceneBuildResult preset, std::wstring name, std::filesystem::path configPath = {});
 std::filesystem::path defaultSavedScenePath();
 std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window);
-bool saveFrameAsBmp(const std::filesystem::path& path, const std::vector<uchar4>& pixels, int width, int height, std::string& error);
+bool saveFrameSnapshot(const std::filesystem::path& path, const std::vector<uchar4>& pixels, int width, int height, std::string& error);
 
 float3 add3(const float3 a, const float3 b)
 {
@@ -596,7 +599,7 @@ void drawHudControlOverlay(
         if (const std::optional<std::filesystem::path> path = saveScreenshotFileDialog(window))
         {
             std::string error;
-            if (saveFrameAsBmp(*path, pixels, gWidth, gHeight, error))
+            if (saveFrameSnapshot(*path, pixels, gWidth, gHeight, error))
             {
                 appState.lastUiMessage = "Р¤РѕС‚РѕРєР°РґСЂ СЃРѕС…СЂР°РЅРµРЅ: " + path->string();
                 appState.lastUiMessageIsError = false;
@@ -746,23 +749,41 @@ std::optional<std::filesystem::path> openMeshFileDialog(GLFWwindow* window)
 
 std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window)
 {
-    wchar_t fileName[MAX_PATH] = L"RayTracerRTX_frame.bmp";
+    wchar_t fileName[MAX_PATH] = L"RayTracerRTX_frame.png";
 
     OPENFILENAMEW ofn{};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = window != nullptr ? glfwGetWin32Window(window) : nullptr;
     ofn.lpstrTitle = L"\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0444\u043E\u0442\u043E\u043A\u0430\u0434\u0440";
     ofn.lpstrFilter =
+        L"PNG (*.png)\0*.png\0"
+        L"JPEG (*.jpg;*.jpeg)\0*.jpg;*.jpeg\0"
         L"BMP \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435 (*.bmp)\0*.bmp\0"
         L"\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B (*.*)\0*.*\0";
     ofn.lpstrFile = fileName;
     ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrDefExt = L"bmp";
+    ofn.lpstrDefExt = L"png";
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
 
     if (GetSaveFileNameW(&ofn) == TRUE)
     {
-        return std::filesystem::path(fileName);
+        std::filesystem::path path(fileName);
+        if (path.extension().empty())
+        {
+            if (ofn.nFilterIndex == 2)
+            {
+                path.replace_extension(".jpg");
+            }
+            else if (ofn.nFilterIndex == 3)
+            {
+                path.replace_extension(".bmp");
+            }
+            else
+            {
+                path.replace_extension(".png");
+            }
+        }
+        return path;
     }
     return std::nullopt;
 }
@@ -843,6 +864,192 @@ bool saveFrameAsBmp(const std::filesystem::path& path, const std::vector<uchar4>
         return false;
     }
     return true;
+}
+
+std::wstring lowerExtension(const std::filesystem::path& path)
+{
+    std::wstring ext = path.extension().wstring();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](const wchar_t ch)
+    {
+        return static_cast<wchar_t>(std::towlower(ch));
+    });
+    return ext;
+}
+
+std::vector<unsigned char> makeBgraTopDownPixels(const std::vector<uchar4>& pixels, const int width, const int height)
+{
+    std::vector<unsigned char> bgra(static_cast<size_t>(width * height * 4), 255);
+    for (int y = 0; y < height; ++y)
+    {
+        for (int x = 0; x < width; ++x)
+        {
+            const uchar4 pixel = pixels[static_cast<size_t>((height - 1 - y) * width + x)];
+            const size_t offset = static_cast<size_t>((y * width + x) * 4);
+            bgra[offset + 0] = pixel.z;
+            bgra[offset + 1] = pixel.y;
+            bgra[offset + 2] = pixel.x;
+            bgra[offset + 3] = pixel.w;
+        }
+    }
+    return bgra;
+}
+
+bool saveFrameWithWic(
+    const std::filesystem::path& path,
+    const std::vector<uchar4>& pixels,
+    const int width,
+    const int height,
+    const GUID& containerFormat,
+    std::string& error)
+{
+    error.clear();
+    if (width <= 0 || height <= 0 || pixels.size() < static_cast<size_t>(width * height))
+    {
+        error = "Нет данных кадра для сохранения.";
+        return false;
+    }
+
+    const HRESULT coInit = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    const bool shouldUninitialize = SUCCEEDED(coInit);
+    if (FAILED(coInit) && coInit != RPC_E_CHANGED_MODE)
+    {
+        error = "Не удалось подготовить Windows Imaging Component.";
+        return false;
+    }
+
+    IWICImagingFactory* factory = nullptr;
+    IWICStream* stream = nullptr;
+    IWICBitmapEncoder* encoder = nullptr;
+    IWICBitmapFrameEncode* frame = nullptr;
+    IPropertyBag2* propertyBag = nullptr;
+    bool ok = false;
+
+    const auto cleanup = [&]()
+    {
+        if (propertyBag != nullptr)
+        {
+            propertyBag->Release();
+        }
+        if (frame != nullptr)
+        {
+            frame->Release();
+        }
+        if (encoder != nullptr)
+        {
+            encoder->Release();
+        }
+        if (stream != nullptr)
+        {
+            stream->Release();
+        }
+        if (factory != nullptr)
+        {
+            factory->Release();
+        }
+        if (shouldUninitialize)
+        {
+            CoUninitialize();
+        }
+    };
+
+    HRESULT hr = CoCreateInstance(
+        CLSID_WICImagingFactory,
+        nullptr,
+        CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(&factory));
+    if (FAILED(hr))
+    {
+        error = "Не удалось создать WIC factory.";
+        cleanup();
+        return false;
+    }
+
+    hr = factory->CreateStream(&stream);
+    if (SUCCEEDED(hr))
+    {
+        hr = stream->InitializeFromFilename(path.wstring().c_str(), GENERIC_WRITE);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = factory->CreateEncoder(containerFormat, nullptr, &encoder);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = encoder->Initialize(stream, WICBitmapEncoderNoCache);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = encoder->CreateNewFrame(&frame, &propertyBag);
+    }
+    if (SUCCEEDED(hr) && containerFormat == GUID_ContainerFormatJpeg && propertyBag != nullptr)
+    {
+        PROPBAG2 option{};
+        option.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
+        VARIANT value{};
+        VariantInit(&value);
+        value.vt = VT_R4;
+        value.fltVal = 0.92f;
+        propertyBag->Write(1, &option, &value);
+        VariantClear(&value);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = frame->Initialize(propertyBag);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = frame->SetSize(static_cast<UINT>(width), static_cast<UINT>(height));
+    }
+    WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat32bppBGRA;
+    if (SUCCEEDED(hr))
+    {
+        hr = frame->SetPixelFormat(&pixelFormat);
+    }
+    if (SUCCEEDED(hr))
+    {
+        const std::vector<unsigned char> bgra = makeBgraTopDownPixels(pixels, width, height);
+        hr = frame->WritePixels(
+            static_cast<UINT>(height),
+            static_cast<UINT>(width * 4),
+            static_cast<UINT>(bgra.size()),
+            const_cast<BYTE*>(bgra.data()));
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = frame->Commit();
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = encoder->Commit();
+    }
+
+    ok = SUCCEEDED(hr);
+    if (!ok)
+    {
+        error = "Не удалось сохранить фотокадр через Windows Imaging Component: " + path.string();
+    }
+    cleanup();
+    return ok;
+}
+
+bool saveFrameSnapshot(const std::filesystem::path& path, const std::vector<uchar4>& pixels, const int width, const int height, std::string& error)
+{
+    const std::wstring ext = lowerExtension(path);
+    if (ext == L".png")
+    {
+        return saveFrameWithWic(path, pixels, width, height, GUID_ContainerFormatPng, error);
+    }
+    if (ext == L".jpg" || ext == L".jpeg")
+    {
+        return saveFrameWithWic(path, pixels, width, height, GUID_ContainerFormatJpeg, error);
+    }
+    if (ext == L".bmp")
+    {
+        return saveFrameAsBmp(path, pixels, width, height, error);
+    }
+
+    error = "Поддерживаются только PNG, JPG/JPEG и BMP.";
+    return false;
 }
 
 bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPath)

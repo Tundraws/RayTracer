@@ -696,7 +696,7 @@ void addEditableFloor(SceneState& scene)
             make_float3(0.0f, 0.0f, 0.0f),
             make_float3(0.0f, 0.0f, 0.0f),
             make_float3(4000.0f, 1.0f, 4000.0f),
-            make_float3(0.48f, 0.50f, 0.48f)));
+            make_float3(0.40f, 1.00f, 0.40f)));
     scene.selectedMeshObject = 0;
     scene.selectedMeshMaterial = 0;
     syncCompatibilityMesh(scene);
@@ -894,9 +894,9 @@ SceneState makeBaseEditorScene()
     scene.lightPosition = make_float3(8.0f, 12.0f, -8.0f);
     scene.exposure = 0.78f;
     scene.skyIntensity = 0.72f;
-    scene.skyHorizonColor = make_float3(0.60f, 0.68f, 0.76f);
-    scene.skyZenithColor = make_float3(0.14f, 0.20f, 0.32f);
-    scene.skyGradientBlend = 1.0f;
+    scene.skyHorizonColor = make_float3(1.00f, 0.431f, 0.00f);
+    scene.skyZenithColor = make_float3(0.216f, 0.478f, 1.00f);
+    scene.skyGradientBlend = 0.15f;
     scene.lightIntensity = 0.95f;
     scene.areaLightRadius = 2.0f;
     scene.environmentIntensity = 0.85f;
