@@ -548,7 +548,7 @@ SceneEditResult SceneEditor::setSelectedMeshBaseColorTexture(const std::filesyst
 {
     if (!hasSelectedMesh(scene_))
     {
-        return makeMeshMaterialDirty(false);
+        return makeGeometryDirty(false);
     }
 
     MeshObject& object = scene_.meshObjects[static_cast<size_t>(scene_.selectedMeshObject)];
@@ -585,7 +585,7 @@ SceneEditResult SceneEditor::setSelectedMeshBaseColorTexture(const std::filesyst
     {
         syncSelectedMeshObjectMaterials(scene_);
     }
-    return makeMeshMaterialDirty(changed);
+    return makeGeometryDirty(changed);
 }
 
 SceneEditResult SceneEditor::setSelectedMeshMaterialType(const int materialType)

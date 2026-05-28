@@ -2503,8 +2503,8 @@ void testSceneEditorMeshBaseColorTextureLoads(TestContext& t)
     const SceneEditResult result = editor.setSelectedMeshBaseColorTexture(texturePath);
 
     t.expect(result.changed, "Loading a base color texture should report a change.");
-    t.expect(result.dirty.material, "Loading a base color texture should set material dirty.");
-    t.expect(!needsRendererSceneRebuild(result.dirty), "Loading a base color texture should use material sync.");
+    t.expect(result.dirty.geometry, "Loading a new base color texture should rebuild GPU texture resources.");
+    t.expect(needsRendererSceneRebuild(result.dirty), "Loading a new base color texture should rebuild renderer resources.");
     t.expect(object.mesh.textures.size() == textureCount + 1, "Texture should be appended to mesh texture list.");
     const MeshMaterial& material = object.mesh.materials[0];
     t.expect(material.textureEnabled == 1, "Loaded texture should be enabled.");
