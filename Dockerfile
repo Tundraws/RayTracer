@@ -73,8 +73,11 @@ RUN g++ -std=c++20 -Wall -Wextra -pedantic \
     RayTracerRTX/src/app/material.cpp \
     RayTracerRTX/src/app/mesh.cpp \
     RayTracerRTX/src/app/obj_loader.cpp \
+    RayTracerRTX/src/app/renderer_controller.cpp \
+    RayTracerRTX/src/app/renderer_statistics.cpp \
     RayTracerRTX/src/app/scene.cpp \
     RayTracerRTX/src/app/scene_config.cpp \
+    RayTracerRTX/src/app/scene_editor.cpp \
     -o /usr/local/bin/raytracerrtx_cpu_tests
 
 CMD ["/usr/local/bin/raytracerrtx_cpu_tests"]
