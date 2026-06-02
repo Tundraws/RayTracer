@@ -453,6 +453,16 @@ SceneEditResult SceneEditor::setSelectedMeshScale(const float3 scale)
     return makeTransformDirty(::setSelectedMeshScale(scene_, scale));
 }
 
+SceneEditResult SceneEditor::setSelectedMeshBottomY(const float bottomY)
+{
+    return makeTransformDirty(::setSelectedMeshBottomY(scene_, bottomY));
+}
+
+SceneEditResult SceneEditor::placeSelectedMeshOnSupport()
+{
+    return makeTransformDirty(::placeSelectedMeshOnSupport(scene_));
+}
+
 SceneEditResult SceneEditor::createGroup(const std::vector<SceneObjectRef>& refs)
 {
     return makeRenderSettingsDirty(createSceneGroup(scene_, refs));

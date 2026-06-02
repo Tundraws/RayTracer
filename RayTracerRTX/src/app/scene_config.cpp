@@ -1,6 +1,7 @@
 #include "scene_config.h"
 
 #include "asset_cache.h"
+#include "gltf_loader.h"
 #include "logger.h"
 #include "obj_loader.h"
 
@@ -19,6 +20,8 @@
 namespace
 {
 constexpr float kPi = 3.14159265358979323846f;
+constexpr int kConfigSceneObjectSphere = 3;
+constexpr int kConfigSceneObjectMesh = 4;
 
 struct JsonValue;
 
@@ -392,6 +395,32 @@ bool readStringField(const JsonObject& object, const std::string& name, std::str
     return true;
 }
 
+bool readIntField(const JsonObject& object, const std::string& name, int& out, std::string& error)
+{
+    const JsonValue* field = findField(object, name);
+    if (field == nullptr)
+    {
+        return true;
+    }
+
+    const double* value = asNumber(*field);
+    if (value == nullptr)
+    {
+        error = "'" + name + "' must be a number";
+        return false;
+    }
+
+    const double rounded = std::round(*value);
+    if (std::fabs(*value - rounded) > 0.0001)
+    {
+        error = "'" + name + "' must be an integer";
+        return false;
+    }
+
+    out = static_cast<int>(rounded);
+    return true;
+}
+
 bool readSceneTuningFields(const JsonObject& object, SceneConfig& config, std::string& error)
 {
     if (findField(object, "exposure") != nullptr)
@@ -488,9 +517,11 @@ bool loadPpmEnvironmentMap(const std::filesystem::path& path, MeshTexture& textu
         return false;
     }
 
+    const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
+
     std::vector<uchar4> pixels;
-    pixels.reserve(static_cast<size_t>(width * height));
-    for (int i = 0; i < width * height; ++i)
+    pixels.reserve(pixelCount);
+    for (size_t i = 0; i < pixelCount; ++i)
     {
         std::string rToken;
         std::string gToken;
@@ -1028,6 +1059,266 @@ bool meshObjectUsesSourceMaterials(const MeshObject& object)
     return true;
 }
 
+bool parseSceneObjectRef(const JsonValue& value, SceneObjectRef& ref, std::string& error)
+{
+    const JsonObject* object = asObject(value);
+    if (object == nullptr)
+    {
+        error = "Each group object reference must be an object";
+        return false;
+    }
+
+    std::string kindName;
+    if (!readStringField(*object, "kind", kindName, error))
+    {
+        return false;
+    }
+    if (kindName.empty())
+    {
+        error = "Group object reference must define string 'kind'";
+        return false;
+    }
+
+    if (kindName == "sphere")
+    {
+        ref.kind = kConfigSceneObjectSphere;
+    }
+    else if (kindName == "mesh")
+    {
+        ref.kind = kConfigSceneObjectMesh;
+    }
+    else
+    {
+        error = "Group object reference kind must be 'sphere' or 'mesh'";
+        return false;
+    }
+
+    if (findField(*object, "index") == nullptr)
+    {
+        error = "Group object reference must define numeric 'index'";
+        return false;
+    }
+    if (!readIntField(*object, "index", ref.index, error))
+    {
+        return false;
+    }
+    if (ref.index < 0)
+    {
+        error = "Group object reference index must be non-negative";
+        return false;
+    }
+    return true;
+}
+
+bool parseSceneGroupObject(const JsonObject& object, SceneGroupConfig& group, std::string& error)
+{
+    if (!readStringField(object, "name", group.name, error) ||
+        !readFloat3(object, "position", group.position, error) ||
+        !readFloat3(object, "rotation", group.rotation, error) ||
+        !readFloat3(object, "scale", group.scale, error))
+    {
+        return false;
+    }
+
+    const JsonValue* objectsField = findField(object, "objects");
+    if (objectsField == nullptr)
+    {
+        error = "Scene group must define 'objects'";
+        return false;
+    }
+
+    const JsonArray* objects = asArray(*objectsField);
+    if (objects == nullptr)
+    {
+        error = "Scene group 'objects' must be an array";
+        return false;
+    }
+
+    for (const JsonValue& item : *objects)
+    {
+        SceneObjectRef ref;
+        if (!parseSceneObjectRef(item, ref, error))
+        {
+            return false;
+        }
+        group.objects.push_back(ref);
+    }
+    return true;
+}
+
+bool isConfigGroupRefValid(const SceneState& scene, const SceneObjectRef ref)
+{
+    if (ref.kind == kConfigSceneObjectSphere)
+    {
+        return ref.index >= 0 && ref.index < static_cast<int>(scene.spheres.size());
+    }
+    if (ref.kind == kConfigSceneObjectMesh)
+    {
+        return ref.index >= 0 && ref.index < static_cast<int>(scene.meshObjects.size());
+    }
+    return false;
+}
+
+void applySceneGroupsFromConfig(const SceneConfig& config, SceneBuildResult& result)
+{
+    result.scene.groups.clear();
+    for (const SceneGroupConfig& groupConfig : config.groups)
+    {
+        SceneGroup group;
+        group.name = groupConfig.name.empty() ? "Group" : groupConfig.name;
+        group.position = groupConfig.position;
+        group.rotation = groupConfig.rotation;
+        group.scale = groupConfig.scale;
+
+        for (const SceneObjectRef ref : groupConfig.objects)
+        {
+            if (isConfigGroupRefValid(result.scene, ref) && findObjectGroupIndex(result.scene, ref) < 0)
+            {
+                group.objects.push_back(ref);
+            }
+            else
+            {
+                const std::string warning = "Scene group '" + group.name + "' references an invalid or already grouped object; reference was skipped.";
+                result.warnings.push_back(warning);
+                logWarning(warning);
+            }
+        }
+
+        if (group.objects.size() >= 2)
+        {
+            result.scene.groups.push_back(std::move(group));
+        }
+        else
+        {
+            const std::string warning = "Scene group '" + group.name + "' has fewer than two valid objects; group was skipped.";
+            result.warnings.push_back(warning);
+            logWarning(warning);
+        }
+    }
+}
+
+struct ConfigMeshBounds
+{
+    float3 min{};
+    float3 max{};
+    bool valid = false;
+};
+
+ConfigMeshBounds calculateConfigMeshBounds(const MeshData& mesh)
+{
+    ConfigMeshBounds bounds;
+    if (mesh.vertices.empty())
+    {
+        return bounds;
+    }
+
+    bounds.min = mesh.vertices.front().position;
+    bounds.max = mesh.vertices.front().position;
+    bounds.valid = true;
+    for (const MeshVertex& vertex : mesh.vertices)
+    {
+        bounds.min.x = std::min(bounds.min.x, vertex.position.x);
+        bounds.min.y = std::min(bounds.min.y, vertex.position.y);
+        bounds.min.z = std::min(bounds.min.z, vertex.position.z);
+        bounds.max.x = std::max(bounds.max.x, vertex.position.x);
+        bounds.max.y = std::max(bounds.max.y, vertex.position.y);
+        bounds.max.z = std::max(bounds.max.z, vertex.position.z);
+    }
+    return bounds;
+}
+
+void normalizeMeshForConfig(MeshObject& object)
+{
+    const ConfigMeshBounds bounds = calculateConfigMeshBounds(object.mesh);
+    const bool supportPanel =
+        object.assetReference.find("panel") != std::string::npos ||
+        object.assetReference.find("plane") != std::string::npos;
+    if (!bounds.valid || supportPanel)
+    {
+        return;
+    }
+
+    const float3 offset = make_float3(
+        (bounds.min.x + bounds.max.x) * 0.5f,
+        bounds.min.y,
+        (bounds.min.z + bounds.max.z) * 0.5f);
+    for (MeshVertex& vertex : object.mesh.vertices)
+    {
+        vertex.position = make_float3(
+            vertex.position.x - offset.x,
+            vertex.position.y - offset.y,
+            vertex.position.z - offset.z);
+    }
+
+    const ConfigMeshBounds normalizedBounds = calculateConfigMeshBounds(object.mesh);
+    if (!normalizedBounds.valid)
+    {
+        return;
+    }
+
+    const float width = normalizedBounds.max.x - normalizedBounds.min.x;
+    const float height = normalizedBounds.max.y - normalizedBounds.min.y;
+    const float depth = normalizedBounds.max.z - normalizedBounds.min.z;
+    const float maxDimension = std::max(width, std::max(height, depth));
+    if (maxDimension > 6.0f)
+    {
+        const float scale = 4.0f / maxDimension;
+        object.scale = make_float3(scale, scale, scale);
+    }
+}
+
+bool isGltfPath(const std::filesystem::path& path)
+{
+    const std::string extension = lowerCopy(path.extension().string());
+    return extension == ".gltf" || extension == ".glb";
+}
+
+std::string normalizeConfigObjectName(std::string name)
+{
+    size_t pos = name.size();
+    while (pos > 0 && std::isdigit(static_cast<unsigned char>(name[pos - 1])) != 0)
+    {
+        --pos;
+    }
+    if (pos > 0 && pos < name.size() && name[pos - 1] == ' ')
+    {
+        name.resize(pos - 1);
+    }
+    return name;
+}
+
+bool findGltfMeshObjectForConfig(
+    const std::filesystem::path& meshPath,
+    const std::string& objectName,
+    MeshObject& outObject,
+    std::string& error)
+{
+    const GltfSceneLoadResult loaded = loadGltfMeshObjects(meshPath);
+    if (!loaded.ok)
+    {
+        error = loaded.error;
+        return false;
+    }
+    if (loaded.meshObjects.empty())
+    {
+        error = "glTF file contains no mesh objects: " + meshPath.string();
+        return false;
+    }
+
+    const std::string normalizedTarget = normalizeConfigObjectName(objectName);
+    for (const MeshObject& object : loaded.meshObjects)
+    {
+        if (normalizeConfigObjectName(object.displayName) == normalizedTarget)
+        {
+            outObject = object;
+            return true;
+        }
+    }
+
+    outObject = loaded.meshObjects.front();
+    return true;
+}
+
 SceneConfigResult parseSceneConfig(const JsonValue& root)
 {
     SceneConfigResult result;
@@ -1222,7 +1513,8 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
                 result.error = error;
                 return result;
             }
-            if (const JsonValue* materialField = findField(*object, "material"))
+            if (const JsonValue* materialField = findField(*object, "material");
+                materialField != nullptr && (primitive != nullptr || asString(*materialField) != nullptr))
             {
                 if (!parseMaterialReference(
                         *materialField,
@@ -1249,6 +1541,35 @@ SceneConfigResult parseSceneConfig(const JsonValue& root)
                 }
             }
             result.config.meshObjects.push_back(meshObject);
+        }
+    }
+
+    if (const JsonValue* groupsField = findField(*rootObject, "groups"))
+    {
+        const JsonArray* groups = asArray(*groupsField);
+        if (groups == nullptr)
+        {
+            result.error = "'groups' must be an array";
+            return result;
+        }
+
+        for (const JsonValue& item : *groups)
+        {
+            const JsonObject* groupObject = asObject(item);
+            if (groupObject == nullptr)
+            {
+                result.error = "Each groups item must be an object";
+                return result;
+            }
+
+            SceneGroupConfig group;
+            std::string error;
+            if (!parseSceneGroupObject(*groupObject, group, error))
+            {
+                result.error = error;
+                return result;
+            }
+            result.config.groups.push_back(std::move(group));
         }
     }
 
@@ -1550,6 +1871,7 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
         {
             result.scene.meshObjects.clear();
             result.scene.mesh = {};
+            applySceneGroupsFromConfig(config, result);
             clampScene(result.scene);
             return result;
         }
@@ -1580,15 +1902,31 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
         else
         {
             meshPath = resolvePath(object.meshPath, baseDirectory);
-            const ObjLoadResult& loaded = assets.loadMesh(meshPath);
-            if (!loaded.ok)
+            if (isGltfPath(meshPath))
             {
-                result.ok = false;
-                result.error = loaded.error;
-                logError(result.error);
-                return result;
+                MeshObject loadedObject;
+                std::string loadError;
+                if (!findGltfMeshObjectForConfig(meshPath, object.name, loadedObject, loadError))
+                {
+                    result.ok = false;
+                    result.error = loadError.empty() ? "Could not load glTF mesh object: " + meshPath.string() : loadError;
+                    logError(result.error);
+                    return result;
+                }
+                objectMesh = std::move(loadedObject.mesh);
             }
-            objectMesh = loaded.mesh;
+            else
+            {
+                const ObjLoadResult& loaded = assets.loadMesh(meshPath);
+                if (!loaded.ok)
+                {
+                    result.ok = false;
+                    result.error = loaded.error;
+                    logError(result.error);
+                    return result;
+                }
+                objectMesh = loaded.mesh;
+            }
         }
         std::vector<MeshMaterial> sourceMaterials = objectMesh.materials;
         applyMeshMaterialOverride(object, materialMap, objectMesh, result);
@@ -1601,6 +1939,10 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
                 : object.primitive);
         meshObject.mesh = objectMesh;
         meshObject.sourceMaterials = std::move(sourceMaterials);
+        if (object.primitive.empty())
+        {
+            normalizeMeshForConfig(meshObject);
+        }
         meshObject.position = object.transform.position;
         meshObject.rotation = object.transform.rotation;
         meshObject.scale = object.transform.scale;
@@ -1613,6 +1955,8 @@ SceneBuildResult buildSceneFromConfig(const SceneConfig& config, const std::file
     {
         result.scene.mesh = std::move(combinedMesh);
         result.scene.meshObjects = std::move(meshObjects);
+        applySceneGroupsFromConfig(config, result);
+        clampScene(result.scene);
     }
     else
     {
@@ -1823,10 +2167,37 @@ bool saveSceneToConfigFile(const std::filesystem::path& path, const SceneState& 
         writeFloat3(object.scale);
         if (!object.mesh.materials.empty() && !meshObjectUsesSourceMaterials(object))
         {
-            output << ",\n      \"material\": ";
+            output << (primitive.empty() ? ",\n      \"materialOverride\": " : ",\n      \"material\": ");
             writeMeshMaterial(object.mesh.materials.front());
         }
         output << "\n    }" << (i + 1 < scene.meshObjects.size() ? "," : "") << "\n";
+    }
+    output << "  ],\n";
+
+    output << "  \"groups\": [\n";
+    for (size_t i = 0; i < scene.groups.size(); ++i)
+    {
+        const SceneGroup& group = scene.groups[i];
+        output << "    {\n";
+        output << "      \"name\": \"" << jsonEscape(group.name) << "\",\n";
+        output << "      \"position\": ";
+        writeFloat3(group.position);
+        output << ",\n      \"rotation\": ";
+        writeFloat3(group.rotation);
+        output << ",\n      \"scale\": ";
+        writeFloat3(group.scale);
+        output << ",\n      \"objects\": [\n";
+        for (size_t j = 0; j < group.objects.size(); ++j)
+        {
+            const SceneObjectRef ref = group.objects[j];
+            const char* kind = ref.kind == kConfigSceneObjectSphere
+                ? "sphere"
+                : (ref.kind == kConfigSceneObjectMesh ? "mesh" : "unknown");
+            output << "        { \"kind\": \"" << kind << "\", \"index\": " << ref.index << " }"
+                   << (j + 1 < group.objects.size() ? "," : "") << "\n";
+        }
+        output << "      ]\n";
+        output << "    }" << (i + 1 < scene.groups.size() ? "," : "") << "\n";
     }
     output << "  ]\n";
     output << "}\n";

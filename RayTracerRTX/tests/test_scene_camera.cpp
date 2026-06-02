@@ -43,6 +43,111 @@ float dot3(const float3& a, const float3& b)
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+float3 add3(const float3& a, const float3& b)
+{
+    return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+float3 sub3(const float3& a, const float3& b)
+{
+    return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+float3 mul3(const float3& value, const float scale)
+{
+    return make_float3(value.x * scale, value.y * scale, value.z * scale);
+}
+
+float3 cross3(const float3& a, const float3& b)
+{
+    return make_float3(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x);
+}
+
+float3 normalize3(const float3& value)
+{
+    const float length = length3(value);
+    if (length <= 0.0f)
+    {
+        return make_float3(0.0f, 0.0f, 0.0f);
+    }
+    return mul3(value, 1.0f / length);
+}
+
+bool intersectReferenceSphere(
+    const float3& rayOrigin,
+    const float3& rayDirection,
+    const float3& center,
+    const float radius,
+    float& tHit)
+{
+    const float3 oc = sub3(rayOrigin, center);
+    const float a = dot3(rayDirection, rayDirection);
+    const float b = 2.0f * dot3(oc, rayDirection);
+    const float c = dot3(oc, oc) - radius * radius;
+    const float discriminant = b * b - 4.0f * a * c;
+    if (discriminant < 0.0f)
+    {
+        return false;
+    }
+
+    const float sqrtDiscriminant = std::sqrt(discriminant);
+    const float t0 = (-b - sqrtDiscriminant) / (2.0f * a);
+    const float t1 = (-b + sqrtDiscriminant) / (2.0f * a);
+    if (t0 > 0.0f)
+    {
+        tHit = t0;
+        return true;
+    }
+    if (t1 > 0.0f)
+    {
+        tHit = t1;
+        return true;
+    }
+    return false;
+}
+
+bool intersectReferenceTriangle(
+    const float3& rayOrigin,
+    const float3& rayDirection,
+    const float3& v0,
+    const float3& v1,
+    const float3& v2,
+    float& tHit,
+    float& baryU,
+    float& baryV)
+{
+    constexpr float epsilon = 1e-6f;
+    const float3 edge1 = sub3(v1, v0);
+    const float3 edge2 = sub3(v2, v0);
+    const float3 pvec = cross3(rayDirection, edge2);
+    const float det = dot3(edge1, pvec);
+    if (std::fabs(det) < epsilon)
+    {
+        return false;
+    }
+
+    const float invDet = 1.0f / det;
+    const float3 tvec = sub3(rayOrigin, v0);
+    baryU = dot3(tvec, pvec) * invDet;
+    if (baryU < 0.0f || baryU > 1.0f)
+    {
+        return false;
+    }
+
+    const float3 qvec = cross3(tvec, edge1);
+    baryV = dot3(rayDirection, qvec) * invDet;
+    if (baryV < 0.0f || baryU + baryV > 1.0f)
+    {
+        return false;
+    }
+
+    tHit = dot3(edge2, qvec) * invDet;
+    return tHit > epsilon;
+}
+
 std::filesystem::path writeFixtureFile(const std::string& name, const std::string& content)
 {
     const std::filesystem::path directory = std::filesystem::temp_directory_path() / "raytracerrtx_obj_loader_tests";
@@ -370,6 +475,95 @@ void testGgxMathHelpers(TestContext& t)
     t.expect(almostEqual(clampMaterialRoughnessShared(5.0f), 1.0f), "Shared roughness clamp should clamp high values.");
     t.expect(almostEqual(clampMaterialIorShared(0.1f), 1.01f), "Shared IOR clamp should clamp low values.");
     t.expect(almostEqual(clampMaterialIorShared(9.0f), 2.8f), "Shared IOR clamp should clamp high values.");
+}
+
+void testReferenceRaySphereIntersection(TestContext& t)
+{
+    float tHit = 0.0f;
+    const bool hit = intersectReferenceSphere(
+        make_float3(0.0f, 0.0f, -5.0f),
+        make_float3(0.0f, 0.0f, 1.0f),
+        make_float3(0.0f, 0.0f, 0.0f),
+        1.0f,
+        tHit);
+
+    t.expect(hit, "Reference ray should hit the sphere.");
+    t.expect(almostEqual(tHit, 4.0f, 1e-4f), "Reference sphere hit distance should match the near intersection.");
+
+    const bool miss = intersectReferenceSphere(
+        make_float3(0.0f, 0.0f, -5.0f),
+        normalize3(make_float3(0.0f, 2.0f, 1.0f)),
+        make_float3(0.0f, 0.0f, 0.0f),
+        1.0f,
+        tHit);
+
+    t.expect(!miss, "Reference ray should miss the sphere when pointed away from it.");
+}
+
+void testReferenceRayTriangleIntersection(TestContext& t)
+{
+    float tHit = 0.0f;
+    float baryU = 0.0f;
+    float baryV = 0.0f;
+    const bool hit = intersectReferenceTriangle(
+        make_float3(0.25f, 0.25f, -1.0f),
+        make_float3(0.0f, 0.0f, 1.0f),
+        make_float3(0.0f, 0.0f, 0.0f),
+        make_float3(1.0f, 0.0f, 0.0f),
+        make_float3(0.0f, 1.0f, 0.0f),
+        tHit,
+        baryU,
+        baryV);
+
+    t.expect(hit, "Reference ray should hit the triangle.");
+    t.expect(almostEqual(tHit, 1.0f, 1e-4f), "Reference triangle hit distance should match the plane distance.");
+    t.expect(almostEqual(baryU, 0.25f, 1e-4f), "Reference triangle barycentric U should match the hit point.");
+    t.expect(almostEqual(baryV, 0.25f, 1e-4f), "Reference triangle barycentric V should match the hit point.");
+
+    const bool miss = intersectReferenceTriangle(
+        make_float3(1.25f, 1.25f, -1.0f),
+        make_float3(0.0f, 0.0f, 1.0f),
+        make_float3(0.0f, 0.0f, 0.0f),
+        make_float3(1.0f, 0.0f, 0.0f),
+        make_float3(0.0f, 1.0f, 0.0f),
+        tHit,
+        baryU,
+        baryV);
+
+    t.expect(!miss, "Reference ray should miss outside the triangle area.");
+}
+
+void testBarycentricNormalInterpolation(TestContext& t)
+{
+    const float w0 = 0.50f;
+    const float w1 = 0.25f;
+    const float w2 = 0.25f;
+    const float3 n0 = make_float3(0.0f, 0.0f, 1.0f);
+    const float3 n1 = make_float3(0.0f, 1.0f, 0.0f);
+    const float3 n2 = make_float3(1.0f, 0.0f, 0.0f);
+
+    const float3 normal = normalize3(add3(add3(mul3(n0, w0), mul3(n1, w1)), mul3(n2, w2)));
+
+    t.expect(almostEqual(length3(normal), 1.0f, 1e-4f), "Interpolated normal should be normalized.");
+    t.expect(normal.z > normal.x && normal.z > normal.y, "Interpolated normal should keep the dominant vertex contribution.");
+}
+
+void testPrimaryRayCenterDirection(TestContext& t)
+{
+    CameraState camera;
+    float3 forward{};
+    float3 right{};
+    float3 up{};
+    float scale = 0.0f;
+    float aspect = 0.0f;
+    updateCameraBasis(camera, 1280, 720, forward, right, up, scale, aspect);
+
+    const float px = 0.0f;
+    const float py = 0.0f;
+    const float3 direction = normalize3(add3(add3(forward, mul3(right, px)), mul3(up, py)));
+
+    t.expect(almostEqual(length3(direction), 1.0f, 1e-4f), "Primary ray direction should be normalized.");
+    t.expect(dot3(direction, forward) > 0.999f, "Center primary ray should follow the camera forward vector.");
 }
 
 void testObjLoaderMultipleMaterials(TestContext& t)
@@ -1412,7 +1606,7 @@ void testAddLoadedMeshUsesSupportPlaneAndFreeSpot(TestContext& t)
 
     t.expect(addMeshObjectToScene(scene, first), "First loaded mesh should be added to current scene.");
     const MeshObject& placedFirst = scene.meshObjects.back();
-    t.expect(almostEqual(placedFirst.position.y, 2.5f), "Loaded mesh should stand on the support panel using its vertex bounds.");
+    t.expect(almostEqual(selectedMeshBottomY(scene), 1.5f), "Loaded mesh should stand on the support panel using its vertex bounds.");
 
     MeshObject second = first;
     t.expect(addMeshObjectToScene(scene, second), "Second loaded mesh should also be added to current scene.");
@@ -1421,7 +1615,7 @@ void testAddLoadedMeshUsesSupportPlaneAndFreeSpot(TestContext& t)
     const float dz = placedSecond.position.z - placedFirst.position.z;
     const float distance = std::sqrt(dx * dx + dz * dz);
     t.expect(distance > 2.0f, "Second loaded mesh should be moved to a nearby free spot.");
-    t.expect(almostEqual(placedSecond.position.y, 2.5f), "Second loaded mesh should also stand on the support panel.");
+    t.expect(almostEqual(selectedMeshBottomY(scene), 1.5f), "Second loaded mesh should also stand on the support panel.");
     t.expect(placedSecond.displayName == "model.obj 1", "Second loaded mesh should receive a unique name.");
 }
 
@@ -1464,8 +1658,7 @@ void testMeshScaleKeepsObjectOnSupportPlane(TestContext& t)
     scene.selectedMeshObject = static_cast<int>(scene.meshObjects.size()) - 1;
 
     t.expect(setSelectedMeshScale(scene, make_float3(3.0f, 5.0f, 3.0f)), "Scaling selected cube should succeed.");
-    const MeshObject& scaled = scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
-    t.expect(almostEqual(scaled.position.y, 2.5f), "Scaled cube should keep its bottom on Y=0 support plane.");
+    t.expect(almostEqual(selectedMeshBottomY(scene), 0.0f), "Scaled cube should keep its bottom on Y=0 support plane.");
 }
 
 void testRemoveSelectedMeshObjectSafe(TestContext& t)
@@ -1563,7 +1756,7 @@ void testSceneConfigLoadsValidScene(TestContext& t)
     const SceneBuildResult scene = buildSceneFromConfig(config.config, configPath.parent_path());
     t.expect(scene.ok, "Valid scene config should build a scene.");
     t.expect(almostEqual(scene.camera.position.x, 1.0f), "Scene config should apply camera position.");
-    t.expect(almostEqual(scene.scene.lightPosition.y, 5.0f), "Scene config should apply light position.");
+    t.expect(almostEqual(scene.scene.lightPosition.y, 6.0f), "Scene config should clamp light position to safe minimum height.");
     t.expect(scene.scene.mesh.vertices.size() == 3, "Scene config mesh path should load OBJ vertices.");
     t.expect(almostEqual(scene.scene.mesh.vertices[1].position.x, 4.0f), "Scene config transform should affect mesh vertices.");
     t.expect(scene.scene.meshObjects.size() == 1, "Scene config should preserve mesh object list.");
@@ -2371,8 +2564,8 @@ void testSelectedMeshTransformInvalidSafe(TestContext& t)
     t.expect(moved, "Invalid selected mesh should clamp before position edit.");
     t.expect(scaled, "Invalid selected mesh should clamp before scale edit.");
     t.expect(scene.selectedMeshObject == clampedIndex, "Invalid selected mesh transform edit should clamp selected index.");
-    t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].position.x, 50.0f), "Mesh position should clamp to max.");
-    t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].position.y, -10.0f), "Mesh position should clamp to min Y.");
+    t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].position.x, 100.0f), "Mesh position should stay within the extended movement range.");
+    t.expect(scene.meshObjects[static_cast<size_t>(clampedIndex)].position.y >= 0.0f, "Mesh position should stay on or above support.");
     t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].scale.x, 0.05f), "Mesh scale should clamp to min.");
     t.expect(almostEqual(scene.meshObjects[static_cast<size_t>(clampedIndex)].scale.y, 100.0f), "Mesh scale should clamp to max.");
 }
@@ -3076,8 +3269,8 @@ void testMoveSphereClamp(TestContext& t)
     moveSelectedSphere(scene, make_float3(200.0f, -200.0f, 200.0f));
     const float3 center = scene.spheres[0].center;
 
-    t.expect(center.x <= 24.0f, "Sphere X should be clamped by scene bounds.");
-    t.expect(center.z <= 24.0f, "Sphere Z should be clamped by scene bounds.");
+    t.expect(center.x <= 200.0f, "Sphere X should stay within extended scene bounds.");
+    t.expect(center.z <= 200.0f, "Sphere Z should stay within extended scene bounds.");
     t.expect(center.y >= radius, "Sphere Y should stay above floor with radius offset.");
 }
 
@@ -3465,6 +3658,64 @@ bool runDynamicSphereGpuSmokeTest(TestContext& t)
 #endif
 }
 
+bool runDynamicMeshGpuSmokeTest(TestContext& t)
+{
+#if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
+    (void)t;
+    std::cout << "[SKIP] Dynamic mesh GPU smoke test skipped: RAYTRACERRTX_ENABLE_GPU_TESTS is not enabled.\n";
+    return false;
+#else
+    try
+    {
+        OptixRenderer renderer;
+        renderer.setRenderSize(64, 64);
+        renderer.initialize();
+
+        SceneState scene = makeDefaultScene();
+        CameraState camera;
+        std::vector<uchar4> pixels(64u * 64u);
+        float gpuTimeMs = -1.0f;
+
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+
+        SceneEditor editor(scene);
+        const SceneEditResult added = editor.addMeshPrimitive(BuiltInMeshCube);
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+
+        const SceneEditResult moved = editor.setSelectedMeshPosition(make_float3(1.5f, 1.0f, 0.0f));
+        const SceneEditResult materialChanged = editor.setSelectedMeshMaterialType(MaterialMirror);
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+
+        const SceneEditResult removed = editor.deleteSelectedMeshObject();
+        renderer.renderFrame(scene, camera, pixels, &gpuTimeMs);
+
+        bool hasNonZeroPixel = false;
+        for (const uchar4 px : pixels)
+        {
+            if (px.x != 0u || px.y != 0u || px.z != 0u || px.w != 0u)
+            {
+                hasNonZeroPixel = true;
+                break;
+            }
+        }
+
+        t.expect(added.changed && added.dirty.geometry, "Dynamic mesh GPU smoke: adding a mesh should mark geometry dirty.");
+        t.expect(moved.changed && moved.dirty.transform, "Dynamic mesh GPU smoke: moving a mesh should mark transform dirty.");
+        t.expect(materialChanged.changed && materialChanged.dirty.material, "Dynamic mesh GPU smoke: changing mesh material should mark material dirty.");
+        t.expect(removed.changed && removed.dirty.geometry, "Dynamic mesh GPU smoke: deleting a mesh should mark geometry dirty.");
+        t.expect(hasNonZeroPixel, "Dynamic mesh GPU smoke: rendered frame after mesh changes must contain non-zero pixels.");
+        t.expect(gpuTimeMs >= 0.0f, "Dynamic mesh GPU smoke: GPU time must be non-negative.");
+        renderer.destroy();
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << "[SKIP] Dynamic mesh GPU smoke test skipped: " << ex.what() << '\n';
+        return false;
+    }
+#endif
+}
+
 bool runDenoiserGpuSmokeTest(TestContext& t)
 {
 #if !defined(RAYTRACERRTX_ENABLE_GPU_TESTS)
@@ -3700,6 +3951,10 @@ int main(int argc, char** argv)
     runTest("Render quality cycles", testRenderQualityCycles);
     runTest("Render quality depth and fallback", testRenderQualityDepthAndFallback);
     runTest("GGX math helpers", testGgxMathHelpers);
+    runTest("Reference ray-sphere intersection", testReferenceRaySphereIntersection);
+    runTest("Reference ray-triangle intersection", testReferenceRayTriangleIntersection);
+    runTest("Barycentric normal interpolation", testBarycentricNormalInterpolation);
+    runTest("Primary ray center direction", testPrimaryRayCenterDirection);
     runTest("OBJ loader triangle with normals", testObjLoaderTriangleWithNormals);
     runTest("OBJ loader multiple materials", testObjLoaderMultipleMaterials);
     runTest("OBJ loader mirror material name mapping", testObjLoaderMirrorMaterialNameMapping);
@@ -3809,6 +4064,15 @@ int main(int argc, char** argv)
     if (runDynamicSphereGpuSmokeTest(t))
     {
         std::cout << "[PASS] Dynamic sphere GPU smoke test (checks: 4)\n";
+    }
+    else
+    {
+        ++testsSkipped;
+    }
+    ++testsRun;
+    if (runDynamicMeshGpuSmokeTest(t))
+    {
+        std::cout << "[PASS] Dynamic mesh GPU smoke test (checks: 6)\n";
     }
     else
     {

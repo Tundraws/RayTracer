@@ -6,6 +6,7 @@
 #include <cctype>
 #include <charconv>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 
@@ -123,26 +124,16 @@ bool loadPpmTexture(const std::filesystem::path& path, MeshTexture& texture, con
     texture.pixels = std::move(pixels);
     return true;
 }
-}
 
-bool loadImageTexture(const std::filesystem::path& path, MeshTexture& texture, const std::string& type)
+bool storeStbTexture(stbi_uc* pixels, const int width, const int height, const int channels, MeshTexture& texture, const std::string& type, const std::string& label)
 {
-    if (lowerExtension(path) == ".ppm")
-    {
-        return loadPpmTexture(path, texture, type);
-    }
-
-    int width = 0;
-    int height = 0;
-    int channels = 0;
-    stbi_uc* pixels = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
     if (pixels == nullptr || width <= 0 || height <= 0)
     {
         if (pixels != nullptr)
         {
             stbi_image_free(pixels);
         }
-        logWarning("Image texture could not be loaded, using material fallback: " + path.string());
+        logWarning("Image texture could not be loaded, using material fallback: " + label);
         return false;
     }
 
@@ -159,11 +150,41 @@ bool loadImageTexture(const std::filesystem::path& path, MeshTexture& texture, c
     }
     stbi_image_free(pixels);
 
-    texture.path = path.string();
+    texture.path = label;
     texture.type = type;
     texture.width = static_cast<unsigned int>(width);
     texture.height = static_cast<unsigned int>(height);
     texture.channels = static_cast<unsigned int>(channels);
     texture.pixels = std::move(result);
     return true;
+}
+}
+
+bool loadImageTexture(const std::filesystem::path& path, MeshTexture& texture, const std::string& type)
+{
+    if (lowerExtension(path) == ".ppm")
+    {
+        return loadPpmTexture(path, texture, type);
+    }
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    stbi_uc* pixels = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
+    return storeStbTexture(pixels, width, height, channels, texture, type, path.string());
+}
+
+bool loadImageTextureFromMemory(const unsigned char* data, const size_t size, MeshTexture& texture, const std::string& type, const std::string& label)
+{
+    if (data == nullptr || size == 0 || size > static_cast<size_t>(std::numeric_limits<int>::max()))
+    {
+        logWarning("Embedded image texture could not be loaded, using material fallback: " + label);
+        return false;
+    }
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    stbi_uc* pixels = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels, 4);
+    return storeStbTexture(pixels, width, height, channels, texture, type, label);
 }

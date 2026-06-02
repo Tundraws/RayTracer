@@ -76,6 +76,8 @@ public:
     SceneEditResult setSelectedMeshPosition(float3 position);
     SceneEditResult setSelectedMeshRotation(float3 rotation);
     SceneEditResult setSelectedMeshScale(float3 scale);
+    SceneEditResult setSelectedMeshBottomY(float bottomY);
+    SceneEditResult placeSelectedMeshOnSupport();
     SceneEditResult setSelectedMeshMaterialProperties(float3 color, float roughness, float ior, float alpha, bool textureEnabled);
     SceneEditResult setSelectedMeshBaseColorTexture(const std::filesystem::path& path);
     SceneEditResult setSelectedMeshMaterialType(int materialType);

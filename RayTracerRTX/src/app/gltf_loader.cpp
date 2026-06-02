@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <tuple>
 #include <variant>
 
 namespace
@@ -371,16 +372,16 @@ Mat4 identityMatrix()
 Mat4 multiplyMatrix(const Mat4& a, const Mat4& b)
 {
     Mat4 result{};
-    for (int row = 0; row < 4; ++row)
+    for (size_t row = 0; row < 4; ++row)
     {
-        for (int col = 0; col < 4; ++col)
+        for (size_t col = 0; col < 4; ++col)
         {
             float value = 0.0f;
-            for (int k = 0; k < 4; ++k)
+            for (size_t k = 0; k < 4; ++k)
             {
-                value += a[static_cast<size_t>(row * 4 + k)] * b[static_cast<size_t>(k * 4 + col)];
+                value += a[row * 4 + k] * b[k * 4 + col];
             }
-            result[static_cast<size_t>(row * 4 + col)] = value;
+            result[row * 4 + col] = value;
         }
     }
     return result;
@@ -481,6 +482,45 @@ struct Accessor
     size_t count = 0;
     std::string type;
 };
+
+bool loadGltfImageTexture(
+    const JsonObject& image,
+    const std::vector<std::vector<unsigned char>>& buffers,
+    const std::vector<BufferView>& views,
+    const std::filesystem::path& basePath,
+    MeshTexture& texture,
+    const std::string& type)
+{
+    const std::string uri = stringField(image, "uri");
+    if (!uri.empty())
+    {
+        if (uri.find("data:") == 0)
+        {
+            return false;
+        }
+        return loadImageTexture(basePath / uri, texture, type);
+    }
+
+    const int bufferViewIndex = intField(image, "bufferView", -1);
+    if (bufferViewIndex < 0 || static_cast<size_t>(bufferViewIndex) >= views.size())
+    {
+        return false;
+    }
+    const BufferView& view = views[static_cast<size_t>(bufferViewIndex)];
+    if (view.buffer < 0 || static_cast<size_t>(view.buffer) >= buffers.size())
+    {
+        return false;
+    }
+    const std::vector<unsigned char>& buffer = buffers[static_cast<size_t>(view.buffer)];
+    if (view.byteOffset > buffer.size() || view.byteLength > buffer.size() - view.byteOffset)
+    {
+        return false;
+    }
+
+    const std::string name = stringField(image, "name");
+    const std::string label = name.empty() ? "embedded glTF image" : name;
+    return loadImageTextureFromMemory(buffer.data() + view.byteOffset, view.byteLength, texture, type, label);
+}
 
 size_t componentSize(const int componentType)
 {
@@ -718,6 +758,7 @@ std::vector<int> readIntArray(const JsonObject& object, const std::string& name)
 struct NodeInfo
 {
     int mesh = -1;
+    int nodeIndex = -1;
     std::vector<int> children;
     Mat4 localTransform = identityMatrix();
 };
@@ -726,7 +767,7 @@ void collectNodeMeshes(
     const std::vector<NodeInfo>& nodes,
     const int nodeIndex,
     const Mat4& parentTransform,
-    std::vector<std::pair<int, Mat4>>& output)
+    std::vector<std::tuple<int, int, Mat4>>& output)
 {
     if (nodeIndex < 0 || static_cast<size_t>(nodeIndex) >= nodes.size())
     {
@@ -736,16 +777,22 @@ void collectNodeMeshes(
     const Mat4 worldTransform = multiplyMatrix(parentTransform, node.localTransform);
     if (node.mesh >= 0)
     {
-        output.push_back({node.mesh, worldTransform});
+        output.push_back({node.mesh, node.nodeIndex, worldTransform});
     }
     for (const int child : node.children)
     {
         collectNodeMeshes(nodes, child, worldTransform, output);
     }
 }
+
+std::string makeGltfObjectName(const std::filesystem::path& path, const int nodeIndex, const int meshIndex, const size_t objectIndex)
+{
+    const std::string fileName = path.filename().string().empty() ? path.string() : path.filename().string();
+    return fileName + " node " + std::to_string(nodeIndex) + " mesh " + std::to_string(meshIndex) + " part " + std::to_string(objectIndex + 1);
+}
 } // namespace
 
-GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
+GltfSceneLoadResult loadGltfMeshObjects(const std::filesystem::path& path)
 {
     try
     {
@@ -756,7 +803,7 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
         if (root == nullptr)
         {
             logError("glTF root must be a JSON object: " + path.string());
-            return GltfLoadResult{false, {}, "glTF root must be a JSON object"};
+            return GltfSceneLoadResult{false, {}, "glTF root must be a JSON object"};
         }
 
         std::vector<std::vector<unsigned char>> buffers;
@@ -868,13 +915,12 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
                                 return -1;
                             }
                             const JsonObject* image = asObject((*images)[static_cast<size_t>(source)]);
-                            const std::string uri = image != nullptr ? stringField(*image, "uri") : std::string{};
-                            if (uri.empty())
+                            if (image == nullptr)
                             {
                                 return -1;
                             }
                             MeshTexture loadedTexture;
-                            if (!loadImageTexture(path.parent_path() / uri, loadedTexture, type))
+                            if (!loadGltfImageTexture(*image, buffers, views, path.parent_path(), loadedTexture, type))
                             {
                                 return -1;
                             }
@@ -923,13 +969,12 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
                             return -1;
                         }
                         const JsonObject* image = asObject((*images)[static_cast<size_t>(source)]);
-                        const std::string uri = image != nullptr ? stringField(*image, "uri") : std::string{};
-                        if (uri.empty())
+                        if (image == nullptr)
                         {
                             return -1;
                         }
                         MeshTexture loadedTexture;
-                        if (!loadImageTexture(path.parent_path() / uri, loadedTexture, type))
+                        if (!loadGltfImageTexture(*image, buffers, views, path.parent_path(), loadedTexture, type))
                         {
                             return -1;
                         }
@@ -959,10 +1004,10 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
         if (meshes == nullptr || meshes->empty())
         {
             logError("glTF file contains no meshes: " + path.string());
-            return GltfLoadResult{false, {}, "glTF file contains no meshes"};
+            return GltfSceneLoadResult{false, {}, "glTF file contains no meshes"};
         }
 
-        std::vector<std::pair<int, Mat4>> nodeMeshes;
+        std::vector<std::tuple<int, int, Mat4>> nodeMeshes;
         const JsonValue* nodesField = findField(*root, "nodes");
         if (const JsonArray* nodes = nodesField != nullptr ? asArray(*nodesField) : nullptr)
         {
@@ -977,6 +1022,7 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
                     continue;
                 }
                 NodeInfo info;
+                info.nodeIndex = static_cast<int>(parsedNodes.size());
                 info.mesh = findField(*node, "mesh") != nullptr ? intField(*node, "mesh") : -1;
                 info.children = readIntArray(*node, "children");
                 info.localTransform = composeTrsMatrix(
@@ -1014,12 +1060,14 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
         }
         if (nodeMeshes.empty())
         {
-            nodeMeshes.push_back({0, identityMatrix()});
+            nodeMeshes.push_back({0, 0, identityMatrix()});
         }
 
+        std::vector<MeshObject> meshObjects;
         for (const auto& nodeMesh : nodeMeshes)
         {
-            const int meshIndex = nodeMesh.first;
+            const int meshIndex = std::get<0>(nodeMesh);
+            const int nodeIndex = std::get<1>(nodeMesh);
             if (meshIndex < 0 || static_cast<size_t>(meshIndex) >= meshes->size())
             {
                 throw std::runtime_error("glTF node references invalid mesh");
@@ -1031,7 +1079,10 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
             {
                 continue;
             }
-            const Mat4 transform = nodeMesh.second;
+            MeshData objectMesh;
+            objectMesh.materials = mesh.materials;
+            objectMesh.textures = mesh.textures;
+            const Mat4 transform = std::get<2>(nodeMesh);
             for (const JsonValue& primitiveValue : *primitives)
             {
                 const JsonObject* primitive = asObject(primitiveValue);
@@ -1049,7 +1100,7 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
                 const int normalAccessor = attributeAccessor(*attributes, "NORMAL");
                 const int texcoordAccessor = attributeAccessor(*attributes, "TEXCOORD_0");
                 const Accessor& positions = accessors[static_cast<size_t>(positionAccessor)];
-                const std::uint32_t vertexOffset = static_cast<std::uint32_t>(mesh.vertices.size());
+                const std::uint32_t vertexOffset = static_cast<std::uint32_t>(objectMesh.vertices.size());
                 for (size_t i = 0; i < positions.count; ++i)
                 {
                     MeshVertex vertex;
@@ -1060,13 +1111,13 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
                         vertex.texcoord = readVec2(buffers, views, accessors, texcoordAccessor, i);
                         vertex.hasTexcoord = 1;
                     }
-                    mesh.vertices.push_back(vertex);
+                    objectMesh.vertices.push_back(vertex);
                 }
 
                 const std::uint32_t materialIndex = static_cast<std::uint32_t>(std::clamp(
                     intField(*primitive, "material", 0),
                     0,
-                    static_cast<int>(mesh.materials.size() - 1)));
+                    static_cast<int>(objectMesh.materials.size() - 1)));
                 const int indicesAccessor = intField(*primitive, "indices", -1);
                 std::vector<std::uint32_t> indices;
                 if (indicesAccessor >= 0)
@@ -1093,34 +1144,98 @@ GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
                 {
                     MeshTriangle triangle{indices[i], indices[i + 1], indices[i + 2], materialIndex};
                     const float3 tangent = computeTriangleTangent(
-                        mesh.vertices[triangle.i0],
-                        mesh.vertices[triangle.i1],
-                        mesh.vertices[triangle.i2]);
-                    mesh.vertices[triangle.i0].tangent = add3(mesh.vertices[triangle.i0].tangent, tangent);
-                    mesh.vertices[triangle.i1].tangent = add3(mesh.vertices[triangle.i1].tangent, tangent);
-                    mesh.vertices[triangle.i2].tangent = add3(mesh.vertices[triangle.i2].tangent, tangent);
-                    mesh.triangles.push_back(triangle);
+                        objectMesh.vertices[triangle.i0],
+                        objectMesh.vertices[triangle.i1],
+                        objectMesh.vertices[triangle.i2]);
+                    objectMesh.vertices[triangle.i0].tangent = add3(objectMesh.vertices[triangle.i0].tangent, tangent);
+                    objectMesh.vertices[triangle.i1].tangent = add3(objectMesh.vertices[triangle.i1].tangent, tangent);
+                    objectMesh.vertices[triangle.i2].tangent = add3(objectMesh.vertices[triangle.i2].tangent, tangent);
+                    objectMesh.triangles.push_back(triangle);
                 }
+            }
+
+            for (MeshVertex& vertex : objectMesh.vertices)
+            {
+                vertex.normal = normalize3(vertex.normal);
+                vertex.tangent = normalize3(vertex.tangent);
+            }
+
+            if (!isEmptyMesh(objectMesh) && hasValidMeshMaterialIndices(objectMesh))
+            {
+                MeshObject object;
+                object.assetReference = path.string();
+                object.displayName = makeGltfObjectName(path, nodeIndex, meshIndex, meshObjects.size());
+                object.mesh = std::move(objectMesh);
+                object.sourceMaterials = object.mesh.materials;
+                meshObjects.push_back(std::move(object));
             }
         }
 
-        for (MeshVertex& vertex : mesh.vertices)
-        {
-            vertex.normal = normalize3(vertex.normal);
-            vertex.tangent = normalize3(vertex.tangent);
-        }
-
-        if (isEmptyMesh(mesh) || !hasValidMeshMaterialIndices(mesh))
+        if (meshObjects.empty())
         {
             logError("glTF import produced an invalid mesh: " + path.string());
-            return GltfLoadResult{false, {}, "glTF import produced an invalid mesh"};
+            return GltfSceneLoadResult{false, {}, "glTF import produced an invalid mesh"};
         }
-        return GltfLoadResult{true, std::move(mesh), {}};
+        return GltfSceneLoadResult{true, std::move(meshObjects), {}};
     }
     catch (const std::exception& ex)
     {
         const std::string error = "Invalid glTF file: " + std::string(ex.what());
         logError(error);
-        return GltfLoadResult{false, {}, error};
+        return GltfSceneLoadResult{false, {}, error};
     }
+}
+
+GltfLoadResult loadGltfMesh(const std::filesystem::path& path)
+{
+    GltfSceneLoadResult loaded = loadGltfMeshObjects(path);
+    if (!loaded.ok)
+    {
+        return GltfLoadResult{false, {}, loaded.error};
+    }
+
+    MeshData combinedMesh;
+    for (const MeshObject& object : loaded.meshObjects)
+    {
+        const std::uint32_t vertexOffset = static_cast<std::uint32_t>(combinedMesh.vertices.size());
+        const std::uint32_t materialOffset = static_cast<std::uint32_t>(combinedMesh.materials.size());
+        const int textureOffset = static_cast<int>(combinedMesh.textures.size());
+
+        combinedMesh.vertices.insert(combinedMesh.vertices.end(), object.mesh.vertices.begin(), object.mesh.vertices.end());
+        combinedMesh.textures.insert(combinedMesh.textures.end(), object.mesh.textures.begin(), object.mesh.textures.end());
+        for (MeshMaterial material : object.mesh.materials)
+        {
+            if (material.textureIndex >= 0)
+            {
+                material.textureIndex += textureOffset;
+            }
+            if (material.normalTextureIndex >= 0)
+            {
+                material.normalTextureIndex += textureOffset;
+            }
+            if (material.metallicTextureIndex >= 0)
+            {
+                material.metallicTextureIndex += textureOffset;
+            }
+            if (material.roughnessTextureIndex >= 0)
+            {
+                material.roughnessTextureIndex += textureOffset;
+            }
+            combinedMesh.materials.push_back(std::move(material));
+        }
+        for (MeshTriangle triangle : object.mesh.triangles)
+        {
+            triangle.i0 += vertexOffset;
+            triangle.i1 += vertexOffset;
+            triangle.i2 += vertexOffset;
+            triangle.materialIndex += materialOffset;
+            combinedMesh.triangles.push_back(triangle);
+        }
+    }
+
+    if (isEmptyMesh(combinedMesh) || !hasValidMeshMaterialIndices(combinedMesh))
+    {
+        return GltfLoadResult{false, {}, "glTF import produced an invalid mesh"};
+    }
+    return GltfLoadResult{true, std::move(combinedMesh), {}};
 }

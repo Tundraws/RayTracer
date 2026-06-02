@@ -17,7 +17,10 @@ namespace
 {
 constexpr float kMinSphereRadius = 0.25f;
 constexpr float kMaxSphereRadius = 5.0f;
+constexpr float kSupportContactOffset = 0.0f;
 constexpr float kPi = 3.14159265358979323846f;
+constexpr float kMeshPositionMin = -200.0f;
+constexpr float kMeshPositionMax = 200.0f;
 constexpr int kSceneObjectSphere = 3;
 constexpr int kSceneObjectMesh = 4;
 
@@ -26,6 +29,13 @@ struct SceneFootprint
     float x = 0.0f;
     float z = 0.0f;
     float radius = 1.0f;
+};
+
+struct MeshBounds
+{
+    float3 min{};
+    float3 max{};
+    bool valid = false;
 };
 
 float clampScalar(const float v, const float minV, const float maxV)
@@ -112,6 +122,17 @@ MeshObject* selectedMeshObject(SceneState& scene)
     return &scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
 }
 
+const MeshObject* selectedMeshObjectConst(const SceneState& scene)
+{
+    if (scene.meshObjects.empty() ||
+        scene.selectedMeshObject < 0 ||
+        scene.selectedMeshObject >= static_cast<int>(scene.meshObjects.size()))
+    {
+        return nullptr;
+    }
+    return &scene.meshObjects[static_cast<size_t>(scene.selectedMeshObject)];
+}
+
 void syncCompatibilityMesh(SceneState& scene)
 {
     if (!scene.meshObjects.empty())
@@ -184,7 +205,7 @@ bool sceneObjectNameExists(const SceneState& scene, const std::string& name)
 
 std::string uniqueSceneObjectName(const SceneState& scene, const std::string& requestedName)
 {
-    const std::string base = trimDuplicateIndexSuffix(requestedName.empty() ? "Object" : requestedName);
+    std::string base = trimDuplicateIndexSuffix(requestedName.empty() ? "Object" : requestedName);
     if (!sceneObjectNameExists(scene, base))
     {
         return base;
@@ -215,7 +236,7 @@ bool sceneGroupNameExists(const SceneState& scene, const std::string& name)
 
 std::string uniqueSceneGroupName(const SceneState& scene, const std::string& requestedName)
 {
-    const std::string base = trimDuplicateIndexSuffix(requestedName.empty() ? "Группа" : requestedName);
+    std::string base = trimDuplicateIndexSuffix(requestedName.empty() ? "Группа" : requestedName);
     if (!sceneGroupNameExists(scene, base))
     {
         return base;
@@ -235,6 +256,69 @@ std::string uniqueSceneGroupName(const SceneState& scene, const std::string& req
 bool isEnvironmentObject(const MeshObject& object)
 {
     return object.assetReference.rfind("environment:", 0) == 0;
+}
+
+MeshBounds calculateMeshBounds(const MeshData& mesh)
+{
+    MeshBounds bounds;
+    if (mesh.vertices.empty())
+    {
+        return bounds;
+    }
+
+    bounds.min = mesh.vertices.front().position;
+    bounds.max = mesh.vertices.front().position;
+    bounds.valid = true;
+    for (const MeshVertex& vertex : mesh.vertices)
+    {
+        bounds.min.x = std::min(bounds.min.x, vertex.position.x);
+        bounds.min.y = std::min(bounds.min.y, vertex.position.y);
+        bounds.min.z = std::min(bounds.min.z, vertex.position.z);
+        bounds.max.x = std::max(bounds.max.x, vertex.position.x);
+        bounds.max.y = std::max(bounds.max.y, vertex.position.y);
+        bounds.max.z = std::max(bounds.max.z, vertex.position.z);
+    }
+    return bounds;
+}
+
+void normalizeMeshForEditor(MeshObject& object)
+{
+    const MeshBounds bounds = calculateMeshBounds(object.mesh);
+    const bool supportPanel =
+        object.assetReference.find("panel") != std::string::npos ||
+        object.assetReference.find("plane") != std::string::npos;
+    if (!bounds.valid || supportPanel)
+    {
+        return;
+    }
+
+    const float3 offset = make_float3(
+        (bounds.min.x + bounds.max.x) * 0.5f,
+        bounds.min.y,
+        (bounds.min.z + bounds.max.z) * 0.5f);
+    for (MeshVertex& vertex : object.mesh.vertices)
+    {
+        vertex.position = sub3(vertex.position, offset);
+    }
+
+    const MeshBounds normalizedBounds = calculateMeshBounds(object.mesh);
+    if (!normalizedBounds.valid)
+    {
+        return;
+    }
+
+    const float width = normalizedBounds.max.x - normalizedBounds.min.x;
+    const float height = normalizedBounds.max.y - normalizedBounds.min.y;
+    const float depth = normalizedBounds.max.z - normalizedBounds.min.z;
+    const float maxDimension = std::max(width, std::max(height, depth));
+    if (maxDimension > 6.0f &&
+        std::fabs(object.scale.x - 1.0f) < 0.0001f &&
+        std::fabs(object.scale.y - 1.0f) < 0.0001f &&
+        std::fabs(object.scale.z - 1.0f) < 0.0001f)
+    {
+        const float scale = 4.0f / maxDimension;
+        object.scale = make_float3(scale, scale, scale);
+    }
 }
 
 float normalizedAbsAngle(const float degrees)
@@ -354,7 +438,8 @@ float3 placeSphereOnSupport(const SceneState& scene, const float3 position, cons
 float3 placeMeshOnSupport(const SceneState& scene, const MeshObject& object, const float3 position)
 {
     const float floorY = supportFloorYAt(scene, position.x, position.z);
-    return make_float3(position.x, floorY + meshBottomOffset(object), position.z);
+    const float contactOffset = isHorizontalSupportPanel(object) ? 0.0f : kSupportContactOffset;
+    return make_float3(position.x, floorY + contactOffset + meshBottomOffset(object), position.z);
 }
 
 float footprintDistance2(const float x0, const float z0, const float x1, const float z1)
@@ -913,8 +998,8 @@ SceneState makeBaseEditorScene()
 
 void clampScene(SceneState& scene)
 {
-    const float3 sphereMin = make_float3(-24.0f, 0.0f, -24.0f);
-    const float3 sphereMax = make_float3(24.0f, 14.0f, 24.0f);
+    const float3 sphereMin = make_float3(kMeshPositionMin, 0.0f, kMeshPositionMin);
+    const float3 sphereMax = make_float3(kMeshPositionMax, kMeshPositionMax, kMeshPositionMax);
     const float floorY = 0.0f;
 
     if (scene.materials.size() < scene.spheres.size())
@@ -947,6 +1032,22 @@ void clampScene(SceneState& scene)
     scene.lightIntensity = clampSceneLightIntensity(scene.lightIntensity);
     scene.areaLightRadius = clampSceneAreaLightRadius(scene.areaLightRadius);
     scene.environmentIntensity = clampSceneEnvironmentIntensity(scene.environmentIntensity);
+
+    for (MeshObject& object : scene.meshObjects)
+    {
+        if (isHorizontalSupportPanel(object))
+        {
+            continue;
+        }
+        const float objectFloorY = supportFloorYAt(scene, object.position.x, object.position.z);
+        const float minBottomY = objectFloorY + kSupportContactOffset;
+        const float bottomY = object.position.y - meshBottomOffset(object);
+        if (bottomY < minBottomY)
+        {
+            object.position.y = minBottomY + meshBottomOffset(object);
+            updateMeshObjectTransform(object);
+        }
+    }
 
     if (scene.selectedSphere < 0)
     {
@@ -1517,6 +1618,7 @@ bool addMeshObjectToScene(SceneState& scene, MeshObject object)
         return false;
     }
 
+    normalizeMeshForEditor(object);
     const float placementRadius = meshFootprintRadius(object);
     object.displayName = uniqueSceneObjectName(
         scene,
@@ -1686,7 +1788,20 @@ bool setSelectedMeshPosition(SceneState& scene, const float3 position)
         return false;
     }
 
-    object->position = clamp3(position, make_float3(-50.0f, -10.0f, -50.0f), make_float3(50.0f, 50.0f, 50.0f));
+    object->position = clamp3(
+        position,
+        make_float3(kMeshPositionMin, -10.0f, kMeshPositionMin),
+        make_float3(kMeshPositionMax, kMeshPositionMax, kMeshPositionMax));
+    if (!isHorizontalSupportPanel(*object))
+    {
+        const float floorY = supportFloorYAt(scene, object->position.x, object->position.z);
+        const float bottomY = object->position.y - meshBottomOffset(*object);
+        const float minBottomY = floorY + kSupportContactOffset;
+        if (bottomY < minBottomY)
+        {
+            object->position.y = minBottomY + meshBottomOffset(*object);
+        }
+    }
     updateMeshObjectTransform(*object);
     return true;
 }
@@ -1714,13 +1829,58 @@ bool setSelectedMeshScale(SceneState& scene, const float3 scale)
 
     const float floorY = supportFloorYAt(scene, object->position.x, object->position.z);
     const float bottomBefore = object->position.y - meshBottomOffset(*object);
-    const bool keepOnSupport = !isHorizontalSupportPanel(*object) && std::fabs(bottomBefore - floorY) <= 0.15f;
+    const float supportBottomY = floorY + kSupportContactOffset;
+    const bool keepOnSupport = !isHorizontalSupportPanel(*object) && std::fabs(bottomBefore - supportBottomY) <= 0.15f;
 
     object->scale = clamp3(scale, make_float3(0.05f, 0.05f, 0.05f), make_float3(100.0f, 100.0f, 100.0f));
     if (keepOnSupport)
     {
-        object->position.y = floorY + meshBottomOffset(*object);
+        object->position.y = supportBottomY + meshBottomOffset(*object);
     }
+    updateMeshObjectTransform(*object);
+    return true;
+}
+
+float selectedMeshBottomY(const SceneState& scene)
+{
+    const MeshObject* object = selectedMeshObjectConst(scene);
+    if (object == nullptr)
+    {
+        return 0.0f;
+    }
+    return object->position.y - meshBottomOffset(*object);
+}
+
+bool setSelectedMeshBottomY(SceneState& scene, const float bottomY)
+{
+    MeshObject* object = selectedMeshObject(scene);
+    if (object == nullptr)
+    {
+        return false;
+    }
+
+    const float floorY = supportFloorYAt(scene, object->position.x, object->position.z);
+    const float nextBottomY = isHorizontalSupportPanel(*object)
+        ? bottomY
+        : std::max(bottomY, floorY + kSupportContactOffset);
+    object->position.y = nextBottomY + meshBottomOffset(*object);
+    object->position = clamp3(
+        object->position,
+        make_float3(kMeshPositionMin, -10.0f, kMeshPositionMin),
+        make_float3(kMeshPositionMax, kMeshPositionMax, kMeshPositionMax));
+    updateMeshObjectTransform(*object);
+    return true;
+}
+
+bool placeSelectedMeshOnSupport(SceneState& scene)
+{
+    MeshObject* object = selectedMeshObject(scene);
+    if (object == nullptr || isHorizontalSupportPanel(*object))
+    {
+        return false;
+    }
+
+    object->position = placeMeshOnSupport(scene, *object, object->position);
     updateMeshObjectTransform(*object);
     return true;
 }
@@ -1975,7 +2135,10 @@ bool setSelectedGroupPosition(SceneState& scene, const float3 position)
     }
 
     SceneGroup& group = scene.groups[static_cast<size_t>(scene.selectedGroup)];
-    const float3 clampedPosition = clamp3(position, make_float3(-50.0f, -10.0f, -50.0f), make_float3(50.0f, 50.0f, 50.0f));
+    const float3 clampedPosition = clamp3(
+        position,
+        make_float3(kMeshPositionMin, -10.0f, kMeshPositionMin),
+        make_float3(kMeshPositionMax, kMeshPositionMax, kMeshPositionMax));
     const float3 delta = sub3(clampedPosition, group.position);
     if (std::fabs(delta.x) < 0.0001f && std::fabs(delta.y) < 0.0001f && std::fabs(delta.z) < 0.0001f)
     {

@@ -1,0 +1,205 @@
+{
+  "camera": {
+    "position": [0.0, 4.2, 4.8],
+    "yaw": -90.0,
+    "pitch": -17.0,
+    "fov": 52.0
+  },
+  "light": {
+    "position": [-3.8, 6.4, 2.2],
+    "intensity": 2.4,
+    "size": 0.70
+  },
+  "render": {
+    "exposure": 0.82,
+    "skyIntensity": 0.30,
+    "skyGradientBlend": 0.45
+  },
+  "environment": {
+    "type": "gradient",
+    "intensity": 0.45,
+    "horizonColor": [0.42, 0.46, 0.52],
+    "zenithColor": [0.10, 0.13, 0.18],
+    "gradientBlend": 0.45
+  },
+  "spheres": [
+    {
+      "name": "Зеркальная сфера",
+      "position": [-3.1, 1.05, 0.2],
+      "radius": 1.05,
+      "material": {
+        "type": "mirror",
+        "baseColor": [0.96, 0.96, 0.96],
+        "roughness": 0.04,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Стеклянная сфера",
+      "position": [2.8, 0.95, -0.1],
+      "radius": 0.95,
+      "material": {
+        "type": "glass",
+        "baseColor": [0.68, 0.88, 1.00],
+        "roughness": 0.035,
+        "ior": 1.45,
+        "alpha": 0.42
+      }
+    },
+    {
+      "name": "Матовая красная сфера",
+      "position": [-0.7, 0.78, -2.7],
+      "radius": 0.78,
+      "material": {
+        "type": "matte",
+        "baseColor": [0.88, 0.16, 0.10],
+        "roughness": 0.78,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Матовая синяя сфера",
+      "position": [3.7, 0.70, -2.8],
+      "radius": 0.70,
+      "material": {
+        "type": "matte",
+        "baseColor": [0.10, 0.28, 0.92],
+        "roughness": 0.72,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    }
+  ],
+  "meshObjects": [
+    {
+      "name": "Пол комнаты",
+      "primitive": "cube",
+      "position": [0.0, -0.06, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [14.0, 0.12, 12.0],
+      "material": {
+        "type": "matte",
+        "baseColor": [0.48, 0.48, 0.46],
+        "roughness": 0.82,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Потолок комнаты",
+      "primitive": "cube",
+      "position": [0.0, 7.06, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [14.0, 0.12, 12.0],
+      "material": {
+        "type": "matte",
+        "baseColor": [0.44, 0.45, 0.47],
+        "roughness": 0.80,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Задняя стена",
+      "primitive": "cube",
+      "position": [0.0, 3.5, -6.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [14.0, 7.0, 0.12],
+      "material": {
+        "type": "matte",
+        "baseColor": [0.55, 0.57, 0.60],
+        "roughness": 0.78,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Передняя стена",
+      "primitive": "cube",
+      "position": [0.0, 3.5, 6.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [14.0, 7.0, 0.12],
+      "material": {
+        "type": "matte",
+        "baseColor": [0.50, 0.52, 0.55],
+        "roughness": 0.78,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Левая стена",
+      "primitive": "cube",
+      "position": [-7.0, 3.5, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.12, 7.0, 12.0],
+      "material": {
+        "type": "matte",
+        "baseColor": [0.58, 0.50, 0.46],
+        "roughness": 0.80,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Правая стена",
+      "primitive": "cube",
+      "position": [7.0, 3.5, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [0.12, 7.0, 12.0],
+      "material": {
+        "type": "matte",
+        "baseColor": [0.46, 0.50, 0.58],
+        "roughness": 0.80,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Металлический куб",
+      "primitive": "cube",
+      "position": [0.1, 1.15, 0.9],
+      "rotation": [0.0, 24.0, 0.0],
+      "scale": [2.3, 2.3, 2.3],
+      "material": {
+        "type": "metal",
+        "baseColor": [0.94, 0.63, 0.20],
+        "roughness": 0.18,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    },
+    {
+      "name": "Матовая зелёная панель",
+      "primitive": "cube",
+      "position": [1.3, 0.9, -3.7],
+      "rotation": [0.0, -12.0, 0.0],
+      "scale": [3.0, 1.8, 0.25],
+      "material": {
+        "type": "matte",
+        "baseColor": [0.18, 0.62, 0.34],
+        "roughness": 0.80,
+        "ior": 1.50,
+        "alpha": 1.00
+      }
+    }
+  ],
+  "groups": [
+    {
+      "name": "Комната",
+      "position": [0.0, 3.5, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.0, 1.0, 1.0],
+      "objects": [
+        { "kind": "mesh", "index": 0 },
+        { "kind": "mesh", "index": 1 },
+        { "kind": "mesh", "index": 2 },
+        { "kind": "mesh", "index": 3 },
+        { "kind": "mesh", "index": 4 },
+        { "kind": "mesh", "index": 5 }
+      ]
+    }
+  ]
+}

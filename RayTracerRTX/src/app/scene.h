@@ -128,6 +128,9 @@ bool applySceneRoomDimensions(SceneState& scene, float width, float depth, float
 bool setSelectedMeshPosition(SceneState& scene, float3 position);
 bool setSelectedMeshRotation(SceneState& scene, float3 rotation);
 bool setSelectedMeshScale(SceneState& scene, float3 scale);
+float selectedMeshBottomY(const SceneState& scene);
+bool setSelectedMeshBottomY(SceneState& scene, float bottomY);
+bool placeSelectedMeshOnSupport(SceneState& scene);
 int findObjectGroupIndex(const SceneState& scene, SceneObjectRef ref);
 bool createSceneGroup(SceneState& scene, const std::vector<SceneObjectRef>& refs);
 bool duplicateSelectedSceneGroup(SceneState& scene);

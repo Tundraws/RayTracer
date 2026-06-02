@@ -1,0 +1,30 @@
+{
+  "camera": {
+    "position": [0.0, 2.7, -7.2],
+    "yaw": 90.0,
+    "pitch": -8.0,
+    "fov": 48.0
+  },
+  "light": {
+    "position": [2.8, 7.0, -4.0],
+    "intensity": 1.0,
+    "size": 1.8
+  },
+  "environment": {
+    "type": "map",
+    "path": "../meshes/studio_env.ppm",
+    "intensity": 0.9
+  },
+  "render": {
+    "exposure": 0.72,
+    "skyIntensity": 0.75
+  },
+  "meshObjects": [
+    {
+      "path": "../meshes/gltf_diamond.gltf",
+      "position": [0.0, 0.2, 0.0],
+      "rotation": [0.0, 30.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    }
+  ]
+}

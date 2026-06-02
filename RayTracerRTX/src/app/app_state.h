@@ -40,7 +40,7 @@ struct AppState
     unsigned int progressiveSamples = 0;
     bool renderingPaused = false;
     bool imguiPanelVisible = true;
-    bool hudSummaryVisible = true;
+    bool hudSummaryVisible = false;
     std::vector<SceneBuildResult> scenePresets;
     std::vector<SceneBuildResult> scenePresetDefaults;
     std::vector<std::wstring> scenePresetNames;
@@ -51,7 +51,7 @@ struct AppState
     bool lastUiMessageIsError = false;
     bool rendererSceneRebuildRequested = false;
     bool imguiPanelPinnedRight = true;
-    float imguiPanelWidth = 360.0f;
+    float imguiPanelWidth = 460.0f;
     float imguiPanelHeight = 680.0f;
     int editorPrimitiveToAdd = BuiltInMeshCube;
     int editorObjectKind = EditorObjectSphere;

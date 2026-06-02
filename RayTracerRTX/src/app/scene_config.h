@@ -48,12 +48,22 @@ struct SphereConfig
     std::string materialOverride;
 };
 
+struct SceneGroupConfig
+{
+    std::string name;
+    std::vector<SceneObjectRef> objects;
+    float3 position = make_float3(0.0f, 0.0f, 0.0f);
+    float3 rotation = make_float3(0.0f, 0.0f, 0.0f);
+    float3 scale = make_float3(1.0f, 1.0f, 1.0f);
+};
+
 struct SceneConfig
 {
     std::vector<MeshObjectConfig> meshObjects;
     bool hasMeshObjects = false;
     std::vector<SphereConfig> spheres;
     bool hasSpheres = false;
+    std::vector<SceneGroupConfig> groups;
     std::vector<SceneMaterialConfig> materials;
     std::vector<std::string> sphereMaterialRefs;
     bool hasCamera = false;

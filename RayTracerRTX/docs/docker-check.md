@@ -70,6 +70,18 @@ docker compose build
 docker compose run --rm coursework-check
 ```
 
+The same check can be launched through the repository helper script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\docker_coursework_build.ps1
+```
+
+For a clean Docker rebuild:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\docker_coursework_build.ps1 -NoCache
+```
+
 If Docker reports `short read` or `unexpected EOF` while reading an image layer,
 the base image/cache is corrupted or the image download was interrupted. Clean
 the builder cache and rebuild:

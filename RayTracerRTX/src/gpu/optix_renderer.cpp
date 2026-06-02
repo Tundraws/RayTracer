@@ -1176,6 +1176,8 @@ void OptixRenderer::createProgramGroups()
     hitShadowDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
     hitShadowDesc.hitgroup.moduleCH = module;
     hitShadowDesc.hitgroup.entryFunctionNameCH = "__closesthit__shadow";
+    hitShadowDesc.hitgroup.moduleAH = module;
+    hitShadowDesc.hitgroup.entryFunctionNameAH = "__anyhit__shadow";
     hitShadowDesc.hitgroup.moduleIS = sphereModule;
     hitShadowDesc.hitgroup.entryFunctionNameIS = nullptr;
     logSize = sizeof(log);
@@ -1212,6 +1214,8 @@ void OptixRenderer::createProgramGroups()
     hitMeshShadowDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
     hitMeshShadowDesc.hitgroup.moduleCH = module;
     hitMeshShadowDesc.hitgroup.entryFunctionNameCH = "__closesthit__shadow_mesh";
+    hitMeshShadowDesc.hitgroup.moduleAH = module;
+    hitMeshShadowDesc.hitgroup.entryFunctionNameAH = "__anyhit__shadow_mesh";
     hitMeshShadowDesc.hitgroup.moduleIS = nullptr;
     hitMeshShadowDesc.hitgroup.entryFunctionNameIS = nullptr;
     logSize = sizeof(log);

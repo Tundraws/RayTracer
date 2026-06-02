@@ -4,6 +4,7 @@
 #include "app_state.h"
 #include "asset_cache.h"
 #include "camera.h"
+#include "gltf_loader.h"
 #include "logger.h"
 #include "material.h"
 #include "renderer_controller.h"
@@ -30,6 +31,7 @@
 #include <GL/gl.h>
 
 #include <algorithm>
+#include <cfloat>
 #include <chrono>
 #include <cmath>
 #include <cctype>
@@ -746,8 +748,12 @@ std::optional<std::filesystem::path> openMeshFileDialog(GLFWwindow* window)
 
     if (GetOpenFileNameW(&ofn) == TRUE)
     {
+        glfwFocusWindow(window);
+        SetForegroundWindow(glfwGetWin32Window(window));
         return std::filesystem::path(fileName);
     }
+    glfwFocusWindow(window);
+    SetForegroundWindow(glfwGetWin32Window(window));
     return std::nullopt;
 }
 
@@ -769,8 +775,12 @@ std::optional<std::filesystem::path> openSceneFileDialog(GLFWwindow* window)
 
     if (GetOpenFileNameW(&ofn) == TRUE)
     {
+        glfwFocusWindow(window);
+        SetForegroundWindow(glfwGetWin32Window(window));
         return std::filesystem::path(fileName);
     }
+    glfwFocusWindow(window);
+    SetForegroundWindow(glfwGetWin32Window(window));
     return std::nullopt;
 }
 
@@ -794,8 +804,12 @@ std::optional<std::filesystem::path> openTextureFileDialog(GLFWwindow* window)
 
     if (GetOpenFileNameW(&ofn) == TRUE)
     {
+        glfwFocusWindow(window);
+        SetForegroundWindow(glfwGetWin32Window(window));
         return std::filesystem::path(fileName);
     }
+    glfwFocusWindow(window);
+    SetForegroundWindow(glfwGetWin32Window(window));
     return std::nullopt;
 }
 
@@ -843,8 +857,12 @@ std::optional<std::filesystem::path> saveSceneFileDialog(GLFWwindow* window)
         {
             path.replace_extension(".json");
         }
+        glfwFocusWindow(window);
+        SetForegroundWindow(glfwGetWin32Window(window));
         return path;
     }
+    glfwFocusWindow(window);
+    SetForegroundWindow(glfwGetWin32Window(window));
     return std::nullopt;
 }
 
@@ -886,8 +904,12 @@ std::optional<std::filesystem::path> saveScreenshotFileDialog(GLFWwindow* window
                 path.replace_extension(".png");
             }
         }
+        glfwFocusWindow(window);
+        SetForegroundWindow(glfwGetWin32Window(window));
         return path;
     }
+    glfwFocusWindow(window);
+    SetForegroundWindow(glfwGetWin32Window(window));
     return std::nullopt;
 }
 
@@ -1160,6 +1182,51 @@ bool saveFrameSnapshot(const std::filesystem::path& path, const std::vector<ucha
 
 bool loadUserMeshPreset(AppState& appState, const std::filesystem::path& meshPath)
 {
+    const std::wstring extension = lowerExtension(meshPath);
+    if (extension == L".gltf" || extension == L".glb")
+    {
+        GltfSceneLoadResult loaded = loadGltfMeshObjects(meshPath);
+        if (!loaded.ok)
+        {
+            appState.lastUiMessage = loaded.error.empty() ? "Не удалось загрузить модель." : loaded.error;
+            appState.lastUiMessageIsError = true;
+            return false;
+        }
+        if (loaded.meshObjects.empty())
+        {
+            appState.lastUiMessage = "В загруженном файле не найдены mesh-объекты.";
+            appState.lastUiMessageIsError = true;
+            return false;
+        }
+
+        saveCurrentScenePreset(appState);
+        const SceneState before = appState.scene;
+        bool added = false;
+        for (MeshObject& object : loaded.meshObjects)
+        {
+            object.assetReference = meshPath.string();
+            if (object.displayName.empty())
+            {
+                object.displayName = meshPath.filename().string().empty() ? meshPath.string() : meshPath.filename().string();
+            }
+            if (object.sourceMaterials.empty())
+            {
+                object.sourceMaterials = object.mesh.materials;
+            }
+            added = addMeshObjectToScene(appState.scene, std::move(object)) || added;
+        }
+
+        applySceneEditResultWithUndo(appState, before, makeGeometryDirty(added));
+        saveCurrentScenePreset(appState);
+        appState.hierarchySelectionKind = SceneHierarchySelectionMesh;
+        appState.hierarchySelectionIndex = appState.scene.selectedMeshObject;
+        appState.editorObjectKind = EditorObjectMesh;
+        appState.lastUiMessage = "Модель добавлена в текущую сцену: " + meshPath.filename().string() +
+            " (" + std::to_string(loaded.meshObjects.size()) + " объектов)";
+        appState.lastUiMessageIsError = false;
+        return added;
+    }
+
     SceneBuildResult loaded = buildSceneFromMeshPath(meshPath, appState.assetCache);
     if (!loaded.ok)
     {
@@ -2049,7 +2116,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             float position[3] = {group.position.x, group.position.y, group.position.z};
             float rotation[3] = {group.rotation.x, group.rotation.y, group.rotation.z};
             float scale[3] = {group.scale.x, group.scale.y, group.scale.z};
-            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##group_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##group_pos"), position, 0.08f, -200.0f, 200.0f, "%.2f"))
             {
                 const SceneState before = scene;
                 applySceneEditResultWithUndo(appState, before, editor.setSelectedGroupPosition(make_float3(position[0], position[1], position[2])));
@@ -2140,7 +2207,7 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
                 return;
             }
             float pos[3] = {sphere.center.x, sphere.center.y, sphere.center.z};
-            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"), pos, 0.05f, -50.0f, 50.0f, "%.2f"))
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##sphere_pos"), pos, 0.05f, -200.0f, 200.0f, "%.2f"))
             {
                 const SceneState before = scene;
                 const float oldRadius = sphere.radius;
@@ -2197,10 +2264,15 @@ void drawImguiPanel(AppState& appState, const FrameStats& stats, GLFWwindow* win
             float position[3] = {selectedMeshObject->position.x, selectedMeshObject->position.y, selectedMeshObject->position.z};
             float rotation[3] = {selectedMeshObject->rotation.x, selectedMeshObject->rotation.y, selectedMeshObject->rotation.z};
             float scale[3] = {selectedMeshObject->scale.x, selectedMeshObject->scale.y, selectedMeshObject->scale.z};
-            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.08f, -50.0f, 50.0f, "%.2f"))
+            if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0437\u0438\u0446\u0438\u044F##mesh_pos"), position, 0.08f, -200.0f, 200.0f, "%.2f"))
             {
                 const SceneState before = scene;
                 applySceneEditResultWithUndo(appState, before, editor.setSelectedMeshPosition(make_float3(position[0], position[1], position[2])));
+            }
+            if (ImGui::Button(u8c(u8"\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u043D\u0430 \u043F\u0430\u043D\u0435\u043B\u044C##mesh_place_on_support")))
+            {
+                const SceneState before = scene;
+                applySceneEditResultWithUndo(appState, before, editor.placeSelectedMeshOnSupport());
             }
             if (ImGui::DragFloat3(u8c(u8"\u041F\u043E\u0432\u043E\u0440\u043E\u0442##mesh_rot"), rotation, 0.8f, -360.0f, 360.0f, "%.1f"))
             {
@@ -2360,7 +2432,10 @@ void processInput(GLFWwindow* window, AppState& appState, float deltaTimeSec)
     }
 
     const float dt = clampf(deltaTimeSec, 0.0f, 0.05f);
-    const float cameraStep = 8.5f * dt;
+    const bool fastCamera =
+        glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+    const float cameraStep = (fastCamera ? 25.5f : 8.5f) * dt;
     bool cameraChanged = false;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
@@ -2706,6 +2781,97 @@ void addSceneConfigPreset(AppState& appState, const std::string& fileName, const
     }
     addScenePreset(appState, buildSceneFromConfig(config.config, path.parent_path(), appState.assetCache), name, path);
 }
+
+struct WindowModeState
+{
+    bool fullscreen = false;
+    int windowX = 100;
+    int windowY = 100;
+    int windowWidth = 1440;
+    int windowHeight = 810;
+};
+
+bool toggleFullscreen(GLFWwindow* window, WindowModeState& state)
+{
+    if (window == nullptr)
+    {
+        return false;
+    }
+
+    if (!state.fullscreen)
+    {
+        glfwGetWindowPos(window, &state.windowX, &state.windowY);
+        glfwGetWindowSize(window, &state.windowWidth, &state.windowHeight);
+
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = monitor != nullptr ? glfwGetVideoMode(monitor) : nullptr;
+        if (monitor == nullptr || mode == nullptr)
+        {
+            return false;
+        }
+
+        int monitorX = 0;
+        int monitorY = 0;
+        glfwGetMonitorPos(monitor, &monitorX, &monitorY);
+        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+        glfwSetWindowPos(window, monitorX, monitorY);
+        glfwSetWindowSize(window, mode->width, mode->height);
+        state.fullscreen = true;
+    }
+    else
+    {
+        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
+        glfwSetWindowPos(window, state.windowX, state.windowY);
+        glfwSetWindowSize(window, state.windowWidth, state.windowHeight);
+        state.fullscreen = false;
+    }
+
+    glfwGetFramebufferSize(window, &gWidth, &gHeight);
+    glViewport(0, 0, gWidth, gHeight);
+    return gWidth > 0 && gHeight > 0;
+}
+
+void rebuildRendererForCurrentSize(
+    OptixRenderer& renderer,
+    AppState& appState,
+    std::vector<uchar4>& pixels)
+{
+    renderer.destroy();
+    renderer.setRenderSize(gWidth, gHeight);
+    renderer.initialize(appState.scene);
+    renderer.setRenderQuality(appState.renderQuality);
+    renderer.setRenderMode(appState.renderMode);
+    renderer.setDenoiserEnabled(appState.denoiserEnabled);
+    pixels.assign(static_cast<size_t>(gWidth) * static_cast<size_t>(gHeight), uchar4{});
+    invalidateAccumulation(appState);
+    appState.rendererSceneRebuildRequested = false;
+}
+
+bool syncFramebufferSize(
+    GLFWwindow* window,
+    OptixRenderer& renderer,
+    AppState& appState,
+    std::vector<uchar4>& pixels)
+{
+    int framebufferWidth = 0;
+    int framebufferHeight = 0;
+    glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+    if (framebufferWidth <= 0 || framebufferHeight <= 0)
+    {
+        return false;
+    }
+
+    if (framebufferWidth == gWidth && framebufferHeight == gHeight)
+    {
+        return false;
+    }
+
+    gWidth = framebufferWidth;
+    gHeight = framebufferHeight;
+    glViewport(0, 0, gWidth, gHeight);
+    rebuildRendererForCurrentSize(renderer, appState, pixels);
+    return true;
+}
 } // namespace
 
 void run_optix_app(const ApplicationOptions& options)
@@ -2781,6 +2947,7 @@ void run_optix_app(const ApplicationOptions& options)
         addScenePreset(appState, buildDefaultSceneInput(), L"\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u0441\u0446\u0435\u043D\u0430");
     }
     addSceneConfigPreset(appState, "floating_sphere_scene.json", L"\u0421\u0444\u0435\u0440\u0430 \u0432 \u0432\u043E\u0437\u0434\u0443\u0445\u0435");
+    addSceneConfigPreset(appState, "material_room_scene.json", L"\u041C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B \u0432 \u043A\u043E\u043C\u043D\u0430\u0442\u0435");
     glfwSetWindowUserPointer(window, &appState);
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
@@ -2789,7 +2956,6 @@ void run_optix_app(const ApplicationOptions& options)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& imguiIo = ImGui::GetIO();
-    imguiIo.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     imguiIo.IniFilename = nullptr;
     imguiIo.Fonts->AddFontFromFileTTF(
         "C:\\Windows\\Fonts\\segoeui.ttf",
@@ -2804,9 +2970,17 @@ void run_optix_app(const ApplicationOptions& options)
     renderer.setRenderSize(gWidth, gHeight);
     renderer.initialize(appState.scene);
 
+    WindowModeState windowMode;
+    windowMode.windowX = windowX;
+    windowMode.windowY = windowY;
+    windowMode.windowWidth = windowWidth;
+    windowMode.windowHeight = windowHeight;
+
     std::vector<uchar4> pixels(gWidth * gHeight);
     FrameStats stats;
     auto lastFrameTime = std::chrono::steady_clock::now();
+    bool f11WasDown = false;
+    bool altEnterWasDown = false;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -2819,17 +2993,30 @@ void run_optix_app(const ApplicationOptions& options)
             glfwSetWindowShouldClose(window, GLFW_TRUE);
         }
 
+        const bool f11IsDown = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
+        const bool altIsDown =
+            glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
+        const bool enterIsDown =
+            glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_KP_ENTER) == GLFW_PRESS;
+        const bool altEnterIsDown = altIsDown && enterIsDown;
+        if ((f11IsDown && !f11WasDown) || (altEnterIsDown && !altEnterWasDown))
+        {
+            if (toggleFullscreen(window, windowMode))
+            {
+                rebuildRendererForCurrentSize(renderer, appState, pixels);
+            }
+        }
+        f11WasDown = f11IsDown;
+        altEnterWasDown = altEnterIsDown;
+
+        syncFramebufferSize(window, renderer, appState, pixels);
+
         processInput(window, appState, deltaTimeSec);
         if (appState.rendererSceneRebuildRequested)
         {
-            renderer.destroy();
-            renderer.setRenderSize(gWidth, gHeight);
-            renderer.initialize(appState.scene);
-            renderer.setRenderQuality(appState.renderQuality);
-            renderer.setRenderMode(appState.renderMode);
-            renderer.setDenoiserEnabled(appState.denoiserEnabled);
-            invalidateAccumulation(appState);
-            appState.rendererSceneRebuildRequested = false;
+            rebuildRendererForCurrentSize(renderer, appState, pixels);
         }
 
         const auto hostFrameStart = std::chrono::steady_clock::now();
@@ -2894,11 +3081,25 @@ void run_optix_app(const ApplicationOptions& options)
         glDrawPixels(gWidth, gHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
         ImGui_ImplOpenGL2_NewFrame();
         ImGui_ImplGlfw_NewFrame();
+        ImGuiIO& imguiFrameIo = ImGui::GetIO();
+        const ImGuiConfigFlags savedImguiConfigFlags = imguiFrameIo.ConfigFlags;
+        if (appState.cursorCaptured)
+        {
+            imguiFrameIo.ConfigFlags |= ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard;
+            imguiFrameIo.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
+            imguiFrameIo.MousePosPrev = ImVec2(-FLT_MAX, -FLT_MAX);
+            imguiFrameIo.MouseDelta = ImVec2(0.0f, 0.0f);
+            for (bool& buttonDown : imguiFrameIo.MouseDown)
+            {
+                buttonDown = false;
+            }
+        }
         ImGui::NewFrame();
         drawHudControlOverlay(appState, stats, window, pixels);
         drawImguiPanel(appState, stats, window);
         ImGui::Render();
         ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+        imguiFrameIo.ConfigFlags = savedImguiConfigFlags;
         glfwSwapBuffers(window);
         if (appState.hudSummaryVisible)
         {

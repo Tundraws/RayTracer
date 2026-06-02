@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1e5aa8"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#20815b"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c46a1c"/>
+    </marker>
+    <style>
+      .title { font: 700 26px "Times New Roman", serif; fill: #111; }
+      .label { font: 21px "Times New Roman", serif; fill: #111; }
+      .small { font: 18px "Times New Roman", serif; fill: #222; }
+      .line { stroke: #2b2b2b; stroke-width: 2.2; fill: none; }
+      .ray { stroke: #1e5aa8; stroke-width: 3.2; fill: none; marker-end: url(#arrow-blue); }
+      .normal { stroke: #20815b; stroke-width: 3.2; fill: none; marker-end: url(#arrow-green); }
+      .reflect { stroke: #c46a1c; stroke-width: 3.2; fill: none; marker-end: url(#arrow-orange); }
+      .dash { stroke: #777; stroke-width: 2; stroke-dasharray: 8 7; fill: none; }
+      .point { fill: #fff; stroke: #111; stroke-width: 2.4; }
+      .panel { fill: #fff; stroke: #c9c9c9; stroke-width: 1.8; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="720" fill="#ffffff"/>
+  <text x="60" y="54" class="title">Обозначения в формулах трассировки лучей</text>
+
+  <!-- Main ray -->
+  <circle cx="135" cy="420" r="7" class="point"/>
+  <text x="116" y="455" class="label">O</text>
+  <path d="M 135 420 L 618 318" class="ray"/>
+  <text x="360" y="356" class="label">D</text>
+
+  <!-- Sphere -->
+  <circle cx="760" cy="280" r="150" fill="#f4f4f4" stroke="#111" stroke-width="2.6"/>
+  <circle cx="760" cy="280" r="6" fill="#111"/>
+  <text x="774" y="274" class="label">C</text>
+
+  <!-- Intersection point -->
+  <circle cx="618" cy="318" r="8" fill="#ffffff" stroke="#1e5aa8" stroke-width="3"/>
+  <text x="575" y="304" class="label">P(t)</text>
+
+  <!-- Radius -->
+  <line x1="760" y1="280" x2="618" y2="318" class="dash"/>
+  <text x="688" y="292" class="label">r</text>
+
+  <!-- Normal, light direction, reflected direction -->
+  <path d="M 618 318 L 490 352" class="normal"/>
+  <text x="507" y="340" class="label">N</text>
+
+  <path d="M 618 318 L 1000 112" class="normal"/>
+  <circle cx="1018" cy="102" r="22" fill="#fff2b8" stroke="#111" stroke-width="2.2"/>
+  <line x1="1018" y1="66" x2="1018" y2="38" class="line"/>
+  <line x1="1018" y1="138" x2="1018" y2="166" class="line"/>
+  <line x1="982" y1="102" x2="954" y2="102" class="line"/>
+  <line x1="1054" y1="102" x2="1082" y2="102" class="line"/>
+  <text x="824" y="158" class="label">L</text>
+  <text x="980" y="205" class="small">источник света</text>
+
+  <path d="M 618 318 L 465 178" class="reflect"/>
+  <text x="482" y="195" class="label">D<tspan baseline-shift="sub" font-size="15">ref</tspan></text>
+
+  <!-- Tangent helper -->
+  <line x1="548" y1="195" x2="690" y2="517" class="dash"/>
+  <text x="678" y="520" class="small">касательная в точке попадания</text>
+
+  <!-- Formula panel -->
+  <rect x="60" y="545" width="1080" height="112" rx="10" class="panel"/>
+  <text x="88" y="585" class="small">Уравнение луча: P(t) = O + tD, t ≥ 0</text>
+  <text x="88" y="623" class="small">Пересечение со сферой: ||O + tD − C||² = r²</text>
+  <text x="625" y="585" class="small">Освещённость: I = max(0, N · L)</text>
+  <text x="625" y="623" class="small">Отражение: Dref = D − 2(D · N)N</text>
+</svg>

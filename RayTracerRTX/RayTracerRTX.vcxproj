@@ -51,13 +51,14 @@
       <WarningLevel>Level3</WarningLevel>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;GLFW_STATIC;RAYTRACERRTX_CUDA_INCLUDE_DIR=&quot;$([System.String]::Copy('$(CudaToolkitIncludeDir)').Replace('\','/'))&quot;;RAYTRACERRTX_OPTIX_INCLUDE_DIR=&quot;$([System.String]::Copy('$(OptixSdkDir)\include').Replace('\','/'))&quot;;RAYTRACERRTX_SOURCE_DIR=&quot;$([System.String]::Copy('$(ProjectDir)src').Replace('\','/'))&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;GLFW_STATIC;RAYTRACERRTX_CUDA_INCLUDE_DIR=&quot;$([System.String]::Copy('$(CudaToolkitIncludeDir)').Replace('\','/'))&quot;;RAYTRACERRTX_OPTIX_INCLUDE_DIR=&quot;$([System.String]::Copy('$(OptixSdkDir)\include').Replace('\','/'))&quot;;RAYTRACERRTX_SOURCE_DIR=&quot;$([System.String]::Copy('$(ProjectDir)src').Replace('\','/'))&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);$(OptixSdkDir)\include;$(ProjectDir)src;$(ProjectDir)glfw\include;$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>cuda.lib;cudart.lib;nvrtc.lib;opengl32.lib;glfw3_mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)glfw\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -74,13 +75,14 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;GLFW_STATIC;RAYTRACERRTX_CUDA_INCLUDE_DIR=&quot;$([System.String]::Copy('$(CudaToolkitIncludeDir)').Replace('\','/'))&quot;;RAYTRACERRTX_OPTIX_INCLUDE_DIR=&quot;$([System.String]::Copy('$(OptixSdkDir)\include').Replace('\','/'))&quot;;RAYTRACERRTX_SOURCE_DIR=&quot;$([System.String]::Copy('$(ProjectDir)src').Replace('\','/'))&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;GLFW_STATIC;RAYTRACERRTX_CUDA_INCLUDE_DIR=&quot;$([System.String]::Copy('$(CudaToolkitIncludeDir)').Replace('\','/'))&quot;;RAYTRACERRTX_OPTIX_INCLUDE_DIR=&quot;$([System.String]::Copy('$(OptixSdkDir)\include').Replace('\','/'))&quot;;RAYTRACERRTX_SOURCE_DIR=&quot;$([System.String]::Copy('$(ProjectDir)src').Replace('\','/'))&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);$(OptixSdkDir)\include;$(ProjectDir)src;$(ProjectDir)glfw\include;$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>cuda.lib;cudart.lib;nvrtc.lib;opengl32.lib;glfw3_mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)glfw\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
