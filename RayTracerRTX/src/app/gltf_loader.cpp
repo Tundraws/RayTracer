@@ -879,13 +879,13 @@ GltfSceneLoadResult loadGltfMeshObjects(const std::filesystem::path& path)
                 const JsonObject* object = asObject(item);
                 MeshMaterial material;
                 material.name = object != nullptr ? stringField(*object, "name") : "gltf_material";
-                material.color = make_float3(0.8f, 0.8f, 0.8f);
+                material.color = make_float3(1.0f, 1.0f, 1.0f);
                 if (object != nullptr)
                 {
                     const JsonValue* pbrField = findField(*object, "pbrMetallicRoughness");
                     if (const JsonObject* pbr = pbrField != nullptr ? asObject(*pbrField) : nullptr)
                     {
-                        const float4 baseColor = readFloat4Array(*pbr, "baseColorFactor", make_float4(0.8f, 0.8f, 0.8f, 1.0f));
+                        const float4 baseColor = readFloat4Array(*pbr, "baseColorFactor", make_float4(1.0f, 1.0f, 1.0f, 1.0f));
                         material.color = make_float3(baseColor.x, baseColor.y, baseColor.z);
                         material.alpha = baseColor.w;
                         const float metallic = numberField(*pbr, "metallicFactor", 0.0f);

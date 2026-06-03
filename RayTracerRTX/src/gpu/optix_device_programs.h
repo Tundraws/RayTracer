@@ -310,10 +310,16 @@ static __forceinline__ __device__ float3 sampleDiffuseTexture(const MeshMaterial
     }
 
     const uchar4 pixel = params.meshTexturePixels[offset];
-    return make_vec(
+    const float3 textureColor = make_vec(
         static_cast<float>(pixel.x) / 255.0f,
         static_cast<float>(pixel.y) / 255.0f,
         static_cast<float>(pixel.z) / 255.0f);
+    const float tintSum = material.color.x + material.color.y + material.color.z;
+    const float3 tint = tintSum <= 0.001f ? make_vec(1.0f, 1.0f, 1.0f) : material.color;
+    return make_vec(
+        textureColor.x * tint.x,
+        textureColor.y * tint.y,
+        textureColor.z * tint.z);
 }
 
 static __forceinline__ __device__ float sampleTextureChannel(
