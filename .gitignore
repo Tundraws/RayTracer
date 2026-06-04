@@ -36,6 +36,7 @@ CppProperties.json
 # Render outputs
 *.ppm
 *.docx
+RayTracerRTX/assets/scenes/saved_scene.json
 
 # Local release packages
 .release/
