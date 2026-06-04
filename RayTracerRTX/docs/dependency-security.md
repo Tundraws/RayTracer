@@ -1,74 +1,61 @@
-# Dependency And Security Notes
+# Зависимости и ограничения безопасности
 
-This document supplements `static-analysis.md` with dependency information and
-security limitations for the coursework project.
+Документ дополняет `static-analysis.md` сведениями о зависимостях и ограничениях безопасности проекта.
 
-## Runtime And Build Dependencies
+## Зависимости сборки и запуска
 
-| Dependency | Role | How It Is Used |
-|---|---|---|
-| Visual Studio 2022 / MSVC v143 | Native Windows C++ build | Builds the GUI application and native tests |
-| Windows SDK | Platform headers and libraries | Required by MSVC project files |
-| CUDA Toolkit 13.1 | CUDA runtime, NVRTC, GPU memory and timing | Used by `OptixRenderer` and linked through Visual Studio properties |
-| NVIDIA OptiX SDK 9.1 | Hardware ray tracing API | Used for RTX pipeline, acceleration structures and device programs |
-| NVIDIA display driver | Runtime GPU driver | Required to launch OptiX on RTX hardware |
-| GLFW | Window and input handling | Stored in the repository as a local dependency |
-| Dear ImGui | Lightweight debug/control panel | Vendored in `third_party/imgui`; only core, GLFW backend and OpenGL2 backend are included |
-| stb_image | PNG/JPG image loading | Vendored as `third_party/stb/stb_image.h`; official `nothings/stb` single-header library, public domain or MIT |
-| OpenGL | Image presentation | Used to display the rendered framebuffer |
-| Docker / Docker Compose | Reproducible checks | Runs documentation/structure checks and CPU-only tests |
+| Зависимость | Назначение | Использование в проекте |
+| --- | --- | --- |
+| Visual Studio 2022 / MSVC v143 | сборка C++ под Windows | сборка приложения и тестового проекта |
+| Windows SDK | заголовки и библиотеки платформы | требуется проектами MSVC |
+| CUDA Toolkit 13.1 | CUDA runtime, NVRTC, память GPU и замеры времени | используется классом `OptixRenderer` и подключается через свойства Visual Studio |
+| NVIDIA OptiX SDK 9.1.0 | API аппаратной трассировки лучей | используется для OptiX pipeline, структур ускорения и GPU-программ |
+| Драйвер NVIDIA | runtime-драйвер видеокарты | требуется для запуска OptiX на RTX-оборудовании |
+| GLFW | окно и обработка ввода | хранится в репозитории как локальная зависимость |
+| Dear ImGui | панель управления | размещён в `third_party/imgui`; включены core-файлы и backend для GLFW/OpenGL2 |
+| stb_image | загрузка PNG/JPG | размещён как `third_party/stb/stb_image.h` |
+| OpenGL | вывод изображения | используется для отображения рассчитанного буфера |
+| Docker / Docker Compose | воспроизводимые проверки | запускает проверки структуры, документации и CPU-тесты |
 
-The OBJ mesh path does not add external runtime dependencies. OBJ and MTL files
-are parsed by the local `src/app/obj_loader.*` implementation. Supported input
-is limited to vertices, normals, texture coordinates, triangular faces,
-`mtllib`, `usemtl`, and selected MTL fields: `Kd`, `Ks`, `Ns`, `Ni`, `d`,
-`map_Kd`, `bump`, `map_Bump`, `norm`, `map_Pr`/`map_roughness`, and
-`map_Pm`/`map_metallic`. PPM parsing is local; PNG and JPG/JPEG decoding uses
-vendored `stb_image.h`. The OptiX denoiser uses the already required NVIDIA
-OptiX SDK and does not add a new third-party dependency.
-The basic glTF path also uses local parsing code and adds no new package. Its
-supported subset is limited to `.gltf` JSON files with external `.bin` buffers
-or `.glb` JSON/BIN chunks, selected mesh/material fields, node TRS transforms,
-and image textures decoded through the same local image loader.
+Путь загрузки OBJ не добавляет внешних runtime-зависимостей. OBJ и MTL разбираются локальной реализацией `src/app/obj_loader.*`. Поддерживаемый набор записей ограничен вершинами, нормалями, текстурными координатами, гранями, `mtllib`, `usemtl` и выбранными MTL-полями: `Kd`, `Ks`, `Ns`, `Ni`, `d`, `map_Kd`, `bump`, `map_Bump`, `norm`, `map_Pr`/`map_roughness`, `map_Pm`/`map_metallic`.
 
-## Dependency Check Approach
+PPM разбирается локальным загрузчиком. PNG и JPG/JPEG декодируются через `stb_image.h`. Шумоподавитель OptiX использует уже подключённый NVIDIA OptiX SDK и не добавляет новой сторонней зависимости.
 
-The project does not use a package manager lock file such as `package-lock.json`,
-`requirements.txt`, `Cargo.lock`, or `go.sum`. Most dependencies are native SDKs
-installed on the Windows host. Because of that, automated dependency scanning is
-limited.
+Загрузка glTF/GLB также выполняется локальным кодом. Поддерживаемый набор ограничен `.gltf` с внешним `.bin`, `.glb` с JSON/BIN-частями, выбранными полями геометрии и материалов, TRS-трансформациями узлов и изображениями, которые проходят через общий загрузчик текстур.
 
-The practical dependency check is:
+## Подход к проверке зависимостей
 
-1. Record required SDK versions in `README.md`.
-2. Keep CUDA and OptiX paths in Visual Studio project properties instead of C++
-   source constants.
-3. Avoid downloading dependencies during application startup.
-4. Use Docker only for reproducible source, documentation and CPU-test checks.
-5. Verify demo OBJ/MTL assets and OBJ loader files as part of the coursework check.
-6. Keep vendored GLFW files limited to the required include/library paths.
-7. Keep vendored Dear ImGui files limited to the required core and backend files.
-8. Keep vendored stb usage limited to `stb_image.h` for image decoding.
-9. Use `scripts/check_windows_environment.ps1` to diagnose Windows machines
-   before running the native RTX application.
-10. Use `scripts/package_release.ps1` to create a portable Release folder that
-   contains the executable, assets and project runtime headers. CUDA, OptiX and
-   the NVIDIA driver remain host dependencies.
+В проекте нет lock-файлов пакетного менеджера: `package-lock.json`, `requirements.txt`, `Cargo.lock`, `go.sum`. Основные зависимости являются нативными SDK, установленными на Windows-хосте. Поэтому автоматическое сканирование зависимостей ограничено.
 
-## Security Controls
+Практическая проверка включает:
 
-| Control | Status | Evidence |
-|---|---|---|
-| Static analysis | Implemented | `docs/static-analysis.md` |
-| Unit tests | Implemented | `tests/test_scene_camera.cpp` |
-| GPU smoke test | Implemented | `tests/RayTracerRTX.Tests.vcxproj` |
-| Docker reproducibility check | Implemented | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
-| Hard-coded local paths in C++ | Avoided | Paths are configured through project properties |
-| Dependency scan | Documented limitation | This file |
+1. Фиксацию требуемых версий SDK в `README.md`.
+2. Хранение путей CUDA и OptiX в свойствах Visual Studio, а не в исходном C++-коде.
+3. Отсутствие загрузки зависимостей при запуске приложения.
+4. Использование Docker только для проверки исходников, документации и CPU-тестов.
+5. Проверку демонстрационных OBJ/MTL-ресурсов в coursework-check.
+6. Ограничение локальных GLFW-файлов необходимыми заголовками и библиотеками.
+7. Ограничение Dear ImGui core-файлами и backend-файлами.
+8. Использование `stb_image.h` только для декодирования изображений.
+9. Диагностику Windows-окружения через `scripts/check_windows_environment.ps1`.
+10. Создание переносимой Release-папки через `scripts/package_release.ps1`.
 
-## Remaining Manual Checks
+CUDA, OptiX и драйвер NVIDIA остаются зависимостями целевой машины.
 
-- Confirm CUDA Toolkit and OptiX SDK versions before final defense.
-- Confirm the installed NVIDIA driver supports the target OptiX version.
-- Re-run native GPU smoke test after GPU driver or SDK updates.
-- Re-run Docker CPU check before final GitHub submission.
+## Контроль безопасности
+
+| Проверка | Статус | Артефакт |
+| --- | --- | --- |
+| Статический анализ | выполнен | `docs/static-analysis.md` |
+| Модульные тесты | выполнены | `tests/test_scene_camera.cpp` |
+| GPU smoke-тесты | выполнены | `tests/RayTracerRTX.Tests.vcxproj` |
+| Docker-проверка | реализована | `Dockerfile`, `docker-compose.yml`, `docs/docker-check.md` |
+| Локальные пути в C++ | не используются | пути задаются через свойства проекта |
+| Проверка зависимостей | ограничение описано | текущий документ |
+
+## Ручные проверки
+
+- Проверить версии CUDA Toolkit и OptiX SDK перед финальной сдачей.
+- Проверить, что драйвер NVIDIA поддерживает целевую версию OptiX.
+- Повторно запустить нативные GPU smoke-тесты после обновления драйвера или SDK.
+- Повторно запустить Docker CPU-check перед финальной отправкой на GitHub.

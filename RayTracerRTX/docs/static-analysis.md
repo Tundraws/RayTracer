@@ -1,28 +1,25 @@
-# Static Analysis Report
+# Отчёт о статическом анализе
 
-Date: 2026-05-19
+Дата: 2026-05-19.
 
-## Tool
+## Инструмент
 
-- Primary tool: `clang-tidy`
-- Version: LLVM 19.1.5
-- Source: Visual Studio LLVM tools
-- `cppcheck` status: not installed in the current environment
+- Основной инструмент: `clang-tidy`.
+- Версия: LLVM 19.1.5.
+- Источник: LLVM tools for Visual Studio.
+- Статус `cppcheck`: не установлен в текущем окружении.
 
-## Scope
+## Область проверки
 
-The analysis covers CPU-side project logic that can be checked without opening
-the GLFW window or launching the OptiX renderer:
+Анализ охватывает CPU-часть проекта, которую можно проверить без открытия окна GLFW и запуска OptiX-рендерера:
 
-- `RayTracerRTX/src/app/camera.cpp`
-- `RayTracerRTX/src/app/material.cpp`
-- `RayTracerRTX/src/app/scene.cpp`
+- `RayTracerRTX/src/app/camera.cpp`;
+- `RayTracerRTX/src/app/material.cpp`;
+- `RayTracerRTX/src/app/scene.cpp`.
 
-GPU/OptiX code is still covered by regular build and GPU smoke testing because
-full static analysis of NVRTC-compiled OptiX device programs requires a
-dedicated CUDA-aware toolchain configuration.
+GPU/OptiX-код проверяется регулярной сборкой и GPU smoke-тестами. Полноценный статический анализ NVRTC-компилируемых GPU-программ OptiX требует отдельной CUDA-aware конфигурации инструмента.
 
-## Command
+## Команда запуска
 
 ```powershell
 & "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\x64\bin\clang-tidy.exe" `
@@ -35,21 +32,20 @@ dedicated CUDA-aware toolchain configuration.
   --extra-arg=-IC:\Users\User\source\repos\RayTracerRTX\RayTracerRTX\src
 ```
 
-## Result
+## Результат
 
-Exit code: `0`
+Код завершения: `0`.
 
-Summary:
+Итог:
 
-- No project-level errors were reported.
-- No actionable project-level warnings were reported.
-- `clang-tidy` reported suppressed warnings from non-user/system headers.
-- `bugprone-easily-swappable-parameters` was disabled because vector math
-  helpers naturally use adjacent parameters of the same type.
+- ошибок уровня проекта не найдено;
+- предупреждений, требующих исправления в коде проекта, не найдено;
+- `clang-tidy` вывел подавленные предупреждения из системных и внешних заголовков;
+- проверка `bugprone-easily-swappable-parameters` отключена, поскольку в математических функциях векторов естественно используются соседние параметры одного типа.
 
-## Follow-up
+## Дальнейшие действия
 
-For final CI, add either:
+Для финальной CI-проверки можно добавить один из вариантов:
 
-- `clang-tidy` with a generated `compile_commands.json`; or
-- `cppcheck` in a Docker/CI image.
+- `clang-tidy` с созданным `compile_commands.json`;
+- `cppcheck` в Docker/CI-образе.

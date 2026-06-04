@@ -1,35 +1,29 @@
-# AI-Assisted Development
+# Использование AI-инструментов
 
-This document records the use of AI tools as a development process artifact.
-It is not a replacement for testing or manual review; every accepted change is
-validated through builds, tests, Docker checks, or direct application runs.
+Документ фиксирует применение AI-инструментов в процессе разработки. AI-ассистент не заменяет тестирование и ручную проверку: каждая принятая правка проверяется сборкой, тестами, Docker-проверками или запуском приложения.
 
-## Where AI Assistance Was Used
+## Области применения
 
-| Area | AI Role | Human/Tool Verification |
-|---|---|---|
-| Repository analysis | Inspect project structure and identify missing coursework artifacts | `git status`, source review |
-| Build fixes | Diagnose Visual Studio, CUDA, OptiX and linker configuration issues | Native MSBuild run |
-| Test planning | Propose CPU unit tests and GPU smoke-test criteria | Test executable output |
-| Docker support | Add reproducible CPU-only check and document RTX GUI limitation | `docker compose build`, `docker compose run --rm coursework-check` |
-| Static analysis evidence | Prepare SAST report structure and interpret warnings | `docs/static-analysis.md` |
-| Performance evidence | Prepare benchmark documentation and table format | Native benchmark output |
-| Documentation | Generate architecture/API/security notes and Mermaid diagrams | Manual review and repository diff |
+| Область | Роль AI-инструмента | Проверка результата |
+| --- | --- | --- |
+| Анализ репозитория | Поиск структуры проекта и недостающих артефактов курсового проекта | `git status`, просмотр исходного кода |
+| Исправления сборки | Диагностика настроек Visual Studio, CUDA, OptiX и линковщика | запуск MSBuild |
+| Планирование тестов | Формирование сценариев CPU-тестов и GPU smoke-тестов | вывод тестового приложения |
+| Docker-проверки | Подготовка CPU-only проверки и описание ограничения RTX/GUI в контейнере | `docker compose build`, `docker compose run --rm coursework-check` |
+| Статический анализ | Подготовка структуры отчёта SAST и разбор предупреждений | `docs/static-analysis.md` |
+| Производительность | Подготовка формата таблиц и описания измерений | вывод benchmark или статистика приложения |
+| Документация | Подготовка архитектурных, API- и справочных материалов | ручная проверка и `git diff` |
 
-## Validation Principle
+## Принцип проверки
 
-AI-generated suggestions are accepted only after one of the following checks:
+Предложения AI-инструмента принимаются только после одной из проверок:
 
-- native Visual Studio/MSBuild build succeeds;
-- CPU unit tests pass;
-- GPU smoke test passes on the RTX-capable Windows host;
-- Docker coursework check passes;
-- the user validates visual behavior in the interactive application.
+- успешная сборка Visual Studio/MSBuild;
+- успешный запуск CPU-тестов;
+- успешный GPU smoke-тест на Windows-хосте с RTX-видеокартой;
+- успешная Docker-проверка;
+- визуальная проверка поведения в интерактивном приложении.
 
-## Current Tooling Boundary
+## Границы применения
 
-The AI assistant can modify source files, documentation, tests, Docker files,
-and Git history. It cannot replace final visual acceptance of the renderer,
-because material appearance and scene composition are evaluated by the project
-author in the running application.
-
+AI-ассистент применялся для правки исходных файлов, документации, тестов, Docker-файлов и Git-операций. Финальная визуальная оценка рендера остаётся за автором проекта, поскольку внешний вид материалов, композиция сцены и качество изображения проверяются в запущенном приложении.

@@ -1,54 +1,71 @@
-# Тесты
+# Тестовое приложение
 
-Unit-тесты находятся в каталоге `tests` и собираются как отдельное консольное приложение.
+Тесты находятся в каталоге `tests` и собираются как отдельное консольное приложение `RayTracerRTX.Tests`.
 
-Текущее покрытие:
+## Состав проверок
 
-- значения сцены по умолчанию и ограничение координат;
+Тестовый набор проверяет:
+
+- значения сцены по умолчанию;
 - переключение материалов;
-- корректность базиса камеры (нормализация, ортогональность, aspect);
-- опциональный GPU smoke-тест (рендер одного кадра через OptiX).
+- ограничения координат и параметров;
+- базис камеры;
+- загрузку OBJ/MTL;
+- загрузку glTF/GLB;
+- загрузку текстур;
+- JSON-сцены;
+- кэш ресурсов;
+- редактор сцены;
+- расчёты пересечений луча со сферой и треугольником;
+- GPU smoke-тесты OptiX-рендерера.
 
-Готовый проект:
+## Сборка
 
-- `tests/RayTracerRTX.Tests.vcxproj`
+Файл проекта:
 
-Запуск в Visual Studio:
+```text
+tests/RayTracerRTX.Tests.vcxproj
+```
 
-1. Откройте `tests/RayTracerRTX.Tests.vcxproj`.
-2. Выберите конфигурацию `Debug|x64`.
-3. Соберите проект (`Ctrl+Shift+B`).
-4. Запустите без отладки (`Ctrl+F5`).
+Сборка в Visual Studio:
 
-Ожидаемый вывод:
+1. Открыть `tests/RayTracerRTX.Tests.sln`.
+2. Выбрать конфигурацию `Debug|x64`.
+3. Собрать проект.
+4. Запустить без отладки.
 
-- строка `All tests passed...`;
-- поимённые строки `[PASS]` для каждого теста;
-- при необходимости строка `[SKIP] GPU smoke test ...`, если среда не готова.
+Сборка из PowerShell:
 
-## Как включить GPU smoke-тест
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" RayTracerRTX\tests\RayTracerRTX.Tests.sln /m /p:Configuration=Debug /p:Platform=x64
+```
 
-По умолчанию тестовый проект CPU-only и не линкует CUDA/OptiX.
+## Запуск
 
-Чтобы включить GPU smoke-тест:
+```powershell
+.\RayTracerRTX\tests\x64\Debug\RayTracerRTX.Tests.exe
+```
 
-1. В свойствах проекта добавьте define:
-   - `RAYTRACERRTX_ENABLE_GPU_TESTS`
-2. Добавьте исходник:
-   - `..\src\gpu\optix_renderer.cpp`
-3. Добавьте include-директории:
-   - `$(ProjectDir)..\glfw\include`
-   - путь к `CUDA\include`
-   - путь к `OptiX SDK\include`
-4. Добавьте зависимости линковки:
-   - `cuda.lib;cudart.lib;nvrtc.lib;opengl32.lib;glfw3.lib`
-5. Добавьте директорию библиотек:
-   - `$(ProjectDir)..\glfw\lib`
+Ожидаемый итог:
 
-## GPU smoke test status
+```text
+All tests passed. Tests: 166, skipped: 0, checks: 810
+```
 
-The GPU smoke test is now enabled in `RayTracerRTX.Tests.vcxproj` by default.
-It defines `RAYTRACERRTX_ENABLE_GPU_TESTS`, links CUDA runtime libraries,
-compiles `src/gpu/optix_renderer.cpp`, initializes OptiX, renders one
-64x64 frame, checks that the framebuffer is non-empty, and validates that
-GPU frame time is non-negative.
+Для каждой проверки выводится строка `[PASS]`. При ошибке выводится `[FAIL]` и сообщение из `TestContext::expect`.
+
+## GPU smoke-тесты
+
+GPU smoke-тесты включены в `RayTracerRTX.Tests.vcxproj` по умолчанию. Проект задаёт макрос `RAYTRACERRTX_ENABLE_GPU_TESTS`, компилирует `src/gpu/optix_renderer.cpp`, подключает CUDA runtime libraries и запускает проверки OptiX-рендерера.
+
+GPU-проверки выполняют:
+
+- инициализацию `OptixRenderer`;
+- рендер одного кадра 64x64;
+- проверку ненулевого буфера пикселей;
+- проверку неотрицательного GPU time;
+- прогрессивное накопление;
+- динамическое изменение сферы и полигональной модели;
+- включение шумоподавителя OptiX.
+
+Для запуска GPU smoke-тестов требуется видеокарта NVIDIA с поддержкой используемых версий CUDA и OptiX.

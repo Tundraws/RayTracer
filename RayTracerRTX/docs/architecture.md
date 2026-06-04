@@ -1,66 +1,63 @@
-# Architecture
+# Архитектура
 
-This document describes the implementation architecture of the real-time RTX
-ray tracer. It is a technical project artifact and can be used as source
-material for the coursework design section.
+Документ описывает архитектуру интерактивного RTX-трассировщика лучей. Материал относится к технической документации проекта и может использоваться как основа для проектного раздела пояснительной записки.
 
-## Module View
+## Модульное представление
 
 ```mermaid
 flowchart LR
-    Main["maingpu.cpp"] --> App["Application loop"]
-    Main --> Args["--mesh / --scene args"]
-    Args --> SceneConfig["SceneConfig JSON"]
-    App --> Input["Input handling"]
-    App --> UI["ImGui hierarchy/properties scene editor"]
+    Main["maingpu.cpp"] --> App["Главный цикл приложения"]
+    Main --> Args["Аргументы --mesh / --scene"]
+    Args --> SceneConfig["JSON-конфигурация сцены"]
+    App --> Input["Обработка ввода"]
+    App --> UI["Редактор сцены Dear ImGui"]
     App --> AppState["AppState"]
     UI --> SceneEditor["SceneEditor"]
     Input --> SceneEditor
     SceneEditor --> DirtyFlags["SceneDirtyFlags"]
-    App --> Controller["RendererController helpers"]
+    App --> Controller["RendererController"]
     App --> Camera["CameraState / updateCameraBasis"]
-    SceneConfig --> JsonMaterials["JSON material inputs"]
+    SceneConfig --> JsonMaterials["Материалы JSON"]
     SceneConfig --> MeshObject["MeshObject + transform"]
-    UI --> SceneGroups["SceneGroup editor selections"]
+    UI --> SceneGroups["Группы объектов"]
     SceneGroups --> SceneEditor
-    SceneConfig --> AssetCache["AssetManager / AssetCache"]
-    AssetCache --> MeshCache["Mesh cache by path"]
-    AssetCache --> TextureCache["Texture cache by path"]
+    SceneConfig --> AssetCache["AssetCache"]
+    AssetCache --> MeshCache["Кэш моделей по пути"]
+    AssetCache --> TextureCache["Кэш текстур по пути"]
     MeshObject --> AssetCache
-    MeshCache --> ObjLoader
-    ObjLoader["ObjLoader"] --> Triangulation["Fan triangulation for OBJ faces"]
+    MeshCache --> ObjLoader["OBJ/glTF loaders"]
+    ObjLoader --> Triangulation["Fan-триангуляция OBJ-граней"]
     Triangulation --> MeshData["MeshData"]
-    ObjLoader --> Textures["map_Kd / normal PPM textures"]
-    ObjLoader --> Tangents["Tangent basis"]
+    ObjLoader --> Textures["map_Kd / normal textures"]
+    ObjLoader --> Tangents["Касательная основа"]
     Textures --> MeshData
     TextureCache --> Textures
     Tangents --> MeshData
     MeshData --> MeshObject
-    MeshObject --> Scene
-    App --> Scene["SceneState"]
+    MeshObject --> Scene["SceneState"]
+    App --> Scene
     UI --> Scene
-    UI --> Mode
     Scene --> Materials["SphereMaterial"]
-    Scene --> MeshMaterials["Mesh materials"]
+    Scene --> MeshMaterials["Материалы моделей"]
     JsonMaterials --> Materials
     JsonMaterials --> MeshMaterials
-    Controller --> Mode["Render mode toggle"]
-    Controller --> Rebuild["Scene rebuild request"]
-    Controller --> AccumReset["invalidateAccumulation"]
+    Controller --> Mode["Режим рендера"]
+    Controller --> Rebuild["Запрос перестроения сцены"]
+    Controller --> AccumReset["Сброс накопления"]
     DirtyFlags --> Controller
     AppState --> Scene
     App --> Renderer["OptixRenderer"]
-    App --> Mode["Render mode toggle"]
+    App --> Mode
     Camera --> Renderer
     Scene --> Renderer
     Mode --> Renderer
-    Renderer --> TriangleGAS["Triangle GAS per mesh object"]
-    Renderer --> IAS["IAS with mesh transforms"]
+    Renderer --> TriangleGAS["Triangle GAS для mesh-объектов"]
+    Renderer --> IAS["IAS с трансформациями"]
     Renderer --> Shared["LaunchParams / rtx_shared.h"]
-    Renderer --> Device["OptiX device programs"]
+    Renderer --> Device["GPU-программы OptiX"]
     TriangleGAS --> IAS
     IAS --> Device
-    Device --> Accum["Progressive accumulation buffer"]
+    Device --> Accum["Буфер накопления"]
     Device --> Framebuffer["CUDA framebuffer"]
     Device --> Post["Tone mapping + gamma"]
     Accum --> Post
@@ -68,115 +65,109 @@ flowchart LR
     Framebuffer --> App
 ```
 
-## Runtime Pipeline
+## Конвейер выполнения
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Args as CLI / JSON scene config
-    participant App as GLFW application
-    participant Cache as AssetManager / AssetCache
-    participant ObjLoader as OBJ/glTF loaders
+    participant User as Пользователь
+    participant Args as CLI / JSON
+    participant App as GLFW-приложение
+    participant Cache as AssetCache
+    participant Loader as OBJ/glTF loaders
     participant Scene as SceneState
     participant Renderer as OptixRenderer
-    participant CUDA as CUDA buffers
+    participant CUDA as CUDA-буферы
     participant OptiX as OptiX pipeline
     participant GPU as RTX GPU
 
-    User->>Args: Optional --mesh or --scene input
-    Args->>Cache: Resolve OBJ/glTF mesh path(s), textures and transforms
-    Args->>Scene: Apply camera and light config
-    User->>App: Keyboard and mouse input
-    Cache->>ObjLoader: Load missing mesh/texture assets once per path
-    ObjLoader-->>Cache: MeshData with tangents, materials, textures
-    Cache->>Scene: Build MeshObject list from cached assets and transforms
-    App->>Scene: Move sphere, light, or toggle material
-    App->>Scene: Tune exposure, sky intensity, light intensity, area light, and environment
-    App->>Cache: F5 reload current JSON scene config, keeping previous scene on failure
-    App->>Renderer: Optional P toggle for progressive accumulation
-    App->>Renderer: Optional N toggle for OptiX denoiser
-    App->>Renderer: Optional Q cycle for quality mode
+    User->>Args: Аргументы --mesh или --scene
+    Args->>Cache: Разрешение путей моделей, текстур и трансформаций
+    Args->>Scene: Применение камеры и света
+    User->>App: Клавиатура и мышь
+    Cache->>Loader: Загрузка отсутствующих ресурсов
+    Loader-->>Cache: MeshData, материалы и текстуры
+    Cache->>Scene: Формирование списка MeshObject
+    App->>Scene: Изменение объектов, света и материалов
+    App->>Renderer: Переключение режима, качества и шумоподавителя
     App->>Renderer: renderFrame(scene, camera)
-    Renderer->>CUDA: Upload sphere materials, mesh buffers, diffuse/normal/environment texture pixels, and LaunchParams
-    Renderer->>OptiX: Build sphere GAS + one triangle GAS per mesh object + IAS transforms
+    Renderer->>CUDA: Копирование геометрии, материалов, текстур и LaunchParams
+    Renderer->>OptiX: Построение GAS/IAS
     Renderer->>OptiX: optixLaunch
-    OptiX->>GPU: Ray generation, sphere hit, mesh closest-hit, miss, shadow, reflection programs
-    GPU-->>CUDA: Write uchar4 framebuffer and progressive HDR accumulation
-    Renderer->>OptiX: Optional denoiser invoke for progressive color buffer
-    Renderer->>CUDA: Copy framebuffer or denoised pixels to host
+    OptiX->>GPU: Raygen, hit, miss, shadow, reflection программы
+    GPU-->>CUDA: Запись framebuffer и HDR-накопления
+    Renderer->>OptiX: Дополнительный denoiser для прогрессивного режима
+    Renderer->>CUDA: Копирование пикселей в память CPU
     Renderer-->>App: hostPixels + gpuTimeMs
-    App->>App: Present image in OpenGL window
+    App->>App: Вывод изображения в OpenGL-окно
 ```
 
-## OptiX Shader Flow
+## Поток GPU-программ OptiX
 
 ```mermaid
 flowchart TD
-    RG["__raygen__rg"] --> Primary["traceRadiance primary ray"]
-    Primary --> HitSphere{"Sphere hit?"}
-    Primary --> HitMesh{"Triangle mesh hit?"}
-    Primary --> HitPlane{"Plane hit?"}
-    Primary --> Miss["__miss__radiance sky color"]
-    Miss --> Environment["Gradient or PPM environment lighting"]
-    HitSphere --> Shadow["Point/area light shadow rays"]
-    HitMesh --> MeshClosestHit["Mesh closest-hit shader"]
-    MeshClosestHit --> NormalMap["Optional tangent-space normal map"]
+    RG["__raygen__rg"] --> Primary["Первичный traceRadiance"]
+    Primary --> HitSphere{"Попадание в сферу?"}
+    Primary --> HitMesh{"Попадание в mesh?"}
+    Primary --> HitPlane{"Попадание в плоскость?"}
+    Primary --> Miss["__miss__radiance"]
+    Miss --> Environment["Цвет окружения"]
+    HitSphere --> Shadow["Теневые лучи"]
+    HitMesh --> MeshClosestHit["__closesthit__radiance_mesh"]
+    MeshClosestHit --> NormalMap["Карта нормалей"]
     NormalMap --> MeshMaterial
-    MeshClosestHit --> MeshMaterial{"Mesh material type"}
-    MeshMaterial --> MeshDiffuse["GGX direct lighting + shadow"]
-    MeshMaterial --> MeshMirror["Mirror reflection ray + roughness broadening"]
-    MeshMaterial --> MeshMetal["Metallic GGX + tinted rough reflection"]
-    MeshMaterial --> MeshGlass["Dielectric Fresnel + refraction + internal reflection"]
+    MeshClosestHit --> MeshMaterial{"Тип материала mesh"}
+    MeshMaterial --> MeshDiffuse["Диффузный расчёт + GGX"]
+    MeshMaterial --> MeshMirror["Зеркальное отражение"]
+    MeshMaterial --> MeshMetal["Металлическое отражение"]
+    MeshMaterial --> MeshGlass["Преломление и Fresnel"]
     MeshMirror --> Depth
     MeshMetal --> Depth
     MeshGlass --> Depth
     MeshDiffuse --> Output
-    Shadow --> Material{"Material type"}
-    Material --> Diffuse["Diffuse lighting + hard shadow"]
-    Material --> Mirror["Reflection ray"]
+    Shadow --> Material{"Тип материала сферы"}
+    Material --> Diffuse["Диффузное освещение"]
+    Material --> Mirror["Луч отражения"]
     Mirror --> Depth{"depth < maxDepth"}
-    Depth -->|yes| Primary
-    Depth -->|no| Fallback["Neutral fallback color"]
-    HitPlane --> PlaneShadow["Point/area light shadow rays"]
-    PlaneShadow --> PlaneLight["Plane lighting + shadow + fog"]
+    Depth -->|да| Primary
+    Depth -->|нет| Fallback["Резервный цвет"]
+    HitPlane --> PlaneShadow["Тени плоскости"]
+    PlaneShadow --> PlaneLight["Освещение плоскости"]
     Diffuse --> Output["setRadiancePayload"]
     Mirror --> Output
     PlaneLight --> Output
     Environment --> Output
 ```
 
-## Data Boundaries
+## Граница данных CPU/GPU
 
 ```mermaid
 flowchart LR
-    Host["CPU side C++"] -->|SceneState| Upload["CUDA upload"]
+    Host["CPU-код C++"] -->|SceneState| Upload["Копирование в CUDA"]
     Host -->|CameraState| Upload
     Upload --> Params["LaunchParams"]
-    Params --> Device["GPU device code"]
+    Params --> Device["GPU-код OptiX"]
     Device -->|uchar4 pixels| Buffer["dFrameBuffer"]
-    Device -->|HDR average| Accum["float4 accumulation buffer"]
-    Accum --> Denoiser["Optional OptiX denoiser"]
+    Device -->|HDR average| Accum["float4 accumulation"]
+    Accum --> Denoiser["OptiX denoiser"]
     Denoiser --> Denoised["float4 denoised output"]
     Buffer -->|cudaMemcpyAsync| HostPixels["std::vector<uchar4>"]
     Denoised -->|tone map + gamma| HostPixels
 ```
 
-## Responsibility Split
+## Разделение ответственности
 
-| Area | Files | Responsibility |
-|---|---|---|
-| Application loop | `src/app/maingpu.cpp`, `src/app/application.*` | Window creation, input, scene updates, presentation |
-| Application state | `src/app/app_state.h` | Shared runtime state for camera, presets, hierarchy selection, quality mode, and renderer rebuild requests |
-| Scene editor | `src/app/scene_editor.*` | Applies scene edits through helper methods and reports `SceneDirtyFlags` for camera, material, transform, geometry, lighting, and render settings |
-| Renderer controller helpers | `src/app/renderer_controller.*` | Centralized accumulation invalidation, quality-mode application, and scene rebuild marking from dirty flags |
-| UI panel | `src/app/application.*` + Dear ImGui | Compact hierarchy/properties editor for selecting scene objects and editing scene, camera, light, sphere, mesh, material, and quality settings |
-| Scene groups | `src/app/scene.*`, `src/app/scene_editor.*` | Optional editor-level groups that reference spheres or mesh objects, expose group name/position/rotation/scale, and move child objects together without introducing a new GPU primitive |
-| Built-in mesh primitives | `src/app/mesh.*` | Generates cube, pyramid, and finite plane/panel as `MeshData` triangles |
-| Environment presets | `src/app/scene.*` | Builds editable floor, wall and ceiling panels for open/room/empty scene modes |
-| Scene model | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*`, `src/app/gltf_loader.*` | Spheres, OBJ/glTF mesh data, materials, selected object, light movement and clamping |
-| Camera | `src/app/camera.*` | Camera state and basis vectors for ray generation |
-| Shared GPU data | `src/common/rtx_shared.h` | Host/device structures used by CUDA and OptiX |
-| Renderer host side | `src/gpu/optix_renderer.*` | CUDA resources, OptiX context, sphere GAS, triangle GAS, IAS, SBT, pipeline, launch, quality settings, progressive accumulation, and optional denoiser |
-| Renderer device side | `src/gpu/optix_device_programs.h` | Ray generation, sphere hit, mesh closest-hit shader, miss programs, shadow and reflection logic |
-| Tests | `tests/*` | CPU unit tests and native GPU smoke test |
-
+| Область | Файлы | Ответственность |
+| --- | --- | --- |
+| Главный цикл | `src/app/maingpu.cpp`, `src/app/application.*` | окно, ввод, обновление сцены и вывод изображения |
+| Состояние приложения | `src/app/app_state.h` | камера, сцена, выбранные объекты, режим качества и запросы перестроения |
+| Редактор сцены | `src/app/scene_editor.*` | изменение сцены и формирование `SceneDirtyFlags` |
+| Управление рендерером | `src/app/renderer_controller.*` | сброс накопления, применение качества и пометка перестроения |
+| Панель UI | `src/app/application.*`, Dear ImGui | выбор и редактирование объектов, материалов, камеры, света и качества |
+| Группы объектов | `src/app/scene.*`, `src/app/scene_editor.*` | editor-level группы сфер и mesh-объектов без нового GPU-примитива |
+| Встроенные mesh-примитивы | `src/app/mesh.*` | создание куба, пирамиды и прямоугольной панели как `MeshData` |
+| Сцена и ресурсы | `src/app/scene.*`, `src/app/material.*`, `src/app/mesh.*`, `src/app/obj_loader.*`, `src/app/gltf_loader.*` | сферы, модели, материалы, загрузка ресурсов, свет и ограничения параметров |
+| Камера | `src/app/camera.*` | состояние камеры и базисные векторы для генерации лучей |
+| Общие GPU-данные | `src/common/rtx_shared.h` | структуры, общие для CPU- и GPU-кода |
+| Host-часть рендерера | `src/gpu/optix_renderer.*` | CUDA-ресурсы, контекст OptiX, GAS/IAS, SBT, pipeline, запуск и denoiser |
+| Device-часть рендерера | `src/gpu/optix_device_programs.h` | генерация лучей, hit/miss/shadow программы, отражения и преломления |
+| Тесты | `tests/*` | CPU-проверки и GPU smoke-тесты |

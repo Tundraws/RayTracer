@@ -47,8 +47,8 @@ RUN test -f README.md \
     && test -f RayTracerRTX/src/app/scene_config.h \
     && test -f RayTracerRTX/src/gpu/optix_device_programs.h \
     && test -f RayTracerRTX/third_party/stb/stb_image.h \
-    && grep -q "OBJ mesh" RayTracerRTX/README.md \
-    && grep -q "OBJ mesh" RayTracerRTX/docs/docker-check.md \
+    && grep -q "GPU-рендерер" RayTracerRTX/README.md \
+    && grep -q "OBJ/MTL" RayTracerRTX/docs/docker-check.md \
     && grep -q "usemtl mat_mirror" RayTracerRTX/assets/meshes/demo.obj \
     && grep -q "newmtl mat_green_diffuse" RayTracerRTX/assets/meshes/demo.mtl \
     && grep -q "map_Kd checker.ppm" RayTracerRTX/assets/meshes/textured_demo.mtl \
